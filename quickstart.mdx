@@ -1,47 +1,136 @@
 ---
-title: "Quickstart"
-description: "Begin with a guide on the fastest path to a successful outcome"
+title: "RL and benchmark task taxonomy"
+description: "How runnable tasks, benchmark evidence, and RL evidence fit together."
+sidebarTitle: "Task taxonomy"
+keywords: ["Harbor", "RL tasks", "benchmark tasks", "task format"]
 ---
 
-Describe how someone begins using your product. What is the first thing they need to do? Are there any prerequisites?
+An RL task and a benchmark task share the same runnable core. The difference is the evidence around it: a benchmark needs enough evidence to defend a score, while an RL delivery needs enough rollout and reward data to train from the task.
 
-A quickstart should take someone from zero to using your product. They'll get a quick win and a sense of what they can accomplish.
+For multi-lab work, Harbor is the common intake format we use. OpenAI and Anthropic are destination exports: keep Harbor as the source of truth, then translate it into the required native schema.
 
-## Prerequisites
+<Info>
+  Harbor defines one portable task package, not separate RL and benchmark formats. Start with the [task structure](https://www.harborframework.com/docs/tasks), then add the evidence your use case needs.
+</Info>
 
-Before you begin, you must have:
+## At a glance
 
-- Requirement one (for example, Node.js 18+, a free account, an API key)
-- Requirement two (for example, a compatible device, a compatible browser, a compatible operating system)
+| Layer | Benchmark | RL | What it proves |
+| --- | --- | --- | --- |
+| Runnable Harbor task | Required | Required | The task can run, reset, and produce a reward |
+| Gold or Oracle solution | Required by Standard Data | Strongly recommended | The task is solvable and the verifier can recognize a correct result |
+| Rubric and calibration anchors | Required when judgment is involved | Conditional | The reward matches the intended capability |
+| Trial rollouts | Required for calibration | Required for training delivery | What the agent did and what reward it received |
+| Training telemetry | Not required | Conditional | How an RL run changed the policy |
 
-## Get started
+## The runnable task
 
-<Steps>
-  <Step title="Install">
-    Describe how to install your product or sign up.
+A standard single-step Harbor task looks like this:
 
-    ```bash
-    npm install your-package
-    ```
-  </Step>
-  <Step title="Configure">
-    Describe any setup or configuration needed before first use.
+```text
+<task-id>/
+├── task.toml
+├── instruction.md
+├── environment/
+│   └── Dockerfile
+├── tests/
+│   └── test.sh
+└── solution/
+    └── solve.sh
+```
 
-    ```bash
-    your-cli init
-    ```
-  </Step>
-  <Step title="Run it">
-    Show the first thing a user does to see it working.
+Harbor's [task documentation](https://www.harborframework.com/docs/tasks) is the schema authority. The [Harbor Cookbook](https://github.com/harbor-framework/harbor-cookbook) has runnable examples.
 
-    ```bash
-    your-cli start
-    ```
-  </Step>
-</Steps>
+### `task.toml`
 
-<Tip>
-  Give people a way to get help. This could be a link to a support page, a chat with a customer support agent, or a forum for your product.
+Required. This is the task's configuration and metadata: name, timeouts, resources, runtime, verifier settings, and any optional features. Do not copy an old Cookbook version stanza without checking the current schema.
 
-  Example: Need help? Reach out to us at [support@yourcompany.com](mailto:support@yourcompany.com).
-</Tip>
+### `instruction.md`
+
+Required for a single-step task. This is the instruction shown to the agent. It should describe the job and expected output without exposing the solution or grader.
+
+For a [multi-step task](https://www.harborframework.com/docs/tasks/multi-step), step-specific instructions, tests, and solutions move under `steps/<name>/`.
+
+### `environment/`
+
+Required as a runtime concept. Most tasks use `environment/Dockerfile`; a pinned image, Compose file, or another supported provider may define the runtime instead. Include only the fixtures and services the task uses. The environment must reset cleanly between runs.
+
+### `tests/test.sh`
+
+Required on Linux (`test.bat` on Windows). This is the verifier entry point. It runs after the agent and writes `reward.txt` or `reward.json` under `/logs/verifier/`.
+
+Those reward files are runtime outputs. Do not pre-generate them in the submitted task.
+
+### `solution/solve.sh`
+
+Optional in generic Harbor, but required by Standard Data when an Oracle check can reasonably be supplied. It gives the Oracle agent a known-good path through the task. A native reference artifact or equivalent validation substrate can stand in when a shell script is the wrong shape.
+
+The agent must never be able to read the solution or verifier-only material during its run.
+
+## Benchmark task
+
+A benchmark task measures capability. In addition to the runnable task, the delivery needs:
+
+- a scoring contract, including deterministic checks and any judge rubric;
+- a known-good output and known-bad calibration anchors;
+- representative trial rollouts and a run manifest;
+- task provenance, rights, and practitioner context; and
+- enough environment and grader metadata to reproduce the score.
+
+GDPx uses a stricter bundle and visibility model. See [Benchmark best practices](/gdpx/benchmark-task-rubric-best-practices#gdpx-standardized-task-bundle) for the exact partner handoff.
+
+Cross-model difficulty, grader bias, contamination, and manual calibration are review outputs. They are not files a partner should invent before Standard Data runs the task.
+
+## RL task
+
+An RL task uses the same Harbor core. The training delivery adds evidence around repeated trials:
+
+```text
+rl-delivery/
+├── tasks/
+│   └── <task-id>/
+├── trajectories/
+│   └── <task-id>/<model>/<harness>/<run>/
+├── docs/
+└── environments/        # only for private images
+```
+
+### `trajectories/`
+
+Required for an RL delivery. Preserve the full, untruncated trace, tool calls and results, reward, model and harness versions, and run-level timing or token data. A trajectory is evidence about a task; it is not the task itself.
+
+Failed trajectories need a failure analysis that separates model failure from environment, harness, verifier, and task-construction defects. Audit passing runs too; reward hacking often appears in successful trajectories first.
+
+### `docs/`
+
+Required for the delivery, outside `tasks/` so the runnable package stays clean. Keep dataset-level scope and provenance here, plus per-task context, failure analysis, reward-hacking notes, and any expert reviews used during development.
+
+Preserve the task snapshot, the review that triggered each revision, and the exact diff. Do not overwrite the history.
+
+### `environments/`
+
+Conditional. Use a root-level environment package only when a task depends on an image that cannot be pulled publicly. Include the image artifact, exact tag and digest, load or build instructions, and a map from the image to every dependent task.
+
+## Conditional Harbor features
+
+Add a feature only when the task uses it.
+
+| Need | Add | Example |
+| --- | --- | --- |
+| Ordered stages | `steps/<name>/` | [Multi-step](https://www.harborframework.com/docs/tasks/multi-step) |
+| Local services | `environment/docker-compose.yaml` | [Multi-container](https://github.com/harbor-framework/harbor-cookbook/tree/e093c9a860b988d9d74901010ddddb9c7f124f92/harbor_cookbook/recipes/multi-container) |
+| Custom tools | MCP declarations and owned server files | [MCP tools](https://github.com/harbor-framework/harbor-cookbook/tree/e093c9a860b988d9d74901010ddddb9c7f124f92/harbor_cookbook/recipes/mcp-tools) |
+| Simulated requirements | User service and persona files | [Simulated user](https://github.com/harbor-framework/harbor-cookbook/tree/e093c9a860b988d9d74901010ddddb9c7f124f92/harbor_cookbook/recipes/simulated-user) |
+| Agent skills | One configured `SKILL.md` per skill | [Skills](https://github.com/harbor-framework/harbor-cookbook/tree/e093c9a860b988d9d74901010ddddb9c7f124f92/harbor_cookbook/recipes/skills) |
+| Several reward dimensions | Multi-key `reward.json` | [Multi-reward](https://github.com/harbor-framework/harbor-cookbook/tree/e093c9a860b988d9d74901010ddddb9c7f124f92/harbor_cookbook/recipes/multi-reward) |
+
+## Not required by default
+
+- A task-level `README.md`, Python test file, Compose file, MCP server, simulated user, or skills directory when the task does not use it.
+- Pre-generated verifier reward files.
+- Training checkpoints, reward curves, optimizer state, or KL logs for a pure benchmark.
+- A private image package when every image can be pulled by digest from a public registry.
+- Private chain-of-thought. Keep observable messages, tool activity, state changes, and final outputs.
+- Raw chat logs, preference pairs, or catalogs presented as runnable tasks. They use a separate intake path.
+
+Use the [audit endpoint](/gdpx/audit-endpoint) for document preflight. It does not validate a Harbor directory or RL delivery archive.

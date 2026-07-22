@@ -9,9 +9,17 @@ Use the audit API to review one GDPx task specification or benchmark methodology
 
 The audit is a preflight check. It does not replace rollout testing, grader calibration, or launch review. See [Benchmark best practices](/gdpx/benchmark-task-rubric-best-practices) for those requirements.
 
-<Note>
-  The public API currently runs the v14 contract. Use `guidelines_version_applied` in the response as the record of which protocol ran.
-</Note>
+<Warning>
+  GDPx acceptance is governed by Standard Data v15. The deployed `/v1/evaluate` route still runs v14 and should be treated as a one-document preflight, not a v15 certificate. Use `guidelines_version_applied` in the response as the record of which protocol ran.
+</Warning>
+
+## Checklist scope
+
+The v15 audit contract is designed to enforce the internal checklist directly: required and conditional files, schema validity, artifact hashes, visibility boundaries, provenance, and cross-file consistency.
+
+Harbor compatibility only proves that a task can run. It does not prove that the rubric is sound, the gold and verifier are hidden from the agent, the results are reproducible, or the benchmark clears the v15 evidence gates.
+
+The live endpoint audits one document at a time, so it cannot prove that a multi-file bundle is complete. Use it for authoring feedback, then review the [submission file taxonomy](/gdpx/benchmark-task-rubric-best-practices#submission-file-taxonomy) before handoff.
 
 ## Base URL
 
@@ -127,7 +135,9 @@ Use JSON transport when the document is already available as text or encoded byt
 
 Submit benchmark methodology papers as text-bearing PDFs. On the current API revision, do not submit them as DOCX or Markdown. Structured benchmark JSON must contain top-level `m_items` or `stage3`; task-spec JSON must contain `steps` and the task fields.
 
-For the expected package, see [What each task submission contains](/gdpx/benchmark-task-rubric-best-practices#what-each-task-submission-contains).
+For required, conditional, and non-required files, see the [submission file taxonomy](/gdpx/benchmark-task-rubric-best-practices#submission-file-taxonomy).
+
+Do not upload a Harbor directory or v15 bundle archive to the live `/v1/evaluate` route. It accepts only the single-document formats listed above.
 
 ## Response
 

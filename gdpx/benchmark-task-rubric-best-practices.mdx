@@ -134,25 +134,107 @@ Change response length, order, and formatting without changing substance. The sc
 
 False positives are especially damaging because they inflate measured capability. Standard Data will rejudge a calibration sample, compare the verifier and judge with qualified human reviewers, and inspect every criterion that cannot cite observable evidence.
 
-## What each task submission contains
+## Submission file taxonomy
 
-Send the task in your normal working format. Standard Data will handle final harness packaging.
+A GDPx submission has three layers. Keep them separate: the partner handoff, the Standard Data-normalized bundle, and the evidence produced during QC.
 
-A complete task includes:
+<Info>
+  Harbor compatibility is the floor, not the acceptance standard. A task may run in Harbor and still fail the Standard Data v15 audit. When the two differ, the v15 checklist controls.
+</Info>
 
-- both kickoff versions;
-- role, decision, deliverable, and construct statement;
-- the complete data room or environment snapshot;
-- tool inventory and production-interface mapping;
-- state and reset instructions for stateful work;
-- practitioner gold output;
-- deterministic verifier with tolerances and criterion-level results;
-- atomic judge rubric with IDs, weights, evidence rules, and aggregation;
-- rubric author and practitioner background;
-- known-bad and partial-credit anchors with expected verdicts; and
-- task metadata, provenance, and rights information.
+### Partner handoff
 
-Do not truncate prompts, files, or source documents in the submitted artifact. A viewer may shorten what it displays; the underlying task may not.
+For a normal single-step task, use this shape:
+
+```text
+task-name/
+├── task.toml
+├── instruction.md
+├── environment/
+│   ├── Dockerfile
+│   └── ... task fixtures and assets
+├── tests/
+│   ├── test.sh
+│   └── ...
+├── solution/
+│   └── solve.sh
+└── README.md
+```
+
+See Harbor's [simple-task recipe](https://github.com/harbor-framework/harbor-cookbook/tree/e093c9a860b988d9d74901010ddddb9c7f124f92/harbor_cookbook/recipes/simple-task) and current [task structure documentation](https://www.harborframework.com/docs/tasks).
+
+| Path | Requirement | What it is for |
+| --- | --- | --- |
+| [`task.toml`](https://github.com/harbor-framework/harbor-cookbook/blob/e093c9a860b988d9d74901010ddddb9c7f124f92/harbor_cookbook/recipes/simple-task/task.toml) | Required | Task identity, metadata, timeouts, resources, environment, and optional feature declarations |
+| [`instruction.md`](https://github.com/harbor-framework/harbor-cookbook/blob/e093c9a860b988d9d74901010ddddb9c7f124f92/harbor_cookbook/recipes/simple-task/instruction.md) | Required for single-step tasks | Full instruction shown to the agent |
+| Runnable environment | Required | Usually `environment/Dockerfile`; Harbor also supports a pinned `docker_image` or `environment/docker-compose.yaml` |
+| [`tests/test.sh`](https://github.com/harbor-framework/harbor-cookbook/blob/e093c9a860b988d9d74901010ddddb9c7f124f92/harbor_cookbook/recipes/simple-task/tests/test.sh) | Required on Linux | Verifier entry point; it writes a numeric reward under `/logs/verifier/` |
+| [`solution/solve.sh`](https://github.com/harbor-framework/harbor-cookbook/blob/e093c9a860b988d9d74901010ddddb9c7f124f92/harbor_cookbook/recipes/simple-task/solution/solve.sh) or equivalent gold artifact | Required by Standard Data | Known-good validation substrate; Harbor itself treats the solution folder as optional |
+| Environment files, verifier helpers, fixtures, and native assets | Conditional | Include only files the task, environment, or verifier actually uses |
+| `README.md` | Optional | Helpful author notes; not part of the Harbor runtime contract |
+
+The handoff must also include the complete system and developer prompts, tool schemas and permissions, expected-output contract, atomic rubric, provenance and license facts, practitioner qualifications, and the full judge prompt and configuration when an LLM judge is used. Provide read access to the source repository used to build the task.
+
+`solution/solve.sh` does not have to be the literal gold format. A native practitioner artifact, gold trace, or deterministic validation notebook is acceptable when that better matches the work. A task cannot enter v15 certification with no known-good validation substrate.
+
+### Conditional Harbor files
+
+Do not add every Harbor feature to every task.
+
+| Add when | Files | Example |
+| --- | --- | --- |
+| The task has ordered stages | `steps/<name>/instruction.md`, an effective step verifier, and optional step `solution/` or `workdir/` | [Multi-step](https://github.com/harbor-framework/harbor-cookbook/tree/e093c9a860b988d9d74901010ddddb9c7f124f92/harbor_cookbook/recipes/multi-step) |
+| The task needs local services | `environment/docker-compose.yaml` plus service images or source | [Multi-container](https://github.com/harbor-framework/harbor-cookbook/tree/e093c9a860b988d9d74901010ddddb9c7f124f92/harbor_cookbook/recipes/multi-container) |
+| The agent needs custom tools | MCP declarations in `task.toml`; bundle a server directory only when the task owns the server | [MCP tools](https://github.com/harbor-framework/harbor-cookbook/tree/e093c9a860b988d9d74901010ddddb9c7f124f92/harbor_cookbook/recipes/mcp-tools) |
+| Requirements come from a simulated user | The user service, persona, and runtime configuration used by that implementation | [Simulated user](https://github.com/harbor-framework/harbor-cookbook/tree/e093c9a860b988d9d74901010ddddb9c7f124f92/harbor_cookbook/recipes/simulated-user) |
+| The agent receives custom skills | A configured skills directory with one `SKILL.md` per skill | [Skills](https://github.com/harbor-framework/harbor-cookbook/tree/e093c9a860b988d9d74901010ddddb9c7f124f92/harbor_cookbook/recipes/skills) |
+| The verifier returns several dimensions | Multi-key `reward.json`; job-level metric files only when the run uses them | [Multi-reward](https://github.com/harbor-framework/harbor-cookbook/tree/e093c9a860b988d9d74901010ddddb9c7f124f92/harbor_cookbook/recipes/multi-reward) |
+
+The Cookbook examples are pinned for stable links and may use older `task.toml` fields. Validate the runnable task against the current Harbor schema. Harbor's schema version and Standard Data protocol v15 are unrelated version numbers.
+
+### Standard Data-normalized v15 bundle
+
+Standard Data converts the partner handoff into a canonical bundle:
+
+```text
+benchmark-bundle/
+├── benchmark.json
+├── tasks.jsonl
+├── artifact-bindings.json
+└── artifacts/
+    ├── prompts, rubrics, and source inputs
+    ├── verifier and validation files
+    ├── gold outputs
+    └── environment and tool assets
+```
+
+`benchmark.json` and `tasks.jsonl` are required for a normalized benchmark bundle. `artifact-bindings.json` is required when attachments are present. Every attachment is bound to a declared kind and visibility: `agent_visible`, `tool_mediated`, `verifier_only`, or `publication_only`. Gold outputs, verifier code, and validation assertions are always `verifier_only`.
+
+Partners should not invent revision IDs, hashes, canonical JSON, or attachment bindings. Standard Data creates those during normalization and rejects missing files, ambiguous mappings, hash mismatches, or verifier-only material that is visible to the agent.
+
+### Required before v15 certification
+
+The first handoff does not need every empirical QC report. The complete v15 evidence set does need to exist before certification. The grouped examples below do not replace the v15 schemas or check pack.
+
+| Evidence group | File examples |
+| --- | --- |
+| Documentation and rights | `metadata.json`, `DATASHEET.md`, calibration-model `MODEL_CARD.md`, `LICENSES.csv`, `ECONOMIC_GROUNDING.md`, `VALUE_TIER_DISTRIBUTION.json` |
+| Rubric and grader | `RUBRIC.json`, `RUBRIC_KAPPA_RAW.csv`, `RUBRIC_PROVENANCE.json`, `RUBRIC_RATIONALE.md`, `JUDGE_PROMPT.txt`, `JUDGE_PROMPT.json`, `VERIFIER_SOUNDNESS.json`, `VERIFIER_SOUNDNESS_RAW.csv` |
+| Harness and environment | `HARNESS.json`, `SANDBOX_MANIFEST.json`, `ENV_CONFIG.json`, `SURFACE_STRATIFICATION.json`, `ENV_RELIABILITY.json` |
+| Results and traces | `MODEL_TRACES/`, `FINAL_OUTPUTS/`, `PROVENANCE.json`, `CROSS_MODEL_RESULTS.json`, `STATISTICS.json`, `PER_ROLLOUT_SCORES.csv`, `DISCRIMINATION.json` |
+| Robustness and review | `CONTAMINATION_REPORT.json`, `ANTI_PATTERN_AUDIT.json`, `PASS_CONDITION_TIGHTNESS.json`, `PER_MODEL_FAILURE_REPORT.json`, `CROSS_TASK_FAILURE_REPORT.json`, `REALISM_AUDIT.json`, `EVAL_AWARENESS_PROBE.json`, `MANUAL_REVIEW.json` |
+
+Standard Data can generate the rollouts, statistics, scans, soundness audits, difficulty reports, failure analysis, and manual-review outputs during QC. Partners still need to supply the underlying facts: licenses, provenance, practitioner qualifications, rubric rationale, judge source, source assets, and economic grounding. We can normalize those facts, but we cannot invent them.
+
+### Not required for a pure GDPx benchmark
+
+- `PROBE_MODEL.json`, training checkpoints, reward curves, KL logs, and other RL-only artifacts.
+- A Harbor `README.md`, Python test file, Compose file, MCP server, simulated-user persona, skills directory, or job metric config unless the task uses it.
+- Pre-generated `/logs/verifier/reward.txt` or `reward.json`; the verifier creates these at runtime.
+- Private chain-of-thought or hidden reasoning. Submit observable messages, actions, tool results, state changes, and final outputs only.
+- Hand-authored Standard Data revision IDs, content hashes, or canonical bundle records.
+
+For a dataset declared as both training and benchmark, a partition manifest and information-flow controls are required. That is a different contract from a pure GDPx benchmark.
 
 ## Partner submission checklist
 

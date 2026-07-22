@@ -1,0 +1,198 @@
+---
+title: "Standard Data Audit Endpoint"
+sidebarTitle: "Audit endpoint"
+description: "How Engram submits GDPx task specifications and benchmark methodology papers to the live audit endpoint."
+keywords: ["GDPx", "audit endpoint", "Engram", "API", "task specification"]
+---
+
+Use the audit API to review one GDPx task specification or benchmark methodology paper before manual review. The service classifies the document, runs the matching v14 checks, and returns structured blockers, warnings, evidence, and suggested fixes.
+
+The audit is a preflight check. It does not replace rollout testing, grader calibration, or launch review. See [Benchmark best practices](/gdpx/benchmark-task-rubric-best-practices) for those requirements.
+
+<Note>
+  The public API currently runs the v14 contract. Use `guidelines_version_applied` in the response as the record of which protocol ran.
+</Note>
+
+## Base URL
+
+```text
+https://task-feedback-vgmxhdw3ka-uc.a.run.app
+```
+
+## Endpoints
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST` | `/v1/evaluate` | Submit one task specification or benchmark paper for review |
+| `GET` | `/v1/evaluations/{evaluation_id}` | Retrieve a completed evaluation |
+| `GET` | `/v1/whoami` | Validate an API key and read its rate limit |
+| `GET` | `/v1/healthz` | Check whether the service is reachable; no authentication required |
+
+Use `/v1/evaluate` before the [partner submission checklist](/gdpx/benchmark-task-rubric-best-practices#partner-submission-checklist). A clean response is one input to [what happens after submission](/gdpx/benchmark-task-rubric-best-practices#what-happens-after-submission), not a launch decision by itself.
+
+## Authentication
+
+All endpoints except `/v1/healthz` require a Standard Data API key.
+
+```http
+Authorization: Bearer <api_key>
+```
+
+Store the key in an environment variable:
+
+```bash
+export STANDARD_DATA_API_KEY="<issued-separately>"
+```
+
+Check the key without starting an evaluation:
+
+```bash
+curl --fail-with-body \
+  --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
+  https://task-feedback-vgmxhdw3ka-uc.a.run.app/v1/whoami
+```
+
+## Submit a file
+
+Multipart upload is the normal request format. The file field must be named `file`.
+
+<CodeGroup>
+
+```bash cURL
+API_BASE="https://task-feedback-vgmxhdw3ka-uc.a.run.app"
+
+curl --fail-with-body \
+  --request POST "${API_BASE}/v1/evaluate" \
+  --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
+  --form "file=@/absolute/path/to/task-spec.pdf;type=application/pdf" \
+  --form 'options={"checks_to_run":["all"],"verbosity":"full","include_suggested_fixes":true}' \
+  --max-time 1500 \
+  --output evaluation.json
+```
+
+```bash HTTPie
+API_BASE="https://task-feedback-vgmxhdw3ka-uc.a.run.app"
+
+http --form POST "${API_BASE}/v1/evaluate" \
+  Authorization:"Bearer ${STANDARD_DATA_API_KEY}" \
+  file@/absolute/path/to/task-spec.pdf \
+  'options={"checks_to_run":["all"],"verbosity":"full","include_suggested_fixes":true}'
+```
+
+</CodeGroup>
+
+`options` is optional. When supplied as multipart data, it must be a valid JSON string. Use `verbosity: "full"` while fixing a submission; summary mode removes the detailed finding arrays.
+
+## Request structure
+
+`POST /v1/evaluate` accepts `multipart/form-data` or `application/json`.
+
+### Multipart fields
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `file` | file | Yes | Document to audit, up to 10 MB |
+| `options` | JSON string | No | Checks, response verbosity, and suggested-fix settings |
+
+### JSON body
+
+Use JSON transport when the document is already available as text or encoded bytes.
+
+```json
+{
+  "task_input": {
+    "format": "markdown",
+    "content": "# Task title\n\nTask instructions...",
+    "filename": "task.md"
+  },
+  "options": {
+    "checks_to_run": ["all"],
+    "guidelines_version": "v14",
+    "verbosity": "full",
+    "include_suggested_fixes": true
+  }
+}
+```
+
+`task_input.format` accepts `pdf`, `docx`, `markdown`, or `json`. In JSON transport, PDF and DOCX content must be base64-encoded. Markdown and JSON content stays as a raw UTF-8 string.
+
+## Input types
+
+| Input | Routing |
+| --- | --- |
+| PDF | Classified as a task specification or benchmark paper |
+| DOCX | Routed to the task-specification audit |
+| Markdown | Supported for task specifications |
+| JSON | Routed from its top-level structure |
+
+Submit benchmark methodology papers as text-bearing PDFs. On the current API revision, do not submit them as DOCX or Markdown. Structured benchmark JSON must contain top-level `m_items` or `stage3`; task-spec JSON must contain `steps` and the task fields.
+
+For the expected package, see [What each task submission contains](/gdpx/benchmark-task-rubric-best-practices#what-each-task-submission-contains).
+
+## Response
+
+Every successful response includes `kind`, which is either `task_spec` or `benchmark_paper`.
+
+```json
+{
+  "kind": "task_spec",
+  "evaluation_id": "eval_...",
+  "aggregate_verdict": {
+    "ready_to_submit": false,
+    "blocking_issues_count": 2,
+    "warning_count": 3,
+    "info_count": 1,
+    "estimated_fix_time_minutes": 45
+  },
+  "ungraded_sections": [],
+  "guidelines_version_applied": "v14",
+  "model_versions": {},
+  "latency_ms": 0,
+  "timestamp": "..."
+}
+```
+
+Task-spec responses add `task_summary`, `per_step_feedback`, `cross_step_findings`, and `task_metadata_findings`. Benchmark-paper responses add `paper_summary`, `m_item_evaluations`, `stage3_evaluations`, and `findings`.
+
+Review `ungraded_sections` before trusting the verdict. Material content may have failed to map to the expected document structure.
+
+For rubric findings, use [Design rubrics and verifiers](/gdpx/benchmark-task-rubric-best-practices#design-rubrics-and-verifiers). The endpoint does not measure task difficulty; use [Set difficulty](/gdpx/benchmark-task-rubric-best-practices#set-difficulty).
+
+## Retrieve an evaluation
+
+```bash
+curl --fail-with-body \
+  --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
+  "${API_BASE}/v1/evaluations/eval_..." \
+  --output evaluation.json
+```
+
+The retrieved response has the same shape as the original result.
+
+## Limits and errors
+
+- Maximum file size: `10 MB`
+- Server request ceiling: approximately `15 minutes`
+- Rate limit: set per API key and returned by `/v1/whoami`
+- Idempotency keys: not supported
+
+Do not retry a slow request while the original connection is open. A retry can create a second evaluation.
+
+Errors use a top-level `detail` field:
+
+```json
+{"detail":"Explanation of what failed."}
+```
+
+| Status | Meaning |
+| --- | --- |
+| `400` | Invalid body, options, file type, parser input, or file size |
+| `401` | Missing or invalid API key |
+| `404` | Evaluation ID not found |
+| `422` | Document could not be routed to an audit type |
+| `429` | Rate limit exceeded; follow `Retry-After` |
+| `500`, `502`, `504` | Protocol, extraction, upstream model, or timeout failure |
+
+<Note>
+  The live OpenAPI document currently omits the request body for `POST /v1/evaluate`. Add the multipart or JSON body manually when generating a client.
+</Note>

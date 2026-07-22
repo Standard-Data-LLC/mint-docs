@@ -1,0 +1,178 @@
+---
+title: "GDPx Benchmark Task & Rubric Best Practices"
+sidebarTitle: "Benchmark best practices"
+description: "How to build realistic GDPx tasks, atomic rubrics, dual verifiers, and launch-grade QC."
+keywords: ["GDPx", "benchmark", "rubrics", "task design", "quality control"]
+---
+
+GDPx measures whether models can complete representative, economically valuable knowledge work in a realistic environment. It is a benchmark, not an RL task pack.
+
+<Info>
+  For GDPx, approximately 0–50% pass@1 is a useful target. A harder task can stay if it is solvable, the graders work, and model results still separate through partial credit.
+</Info>
+
+The unit is the whole job: the kickoff, source material, tools, observable work, final artifact, deterministic checks, and rubric. We grade the work itself. We do not grade private reasoning or whether the model followed one preferred path.
+
+## Define the work
+
+Start with the capability the task is meant to measure. Name the role, the decision or state change, and why mistakes matter.
+
+| Weak construct | Better construct |
+| --- | --- |
+| Produce a spreadsheet | Reconcile conflicting operating data and produce a decision-ready forecast with traceable assumptions |
+| Summarize the documents | Triage a customer escalation across product, contract, and account history, then recommend the next action under the company policy |
+| Use the tools correctly | Update a live operating artifact while preserving formulas, permissions, and downstream dependencies |
+
+The file type is part of the task, not the capability. A spreadsheet task should measure whether the model made the right operating decision and left behind a usable workbook.
+
+For each task family, include a short construct statement covering:
+
+- who normally does the work;
+- what outcome matters;
+- which errors are expensive; and
+- what a strong practitioner notices that a merely competent one may miss.
+
+Prefer fewer, stronger tasks. Renaming companies and changing numbers does not create a new task family.
+
+## Write the task
+
+Professional work rarely arrives as a complete specification. It arrives as an email, Slack message, ticket, or comment from someone who assumes shared context.
+
+Write two kickoff versions:
+
+1. A real-world version in the language a manager, client, or colleague would use.
+2. A structured version that states the role, objective, constraints, and deliverable.
+
+Both versions should ask for the same job. The real-world version may leave normal practitioner assumptions unstated, but every private definition, policy, or source fact must be discoverable in the environment.
+
+Good ambiguity makes the model recover context. Bad ambiguity makes the task unsolvable.
+
+Include the sender role, intended recipient, expected deliverable, and any assumptions you intentionally left implicit. If a qualified practitioner would ask a question, define what the environment should return.
+
+## Build the environment
+
+The environment should behave like the workbench it represents. Include the mess that changes the answer: stale files beside current ones, conflicting records, buried conventions, partial histories, and production-like tool constraints.
+
+Do not add random clutter, broken links, or arbitrary latency to make a task look difficult.
+
+For stateful work, define:
+
+- the starting state;
+- allowed and expected state changes;
+- forbidden side effects;
+- post-state checks;
+- reset behavior between rollouts; and
+- what happens on interruption, stale data, or a failed tool call.
+
+For editable artifacts, provide the native file. Reopen the output. Check formulas or executable behavior. Render it when layout matters. Confirm the requested edit did not break unrelated content.
+
+Every load-bearing tool should map to a real production surface. A prose plan to update a system does not test the same capability as making the update.
+
+## Set difficulty
+
+GDPx should spread the frontier. Some models should make partial progress, while stronger models should finish more often.
+
+Use at least three model tiers and at least 16 independent rollouts per task-model cell. Pin the model version, harness, tools, system prompt, sampling settings, turn budget, timeout, context policy, judge version, and retry policy.
+
+Review more than binary pass@1. Use mean rubric score, per-criterion pass rates, cross-model spread, runtime, token use, and environment failures to understand what the task measures.
+
+### Zero-pass tasks
+
+A zero-pass task can stay only when:
+
+- a qualified practitioner can solve it with the exact model context and tools;
+- the practitioner output passes both graders;
+- the environment is reliable;
+- at least one model shows meaningful partial progress, or the task is labeled beyond the current frontier; and
+- known-good, known-bad, and partial-credit anchors produce the expected grader results.
+
+If every model receives zero or near-zero partial credit, the task is a floor item. Rework it, split the independently useful outcomes, or hold it for a later release.
+
+Tasks above roughly 50% pass@1 may still be useful as anchors or regression checks, but they should not dominate the benchmark.
+
+## Design rubrics and verifiers
+
+Every task needs two grading layers.
+
+| Layer | Use it for |
+| --- | --- |
+| Deterministic verifier | Values, schemas, file presence, formulas, compilation, geometry, allowed state transitions, side effects, reconciliations, and artifact integrity |
+| LLM judge | Evidence-based recommendations, material contradictions, prioritization, decision quality, and caveats that require practitioner judgment |
+
+If code can check something reliably, use code. Do not turn judgment into brittle string matching, and do not ask an LLM to grade a number that a verifier can calculate.
+
+Each judge criterion should contain:
+
+- a stable ID;
+- one independently evaluable claim;
+- a numerical weight and failure-mode tag;
+- the observable evidence required to pass; and
+- a citation to the output, tool call, or state change used for the verdict.
+
+One criterion should test one thing. “Calculates adjusted ARR and explains the drivers” is two criteria:
+
+- `ARR_01` verifies the final value within the declared tolerance.
+- `ARR_02` judges whether the explanation identifies the source-backed drivers.
+
+Avoid criteria such as “mentions churn” or “provides citations.” Require the actual capability: identify the relevant cohort using the supplied definition, or cite the source that supports the decision.
+
+The grader may accept alternate valid methods. It may not score private chain-of-thought or an unstated preferred workflow.
+
+## Calibrate the grader
+
+Test the grader against work you understand before using it on model rollouts.
+
+Each task should include:
+
+- a practitioner gold output;
+- an alternate correct output where another method is defensible;
+- one to three known-bad outputs with named defects;
+- a partial-credit output where practical; and
+- expected per-criterion results for each anchor.
+
+Change response length, order, and formatting without changing substance. The score should stay stable. Add plausible but irrelevant detail. The score should not improve.
+
+False positives are especially damaging because they inflate measured capability. Standard Data will rejudge a calibration sample, compare the verifier and judge with qualified human reviewers, and inspect every criterion that cannot cite observable evidence.
+
+## What each task submission contains
+
+Send the task in your normal working format. Standard Data will handle final harness packaging.
+
+A complete task includes:
+
+- both kickoff versions;
+- role, decision, deliverable, and construct statement;
+- the complete data room or environment snapshot;
+- tool inventory and production-interface mapping;
+- state and reset instructions for stateful work;
+- practitioner gold output;
+- deterministic verifier with tolerances and criterion-level results;
+- atomic judge rubric with IDs, weights, evidence rules, and aggregation;
+- rubric author and practitioner background;
+- known-bad and partial-credit anchors with expected verdicts; and
+- task metadata, provenance, and rights information.
+
+Do not truncate prompts, files, or source documents in the submitted artifact. A viewer may shorten what it displays; the underlying task may not.
+
+## Partner submission checklist
+
+- A qualified practitioner can solve the task using only the supplied context and tools.
+- The task measures a meaningful decision, artifact, or state change.
+- Both kickoff versions ask for the same job.
+- Required context is discoverable.
+- The environment is realistic and resettable.
+- Every important tool maps to a production surface.
+- The gold output opens, runs, renders, or reconciles as expected.
+- Deterministic checks cover everything code can settle.
+- Every judge criterion is atomic and evidence-based.
+- The grader accepts good work and rejects the anchors for the intended reason.
+- Alternate valid methods are not penalized.
+- Files are complete, and provenance and rights are disclosed.
+
+## What happens after submission
+
+The audit endpoint is the first pass. Standard Data then checks solvability, environment reliability, grader behavior, cross-model difficulty, artifact integrity, and failure causes before a task can affect a published score.
+
+A failed rollout is not automatically a model failure. We first rule out prompt, environment, harness, rubric, orchestration, and task-construction defects. GDPx should measure capability failure, not benchmark debt.
+
+Use the [audit endpoint](/gdpx/audit-endpoint) to catch document and rubric issues before handoff.

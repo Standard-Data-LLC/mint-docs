@@ -1,0 +1,383 @@
+---
+title: "GDPx Benchmark Task & Rubric Best Practices"
+sidebarTitle: "Benchmark best practices"
+description: "How to build realistic GDPx tasks, atomic rubrics, dual verifiers, and launch-grade QC."
+keywords: ["GDPx", "benchmark", "rubrics", "task design", "quality control"]
+---
+
+## Summary
+
+We're building GDPx as a live, verifiable benchmark for agentic knowledge work, using tasks and data that come from operating businesses. The score is meant to rank models by capability on representative, economically valuable work. It is not an RL task pack, and we should not design it around where a training run gets the cleanest gradient.
+
+That distinction changes the construction target. An RL set should put most tasks where a target model succeeds often enough to learn from them. A benchmark should spread the frontier: some models should make partial progress, stronger models should finish more often, and the score should reveal where and why they separate. For GDPx, approximately 0-50% pass@1 is a good range. A zero-pass task can stay if it passes the safeguards in this guide. It cannot stay merely because it looks hard.
+
+The benchmark unit is the whole job: kickoff correspondence, environment, tools, observable work, final artifact, deterministic checks, and an atomic rubric for the judgment that code cannot settle. We grade the work itself. We do not grade private reasoning, adherence to one author's preferred method, or whether the response uses enough benchmark-sounding language.
+
+This guide separates two jobs throughout:
+
+- **Partner submission requirement.** What Engram authors and sends with each task.
+- **GDPx launch QC.** What Standard Data runs after intake before a task can affect the published score.
+
+The practical ask is fewer, stronger tasks. A thin task with a polished rubric is still thin. A realistic task with a loose grader is still unpublishable. We need both sides to hold.
+
+## Start with the benchmark construct
+
+Write down what the task is supposed to measure before writing the prompt. The construct should be a capability a qualified practitioner uses in paid work, stated at the level of the job rather than the file format.
+
+Strong constructs sound like:
+
+- Reconcile conflicting operating data and produce a decision-ready forecast with traceable assumptions.
+- Triage a customer escalation across product, contract, and account history, then recommend the next action under the company's actual policy.
+- Update a live operating artifact after a state change while preserving formulas, permissions, and downstream dependencies.
+
+Weak constructs sound like:
+
+- Produce a spreadsheet.
+- Summarize the documents.
+- Use the tools correctly.
+- Write a professional memo.
+
+The weak versions name a surface or output shape. They do not say what capability the score represents. A spreadsheet may be the right artifact, but GDPx should measure whether the model made the right operating decision and built a usable artifact, not whether it filled cells.
+
+**Partner submission requirement.** For each task family, provide a one-paragraph construct statement: who does this work, what decision or state change matters, why errors are expensive, and what a strong practitioner does that a merely competent one misses. Tag each task as high-judgment, mixed, or commodity. We expect the slice to lean toward high-judgment work. If the available work is mostly commodity, flag that instead of padding the set.
+
+**GDPx launch QC.** We check whether the task set actually covers the declared construct, whether one cheap skill or repeated trap dominates it, and whether performance on the tasks predicts expert-rated performance on the underlying work. We also keep benchmark evaluation items separate from any construct-matched training siblings. Released tasks, gold outputs, hidden tests, judge targets, and distinctive benchmark assets cannot enter a training or reward-development loop.
+
+## Write the work as it arrives
+
+Most professional work does not arrive as a complete specification. It arrives as a forwarded email, a Slack message, a ticket, a comment in a document, or a terse request from someone who assumes shared context. That is part of the work, not noise to remove.
+
+For each task, write two kickoff versions:
+
+1. **Real-world version.** The message a supervisor, client, or colleague would actually send. It names the deliverable, points at the workspace, and leaves normal practitioner assumptions implicit.
+2. **Structured version.** A clean "You are X" formulation that states the role, objective, constraints, and required deliverable.
+
+The pair gives us a provenance axis. It lets GDPx measure the cost of turning natural workplace correspondence into an execution plan without confusing that cost with the underlying domain skill.
+
+A good real-world kickoff is terse but solvable:
+
+> Can you take a first pass at the renewal view before tomorrow's pipeline review? The latest account notes and pricing are in the customer folder. Use the same risk treatment we used last quarter, and flag anything I should raise with Finance.
+
+A weak kickoff either over-specifies the path or withholds required information:
+
+> Open `accounts.csv`, filter rows where renewal\_date is within 90 days, join on account\_id to `pricing.xlsx`, calculate ARR, then create a five-column table...
+
+The first version asks for the job. The second scripts the trajectory and mostly tests instruction following. At the other extreme, "analyze the account" does not name a decision or deliverable and is not enough for a qualified person to act on.
+
+Leave one or two reasonable assumptions unstated when a practitioner would know where to recover them. Do not omit a private convention, policy, or definition unless it exists somewhere the agent can reach. Hidden context is a benchmark defect, not difficulty.
+
+**Partner submission requirement.** Ship both kickoff versions, the sender's role, the intended recipient's role, the expected deliverable, and a short note identifying the assumptions intentionally left implicit. If a qualified practitioner would ask a clarifying question, say what information the environment should return when asked.
+
+**GDPx launch QC.** We run a solvability review on both versions. A qualified reviewer gets exactly the model's context and tools. If the reviewer cannot determine what to do or cannot access a required fact, the task goes back for repair before model difficulty is considered.
+
+## Build an environment that behaves like work
+
+The environment should contain the mess that changes professional outcomes: stale files next to current ones, inconsistent naming, partial records, buried conventions, duplicated numbers that do not quite reconcile, and tools with production-like constraints. It should not contain random clutter added only to burn tokens.
+
+Useful difficulty comes from discriminating among evidence, maintaining state, applying a domain convention, recovering from a failed action, or checking the model's own work. Useless difficulty comes from broken links, arbitrary latency, unlabeled missing inputs, or a tool schema that has no relation to the production interface.
+
+Vary the failure modes across the slice. If every task turns on finding the newest file, we are measuring file recency twelve times. Some tasks should punish sloppy retrieval. Others should punish an unsupported inference, a missed dependency, a bad state transition, weak self-checking, or failure to notice that two source systems disagree.
+
+Tools should represent production surfaces. A search index should behave like search, including imperfect recall and useful metadata. An ERP tool should expose records and mutations the real role can access, not a toy `list_all` endpoint that removes the work. If the claim is action-taking, the scored task must include a real state change. A prose plan to update the system is not the same capability as updating it.
+
+For stateful tasks, define:
+
+- Pre-state and the information visible to the agent.
+- Intended state changes and acceptable equivalent outcomes.
+- Forbidden side effects.
+- Relevant intermediate states.
+- Post-state checks, including idempotency where a retry is plausible.
+- Reset behavior between rollouts.
+- What happens on interruption, stale data, partial completion, and tool failure.
+
+For editable artifacts such as spreadsheets, documents, slides, code, or designs, ship the native file. Grade semantic correctness and artifact integrity. Reopen the output. Check formulas or executable behavior. Render it when layout matters. Confirm the artifact remains editable and that the requested change did not break unrelated content.
+
+**Partner submission requirement.** Send the full data room or environment snapshot, a tool inventory, production-interface mapping, state-reset instructions, expected mutations, forbidden side effects, and any house definitions or policies the agent must discover. Do not truncate prompts, files, tool outputs, or source documents in the handed-over artifact. The viewer may truncate for display; the underlying task may not.
+
+**GDPx launch QC.** We inspect for simulation tells, public-benchmark provenance, answer-bearing tool schemas, agent-visible canaries, cross-episode state bleed, stale reads, silent defaults, and action-space drift. We also run the harness under representative concurrency. Environment failures must remain below 5% overall. A traceback, timeout, race, malformed response, or infrastructure error is tagged as an environment failure and excluded from model-failure accounting.
+
+## Use GDPx difficulty policy, not an RL band
+
+GDPx is a benchmark. Do not apply the usual RLVR target of 25-75% pass@1, and do not reject a task because it falls below 30%. Approximately 0-50% pass@1 is good for this benchmark, provided the set shows useful separation in partial scores and across models.
+
+Difficulty is a panel result, not an author's prediction. A task that feels hard may be saturated by the frontier. A task with no full passes may still separate models cleanly through partial completion. We therefore look at pass@1, pass@10, mean score across ten rollouts, per-criterion pass rates, and the cross-model spread. We also report input and output tokens, wall-clock time, failure rate, and the declared resource envelope. Cost is part of the benchmark condition.
+
+Use at least three model tiers for calibration and at least 16 independent rollouts per task-model cell. Pin model version, sampling settings, system prompt, tools, harness version, judge version, turn budget, timeout, context policy, and any retry policy. If those change materially, it is a different evaluation surface.
+
+### Zero-pass safeguards
+
+A zero-pass task may launch only when all of the following are true:
+
+- A qualified practitioner solves it with the exact context and tools available to the model.
+- The deterministic checks and rubric both pass the practitioner output.
+- The task has been run with enough independent attempts to support the claim, normally at least 16 rollouts per model across at least three model tiers.
+- The environment is reliable and failures are not being scored as model failures.
+- At least one model shows substantive partial progress, or the task is explicitly labeled beyond current frontier and kept from dominating the headline index.
+- The rubric criteria are reachable. A wall of zeros caused by one impossible gate is not useful discrimination.
+- Known-good, known-bad, and partial-credit anchors produce the expected grader behavior.
+- The write-up says "no evaluated model solved this under the declared condition," not "models cannot solve this."
+
+If every model receives zero or near-zero partial credit, the task is a floor item. Keep a small, clearly labeled floor tail if it represents important work, but do not let it stand in for benchmark quality. Rework the task, improve the environment, split the job into independently scored outcomes, or hold it for a later release.
+
+At the other end, tasks above roughly 50% pass@1 are not automatically bad, but they should earn their place as anchors, regression checks, or coverage for an important family. A benchmark full of them will saturate quickly.
+
+**Partner submission requirement.** Include a difficulty note naming the models or practitioner baselines you expect to pass, the likely failure point, and any reason a zero-pass result would still be informative. Do not tune the task against one model's failed-cases bucket.
+
+**GDPx launch QC.** Standard Data runs the cross-model panel, computes unbiased pass@k where applicable, reviews score distributions and criterion-level spread, and checks the fraction of tasks at the floor and ceiling. We publish the exact model-task-harness-resource condition rather than presenting a score as a property of the model alone.
+
+## Grade with two layers
+
+Every task ships with a deterministic verifier and an LLM-judge rubric. The balance changes by domain, but the split is not optional.
+
+### Deterministic layer
+
+Anything code can settle without judgment belongs here: exact or tolerance-bounded values, schema validity, query results, required file presence, formula integrity, successful compilation, geometry validity, permitted state transitions, side-effect checks, reconciliations, and native-artifact integrity.
+
+The verifier should return criterion-level results, not just one pass/fail bit. It should make tolerances, equivalence rules, and gating conditions explicit. A deterministic failure must say what check failed and what observable artifact it inspected.
+
+Do not force judgment into code through brittle string matching. A correct answer should not fail because it uses an equivalent label or defensible format. Conversely, do not leave a quantitative check to an LLM because a judge can usually recognize the right-looking number. If code can check it, code should check it.
+
+### LLM-judge layer
+
+Use the judge for the parts a qualified practitioner must assess: whether a recommendation follows from the evidence, whether the output handles a material contradiction, whether a risk is prioritized correctly, whether the deliverable is decision-ready, or whether a required caveat is stated with the right implication.
+
+The judge sees the rubric, observable trace evidence, final output, deterministic results where relevant, and the declared task constraints. It does not see private chain-of-thought, criterion rationales that merely lengthen the prompt, or an answer key that forces one preferred method.
+
+Each judge criterion must include:
+
+- Stable criterion ID.
+- One independently evaluable claim.
+- `MET`, `UNMET`, or `CANNOT_ASSESS` verdict.
+- Numerical severity weight.
+- Failure-mode tag, such as accuracy, completeness, context awareness, instruction following, or communication quality.
+- The observable evidence required to pass.
+- A citation to the output passage, turn, tool call, or state transition used for the verdict.
+- The aggregation rule across criteria.
+
+Keep criterion rationale and practitioner notes in metadata, outside the judge prompt. The rationale is still required. It explains why the criterion exists and who decided it matters.
+
+### Resolve disagreements against the construct
+
+The two layers are complementary, not a voting jury. A deterministic checker may confirm the final number while the judge catches an unauthorized source, forbidden side effect, missing deliverable, or decision that does not follow from the evidence. The judge may accept an alternate valid method that differs from the gold trace. When the layers disagree, adjudicate the observable facts against the declared construct and record the resolution in a per-criterion reward ledger.
+
+Neither layer may score an unstated preferred path. Where the outcome has an objective answer and several defensible methods, grade the outcome and observable constraints. Do not grade whether the model copied the reference workflow.
+
+## Write atomic criteria that require capability
+
+The rubric is the measurement instrument. If it rewards mentions, formatting, or a bundled set of claims, the benchmark will rank verbosity and answer-key imitation instead of capability.
+
+One criterion checks one thing. "Computes X and interprets X" is two criteria. "Identifies the risk, quantifies the exposure, and recommends mitigation" is three. Split them, then use weights and aggregation to preserve the importance of completing the whole job.
+
+Most multi-step tasks will end up with roughly eight or more criteria once the claims are split properly. Treat that as a smell test, not a quota. A five-step job with three broad criteria is probably under-specified; a narrow task does not need filler criteria to reach eight.
+
+### Weak and strong examples
+
+**Weak:** "Calculates adjusted ARR correctly and explains the drivers."
+
+This collapses a numerical result and a judgment. A response that gets the number right but the explanation wrong receives the same zero as a response that does neither.
+
+**Strong:**
+
+- `ARR_01` \[deterministic, weight 20, accuracy\]: Final adjusted ARR equals the verifier-computed value within the declared currency tolerance.
+- `ARR_02` \[judge, weight 10, context awareness\]: The output identifies the contract downgrade as a driver only for accounts whose effective date falls inside the forecast window, citing the account record used.
+- `ARR_03` \[judge, weight 8, completeness\]: The output separately flags the stale pricing file and states which dated source controlled the calculation.
+
+**Weak:** "Uses the available sources and provides a well-supported recommendation."
+
+This is subjective, compound, and satisfiable by citation theater.
+
+**Strong:**
+
+- `REC_01` \[judge, weight 15, accuracy\]: The recommendation selects one of the allowed actions and cites the two source facts that determine that choice.
+- `REC_02` \[deterministic, weight 10, instruction following\]: Every cited source ID exists in the task data room and the cited version was agent-visible.
+- `REC_03` \[judge, weight 12, context awareness\]: The recommendation addresses the material contradiction between the CRM note and signed contract rather than silently choosing one.
+
+**Weak:** "The memo is clear, concise, professional, and complete."
+
+This asks one verdict to absorb four undefined qualities. It also rewards the judge's style preference.
+
+**Strong:**
+
+- `MEMO_01` \[judge, weight 6, instruction following\]: The opening section states the requested decision and recommended action.
+- `MEMO_02` \[judge, weight 8, completeness\]: Each material risk named in the source package is either addressed or explicitly ruled out with evidence.
+- `MEMO_03` \[deterministic, weight 4, instruction following\]: The native deliverable opens successfully and contains the required sections.
+- `MEMO_04` \[judge, weight 5, communication quality\]: No sentence contradicts the selected action, cited evidence, or numerical appendix.
+
+Avoid criteria such as "mentions churn," "discusses risks," or "provides citations." Replace concept presence with a quality bar: identifies the relevant churn cohort using the declared definition; ranks risks by expected impact; cites the specific source that supports the claim.
+
+Use hard gates sparingly. A gate is appropriate when failure invalidates the job, such as a non-opening file, an unsafe side effect, a non-watertight geometry output, or use of prohibited customer data. A gate is not appropriate because one preferred section is missing from an otherwise valid result.
+
+**Partner submission requirement.** Author the rubric with a practitioner who does the work. Ship the rubric JSON, practitioner role and years of experience, construction rationale, aggregation rule, and any genuine dealbreakers. Run an atomicity pass before sending. If a criterion uses "and," comma-joined verbs, or two grading subjects, split it unless the combined phrase is truly one observable claim.
+
+**GDPx launch QC.** We lint every criterion, inspect minimum-satisfying responses, and remove criteria that reward surface compliance. During calibration, criteria with persistently low agreement or a `CANNOT_ASSESS` rate above 30% are rewritten or dropped. A modest abstention rate is healthy when the rollout genuinely lacks evidence.
+
+### Why this rubric also works for RL
+
+The same properties that make the benchmark credible make a rubric usable as an RL signal: atomic credit, low false-positive rates, observable evidence, useful partial scores, and acceptance of alternate valid methods. A reward that says only "good memo" is too vague to diagnose or learn from. A reward that checks fifteen formatting tokens is precise but teaches the wrong behavior.
+
+That does not make this an RL task pack. GDPx launch does not require a post-training run, reward curve, forgetting test, or the 25-75% trainability band. If Engram later builds construct-matched training siblings, keep them separate from the benchmark tasks, hidden tests, gold outputs, judge targets, and distinctive source assets. Use the benchmark to measure the result, not to tune the reward against the held-out evaluation.
+
+## Calibrate the verifier and judge
+
+No grader earns trust from source review alone. It has to reject known failures, accept defensibly correct work, preserve partial credit, and remain stable across response length, ordering, and style.
+
+For each task, start with three anchor classes:
+
+- **Known good.** The practitioner gold output and, where possible, an alternate correct output that takes a different method.
+- **Known bad.** One to three responses with named defects: fabricated values, sign errors, internal contradictions, unsupported recommendations, generic prose with no work, missed state changes, or prohibited side effects.
+- **Partial credit.** A response that is right on some criteria and wrong on others, used to confirm that one criterion's verdict does not leak into another.
+
+Then run counterfactuals. Shorten and lengthen a response without changing its substance. Swap answer order. Perturb style and formatting. Add plausible but irrelevant detail. A sound judge should not move materially unless the changed text alters evidence for a criterion.
+
+False positives are the dangerous error for a benchmark: the grader accepts bad work and inflates capability. False negatives matter too: the grader rejects a valid method and turns benchmark author preference into the score. We report both.
+
+**Partner submission requirement.** Ship the gold output, known-bad anchors, partial-credit anchor where practical, expected per-criterion verdicts, and the full judge prompt or judge specification. A closed black-box grader is not enough. Record the judge model, revision, prompt version, schema, temperature, retry policy, and position-swap policy.
+
+**GDPx launch QC.** We build a stratified human-rejudged calibration set and compute false-positive and false-negative rates, judge-human agreement, human-human agreement, repeated-judge stability, abstentions, and infrastructure failures. The launch target is below 5% false positives for rule-based checks and below 10% for LLM-judge verdicts. Judge-human agreement should reach at least 85% on the shared manual-review sample, and verifier-human agreement should be read relative to the human-human ceiling. If experts do not agree on the task, the answer is not a more forceful judge prompt. The task or rubric needs work.
+
+Every criterion verdict must cite observable evidence. We spot-check those citations against raw traces. A bare `MET` or `UNMET` without a source passage, tool call, or state event is not auditable and does not launch.
+
+### Internal calibration gates
+
+These are Standard Data launch checks, not extra packaging work for Engram.
+
+- **Human agreement.** Sample 50-100 rollouts with at least two independent annotators. Compute Cohen's kappa or Krippendorff's alpha per criterion and require at least 0.60. Record the statistic and sample size with the criterion. A 5-10% `CANNOT_ASSESS` rate can be normal; 30% or more means the evidence rule or criterion is wrong.
+- **Verifier soundness.** Rejudge 200 verifier-PASS and 200 verifier-FAIL rollouts with at least three qualified annotators. Require deterministic false positives below 5%, LLM-judge false positives below 10%, human-human kappa of at least 0.50, and ceiling-normalized soundness of at least 0.85. Report false negatives even when they do not block launch.
+- **Anti-pattern bank.** Expand the partner's one to three known-bad anchors to five to ten internal probes per task. Include fabricated facts, contradictions, sign errors, scope creep, unsupported platitudes, lazy paraphrase, and domain-specific shortcuts. At least 80% should score below the median competent response.
+- **Pass-condition tightness.** Sample 20 criteria and write the laziest response that should pass under the literal wording but does not demonstrate the underlying capability. Run each response through the grader, then have a separate annotator judge whether it demonstrates the concept. No more than 30% may pass the grader while failing that second review.
+- **Judge stability.** Rerun 10% of the calibration sample with a different seed and reordered context. Require at least 85% self-agreement. Manually review at least 20 complete trajectories and require at least 85% judge-human agreement before using aggregate triage labels.
+- **Statistical reporting.** Use at least 16 independent rollouts per task-model cell, and normally 16-64 where pass@k matters. For headline model comparisons, use at least three seeds and report paired bootstrap 95% confidence intervals, effect size, and probability of improvement. Keep binary pass@1 separate from mean rubric score.
+
+## Preserve the harness condition and observable trace
+
+A GDPx score belongs to a model, task set, harness, and resource envelope together. Change the system prompt, tools, context policy, turn budget, retries, or judge and the result may change even when the model does not.
+
+**Partner submission requirement.** You do not need to rebuild your materials for our final harness. Send tasks in your normal working format. Include enough specification for us to reproduce the intended workbench: tool names and schemas, permissions, network expectations, state-reset logic, maximum useful turns, timeout assumptions, source assets, grader entry points, and any dependency versions that affect results. Map each tool to the production surface it represents.
+
+**GDPx launch QC.** We pin the final harness commit, container image digest, environment snapshot, tool registry, network and permission policy, isolation level, retry and recovery rules, context and compaction policy, maximum turns, timeout, concurrency, model parameters, and scorer and judge revisions. We smoke-test the published entry point and load-test at the declared concurrency. Silent defaults are release blockers.
+
+Run at least two scaffolding configurations on the same model, including its native production harness. If the spread exceeds five percentage points, disclose it as scaffold sensitivity. Do not quietly choose the harness that produces the cleanest ranking.
+
+Every rollout preserves the observable record needed to reproduce and audit it:
+
+- System, developer, and user prompts, or a hash and redaction reason where disclosure is restricted.
+- Assistant-visible messages.
+- Tool call ID, arguments, result, error, and retry.
+- Environment observation and relevant state transition.
+- State snapshot or diff pointer for persistent environments.
+- Compaction or truncation event, including what observable content was retained or removed.
+- Per-step timestamps and input, output, cache, and tool-result token counts.
+- Final native artifact or final output exactly as graded.
+- Grader inputs, per-criterion results, citations, and final aggregation.
+
+We do not request or ship private chain-of-thought. Observable actions and artifacts are enough to diagnose the work, and hidden reasoning is not a reproducibility artifact.
+
+Retain every rollout used in a headline metric. Three hand-picked examples per task are useful for review, but they are not a substitute for the metric-bearing traces. Prompt content cannot be truncated. Tool, stdout, or stderr payloads may be cut only above a declared byte ceiling (10 MB is a reasonable floor), with a cut marker and the elided fraction recorded.
+
+The internal evidence package includes `RUBRIC.json`, raw agreement data, rubric provenance and rationale, verifier soundness results, the anti-pattern and pass-condition audits, `HARNESS.json`, `SANDBOX_MANIFEST.json`, `ENV_CONFIG.json`, the readable and versioned judge prompt, full model traces, final native outputs, and provenance records. Engram can send the normal working bundle; Standard Data owns the normalization into this release package.
+
+## Triage failures before blaming the model
+
+The first question on every failed rollout is: could a qualified person have solved the task with exactly the context and tools the model had? If not, set it aside as a task, environment, or harness defect. It carries no evidence about model capability.
+
+For solvable failures, use a separate triage pass. The task grader says what criteria failed. The triage pass says why. Keep those jobs separate.
+
+Use these primary labels:
+
+- **Capability failure.** The workbench is sound and the observable trajectory pursues a valid approach, but the model cannot complete a specific step.
+- **Prompt defect.** The kickoff is underspecified, contradictory, misleading, or format-sensitive in a way a qualified person would also trip over.
+- **Scaffolding defect.** A required source or action is unreachable, a tool is broken, or the interaction hides context the gold output depends on.
+- **Rubric defect.** The rollout is defensibly correct but the grader is too narrow, format-driven, or tied to the reference path.
+- **Environment defect.** State is stale, reset is incomplete, a timeout becomes a plausible default, or infrastructure behavior changes the outcome.
+- **Orchestration defect.** A valid multi-step workflow fails at a handoff, retry, compaction, or state boundary.
+- **Triangulation failure.** The prompt asks for one thing, the task specification expects another, and the rubric scores a third.
+- **Task-construction defect.** The source material, label, gold artifact, or hidden assumption is wrong or internally inconsistent.
+
+Each label cites the message, tool result, state transition, artifact, or rubric decision that establishes it. Do not infer a private thought process. Allow multi-label assignment when needed, but select one primary cause so the remediation is actionable.
+
+**Partner submission requirement.** When you already know a task's likely failure modes, include them in metadata and provide at least one anchor response for the important ones. Flag ambiguous source facts and known environment limitations before handoff.
+
+**GDPx launch QC.** A qualified reviewer reads at least 20 full trajectories across model families and failure classes. Those labels calibrate the automated triage judge. We require at least 85% judge-human agreement before using its aggregate labels. We then report failures by model family and across tasks. A failure cluster concentrated on one tool or task family is treated as a workbench problem until shown otherwise.
+
+Tasks do not launch while prompt, scaffolding, rubric, environment, orchestration, triangulation, or construction defects are materially driving the score. Capability failure is the signal we want. The other classes are benchmark debt.
+
+Use aggregate defect rates as escalation triggers, not as permission to ignore smaller problems. If prompt and scaffolding defects exceed 20% of failures, revise the tasks or environment. If rubric defects exceed 10%, rewrite the rubric and rerun verifier calibration. If orchestration defects exceed 15% on long-horizon work, the environment is not yet evaluable. If prompt, task specification, and rubric disagree on more than 3% of reviewed cases, stop the run and realign them. For any construct-matched training sibling, investigate training-data defects above 5% rather than laundering them into a model score.
+
+## What each task submission contains
+
+A good planning assumption for the current Engram slice is roughly 25 candidate tasks to land 15-20 after QC. That is expected attrition, not a target rejection rate. Do not pad the intake to hit 25; a smaller set of independent, defensible tasks is better than near-duplicates.
+
+A complete partner task is this bundle:
+
+- Real-world kickoff correspondence.
+- Structured kickoff version.
+- Declared role, decision, deliverable, and benchmark construct.
+- Data room or environment, with all underlying artifacts untruncated.
+- Tool inventory and production-interface mapping.
+- Pre-state, intended post-state, reset procedure, and forbidden side effects for stateful work.
+- Reference or gold output from a qualified practitioner.
+- Deterministic verifier, validation script, tolerances, and expected criterion-level results.
+- Atomic LLM-judge rubric with IDs, weights, failure-mode tags, observable evidence rules, and aggregation.
+- Rubric provenance: author role, practitioner experience, construction rationale, and review pass count.
+- One to three known-bad or adversarial outputs, plus a partial-credit output where practical.
+- Expected grader verdicts for every anchor.
+- Metadata: task family, value tier, source provenance, difficulty note, single-turn or stateful designation, tool surface, required artifact type, and rights or license status.
+- Any source link or a redaction reason when the source cannot leave the partner environment.
+
+Send it in the working format you use. We will standardize it into the GDPx harness. Do not spend time reproducing our packaging layer unless we ask for a specific adapter.
+
+## Partner submission checklist
+
+Before sending a task, confirm:
+
+- A qualified practitioner could solve it using only the supplied context and tools.
+- The task measures an economically meaningful decision, artifact, or state change.
+- Both kickoff versions ask for the same underlying job.
+- Intentional ambiguity reflects normal work; required private context is discoverable.
+- The environment contains realistic difficulty without arbitrary breakage.
+- The task is not a near-duplicate of another task with names and numbers changed.
+- Every load-bearing tool maps to a real production surface.
+- Stateful work declares pre-state, post-state, forbidden side effects, and reset behavior.
+- The gold output opens, runs, renders, or reconciles as appropriate.
+- Deterministic checks cover everything code can verify.
+- Each judge criterion is atomic and requires demonstrated capability.
+- Weights, tags, evidence requirements, and aggregation are explicit.
+- The grader accepts the gold output and rejects each known-bad anchor for the intended reason.
+- An alternate valid method is not penalized merely for differing from the gold path.
+- Files, prompts, and tool outputs are complete and untruncated.
+- Provenance, practitioner authorship, and rights are disclosed.
+- The difficulty note distinguishes "no evaluated model solved it" from an impossibility claim.
+
+## GDPx launch checklist
+
+Standard Data clears a task for the published benchmark only after confirming:
+
+- The task is declared and tested as benchmark mode, not evaluated under an RL trainability band.
+- The construct, value tier, and family coverage match the GDPx slice.
+- Train, tuning, private holdout, and benchmark-evaluation information flows are separated where sibling tasks exist.
+- The prompt, specification, environment, gold output, and rubric agree.
+- No source answer, hidden test, canary, grader target, or private seed is agent-visible.
+- The deterministic verifier has acceptable known-good and known-bad behavior.
+- The judge has measured FP/FN rates, human calibration, stability, and evidence citations.
+- Atomicity and pass-condition tightness checks pass.
+- The harness and resource envelope are versioned and reproducible.
+- Environment failure rate is below 5% overall and remains controlled under load.
+- Observable traces reconcile tool calls, state changes, final outputs, grader inputs, and reported metrics.
+- Cross-model calibration uses at least three model tiers and enough independent rollouts for the difficulty claim.
+- Approximately 0-50% pass@1 is treated as the target region, with partial scores and cross-model spread used to judge discrimination.
+- Every zero-pass task clears the solvability, verifier, harness, partial-progress, and disclosure safeguards.
+- Floor and ceiling items do not dominate the set.
+- Failures have been triaged, and benchmark defects are not counted as capability failures.
+- At least 20 full trajectories have been manually reviewed across the calibration sample.
+- Native artifacts pass semantic, integrity, and reopen or render checks where relevant.
+- The evaluation card states the exact model-task-harness-resource condition, known limitations, and refresh policy.
+
+## What we will send back
+
+After intake, we will return task-level issues rather than a single opaque accept or reject. Expect comments on solvability, realism, duplicated failure modes, deterministic coverage, rubric atomicity, pass-condition looseness, grader disagreements, environment defects, and difficulty. We may ask to split a compound task or criterion, add an anchor response, expose a missing state check, or replace a benchmark tell with a production-like artifact.
+
+Once a task enters calibration, we will share the model spread, pass@1 and pass@10 profile, mean rubric score, dominant failed criteria, grader disagreements, harness failures, and failure-triage findings. That is the useful loop. A task should improve because we learned what it measures, not because we kept editing it until one model failed.
+
+Send Slack questions as they come up rather than saving them for a meeting. If a task family is hard to source cleanly, flag it early. We would rather launch fewer tasks that survive this process than force a weak family into the benchmark.
+
+Reach me directly with anything.

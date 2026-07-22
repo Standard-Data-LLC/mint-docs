@@ -31,7 +31,23 @@
           "icon": "newspaper"
         }
       ]
-    }
+    },
+    "groups": [
+      {
+        "group": "Getting Started",
+        "pages": [
+          "index",
+          "quickstart"
+        ]
+      },
+      {
+        "group": "GDPx",
+        "pages": [
+          "gdpx/benchmark-task-rubric-best-practices",
+          "gdpx/audit-endpoint"
+        ]
+      }
+    ]
   },
   "logo": {
     "light": "/logo/light.svg",

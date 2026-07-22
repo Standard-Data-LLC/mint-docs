@@ -8,15 +8,6 @@
     "dark": "#15803D"
   },
   "navigation": {
-    "pages": [
-      {
-        "group": "Getting Started",
-        "pages": [
-          "index",
-          "quickstart"
-        ]
-      }
-    ],
     "groups": [
       {
         "group": "Task formats",
@@ -31,18 +22,6 @@
           "gdpx/audit-endpoint"
         ]
       }
-    ]
-  },
-  "contextual": {
-    "options": [
-      "copy",
-      "view",
-      "chatgpt",
-      "claude",
-      "perplexity",
-      "mcp",
-      "cursor",
-      "vscode"
     ]
   },
   "description": "Task formats and developer references for Standard Data benchmark submissions.",

@@ -123,6 +123,8 @@ The [Harbor task](/quickstart#the-runnable-task) is the portable runtime core. G
 | `gold/` | Required | A strong-practitioner reference output and 1–3 known-bad responses that must fail |
 | `samples/` | Required | A few full, untruncated rollouts, their run envelope, and the per-criterion reward ledger |
 
+`RUN_MANIFEST.json` records the model and harness envelope plus token, tool, cost, and wall-clock data for each rollout. `reward_ledger.json` keeps deterministic output, judge output, and the final criterion contribution separate.
+
 ### `TASK.json`
 
 Keep the manifest to the partner-supplied fields below. Standard Data adds revision IDs, hashes, bindings, and other canonical metadata during normalization.

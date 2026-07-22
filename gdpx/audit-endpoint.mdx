@@ -1,25 +1,17 @@
 ---
-title: "Standard Data Audit Endpoint"
+title: "Audit endpoint"
 sidebarTitle: "Audit endpoint"
-description: "How Bench Partners submit GDPx task specifications and benchmark methodology papers to the live audit endpoint."
-keywords: ["GDPx", "audit endpoint", "Engram", "API", "task specification"]
+description: "Submit one GDPx task specification or benchmark paper for preflight review."
+keywords: ["GDPx", "audit endpoint", "API", "task specification"]
 ---
 
-Use the audit API to review one GDPx task specification or benchmark methodology paper before manual review. The service classifies the document, runs the matching checks, and returns structured blockers, warnings, evidence, and suggested fixes.
-
-The audit is a preflight check. It does not replace rollout testing, grader calibration, or launch review. See [Benchmark best practices](/gdpx/benchmark-task-rubric-best-practices) for those requirements.
+The audit API reviews one GDPx task specification or benchmark methodology paper. It returns structured blockers, warnings, evidence, and suggested fixes.
 
 <Warning>
-  GDPx acceptance is governed by Standard Data v15. The deployed `/v1/evaluate` route still runs v14 and should be treated as a one-document preflight, not a v15 certificate. Use `guidelines_version_applied` in the response as the record of which protocol ran.
+  GDPx acceptance follows Standard Data v15. The live `/v1/evaluate` route still runs v14, so treat it as a one-document preflight, not a v15 certificate. The response records the applied version in `guidelines_version_applied`.
 </Warning>
 
-## Checklist scope
-
-The v15 audit contract is designed to enforce the internal checklist directly: required and conditional files, schema validity, artifact hashes, visibility boundaries, provenance, and cross-file consistency.
-
-Harbor compatibility only proves that a task can run. It does not prove that the rubric is sound, the gold and verifier are hidden from the agent, the results are reproducible, or the benchmark clears the v15 evidence gates.
-
-The live endpoint audits one document at a time, so it cannot prove that a multi-file bundle is complete. Use it for authoring feedback, then review the [submission file taxonomy](/gdpx/benchmark-task-rubric-best-practices#submission-file-taxonomy) before handoff.
+For the complete task package, use the [task taxonomy](/quickstart). For content and grading requirements, use [Benchmark best practices](/gdpx/benchmark-task-rubric-best-practices).
 
 ## Base URL
 
@@ -31,38 +23,22 @@ https://task-feedback-vgmxhdw3ka-uc.a.run.app
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `POST` | `/v1/evaluate` | Submit one task specification or benchmark paper for review |
-| `GET` | `/v1/evaluations/{evaluation_id}` | Retrieve a completed evaluation |
+| `POST` | `/v1/evaluate` | Audit one task specification or benchmark paper |
+| `GET` | `/v1/evaluations/{evaluation_id}` | Retrieve an evaluation |
 | `GET` | `/v1/whoami` | Validate an API key and read its rate limit |
-| `GET` | `/v1/healthz` | Check whether the service is reachable; no authentication required |
-
-Use `/v1/evaluate` before the [partner submission checklist](/gdpx/benchmark-task-rubric-best-practices#partner-submission-checklist). A clean response is one input to [what happens after submission](/gdpx/benchmark-task-rubric-best-practices#what-happens-after-submission), not a launch decision by itself.
+| `GET` | `/v1/healthz` | Check service health without authentication |
 
 ## Authentication
 
-All endpoints except `/v1/healthz` require a Standard Data API key.
-
-```http
-Authorization: Bearer <api_key>
-```
-
-Store the key in an environment variable:
+All routes except `/v1/healthz` require a bearer token.
 
 ```bash
 export STANDARD_DATA_API_KEY="<issued-separately>"
 ```
 
-Check the key without starting an evaluation:
-
-```bash
-curl --fail-with-body \
-  --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
-  https://task-feedback-vgmxhdw3ka-uc.a.run.app/v1/whoami
-```
-
 ## Submit a file
 
-Multipart upload is the normal request format. The file field must be named `file`.
+Use multipart form data. The file field must be named `file`.
 
 <CodeGroup>
 
@@ -89,22 +65,11 @@ http --form POST "${API_BASE}/v1/evaluate" \
 
 </CodeGroup>
 
-`options` is optional. When supplied as multipart data, it must be a valid JSON string. Use `verbosity: "full"` while fixing a submission; summary mode removes the detailed finding arrays.
+`options` is optional JSON. Use `verbosity: "full"` while fixing a submission.
 
-## Request structure
+## JSON request
 
-`POST /v1/evaluate` accepts `multipart/form-data` or `application/json`.
-
-### Multipart fields
-
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `file` | file | Yes | Document to audit, up to 10 MB |
-| `options` | JSON string | No | Checks, response verbosity, and suggested-fix settings |
-
-### JSON body
-
-Use JSON transport when the document is already available as text or encoded bytes.
+Use JSON when the input is already text or base64-encoded bytes.
 
 ```json
 {
@@ -122,26 +87,11 @@ Use JSON transport when the document is already available as text or encoded byt
 }
 ```
 
-`task_input.format` accepts `pdf`, `docx`, `markdown`, or `json`. In JSON transport, PDF and DOCX content must be base64-encoded. Markdown and JSON content stays as a raw UTF-8 string.
+`task_input.format` accepts `pdf`, `docx`, `markdown`, or `json`. PDF and DOCX content must be base64-encoded in JSON transport. Submit benchmark methodology papers as text-bearing PDFs on the current API revision.
 
-## Input types
-
-| Input | Routing |
-| --- | --- |
-| PDF | Classified as a task specification or benchmark paper |
-| DOCX | Routed to the task-specification audit |
-| Markdown | Supported for task specifications |
-| JSON | Routed from its top-level structure |
-
-Submit benchmark methodology papers as text-bearing PDFs. On the current API revision, do not submit them as DOCX or Markdown. Structured benchmark JSON must contain top-level `m_items` or `stage3`; task-spec JSON must contain `steps` and the task fields.
-
-For required, conditional, and non-required files, see the [submission file taxonomy](/gdpx/benchmark-task-rubric-best-practices#submission-file-taxonomy).
-
-Do not upload a Harbor directory or v15 bundle archive to the live `/v1/evaluate` route. It accepts only the single-document formats listed above.
+The live route accepts one document, not a Harbor directory or v15 bundle archive.
 
 ## Response
-
-Every successful response includes `kind`, which is either `task_spec` or `benchmark_paper`.
 
 ```json
 {
@@ -162,13 +112,9 @@ Every successful response includes `kind`, which is either `task_spec` or `bench
 }
 ```
 
-Task-spec responses add `task_summary`, `per_step_feedback`, `cross_step_findings`, and `task_metadata_findings`. Benchmark-paper responses add `paper_summary`, `m_item_evaluations`, `stage3_evaluations`, and `findings`.
+`kind` is `task_spec` or `benchmark_paper`. Review `ungraded_sections` before trusting the verdict; material content may not have mapped to the expected document structure.
 
-Review `ungraded_sections` before trusting the verdict. Material content may have failed to map to the expected document structure.
-
-For rubric findings, use [Design rubrics and verifiers](/gdpx/benchmark-task-rubric-best-practices#design-rubrics-and-verifiers). The endpoint does not measure task difficulty; use [Set difficulty](/gdpx/benchmark-task-rubric-best-practices#set-difficulty).
-
-## Retrieve an evaluation
+Retrieve the same result later with:
 
 ```bash
 curl --fail-with-body \
@@ -177,32 +123,11 @@ curl --fail-with-body \
   --output evaluation.json
 ```
 
-The retrieved response has the same shape as the original result.
-
-## Limits and errors
+## Limits
 
 - Maximum file size: `10 MB`
-- Server request ceiling: approximately `15 minutes`
-- Rate limit: set per API key and returned by `/v1/whoami`
+- Request ceiling: approximately `15 minutes`
+- Rate limit: returned by `/v1/whoami`
 - Idempotency keys: not supported
 
-Do not retry a slow request while the original connection is open. A retry can create a second evaluation.
-
-Errors use a top-level `detail` field:
-
-```json
-{"detail":"Explanation of what failed."}
-```
-
-| Status | Meaning |
-| --- | --- |
-| `400` | Invalid body, options, file type, parser input, or file size |
-| `401` | Missing or invalid API key |
-| `404` | Evaluation ID not found |
-| `422` | Document could not be routed to an audit type |
-| `429` | Rate limit exceeded; follow `Retry-After` |
-| `500`, `502`, `504` | Protocol, extraction, upstream model, or timeout failure |
-
-<Note>
-  The live OpenAPI document currently omits the request body for `POST /v1/evaluate`. Add the multipart or JSON body manually when generating a client.
-</Note>
+Do not retry while the original request is still open. A retry can create a second evaluation. Errors return a top-level `detail` field.

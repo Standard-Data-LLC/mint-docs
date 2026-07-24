@@ -1,0 +1,218 @@
+---
+title: "Large-folder uploads"
+sidebarTitle: "Large-folder uploads"
+description: "Roadmap preview for resumable ZIP and folder uploads through the staged source-bundle pipeline."
+icon: "folder-up"
+tag: "Roadmap preview"
+keywords: ["large folder uploads", "ZIP uploads", "source bundles", "RoadmapBench", "resumable uploads"]
+---
+
+<Warning>
+  **Roadmap preview — not available in production.** The upload-session implementation exists in application source, but large-folder admission and external routing remain disabled. Do not build a production client against the route shapes on this page yet.
+</Warning>
+
+The existing v15 import path is intentionally bounded. It is not suitable for a 160 MiB ZIP or a source folder with hundreds of files: it permits 16 MiB per upload, 32 MiB compressed and expanded, 31 archive members, buffers archives in memory, and expects the canonical `task.json` dialect.
+
+<Note>
+  The live `/v1/evaluate` endpoint is unchanged. It remains a synchronous, **single-document API with a 10 MB file limit**. It does not accept a folder, Harbor directory, or v15 source bundle.
+</Note>
+
+`large-folder-v1` is the proposed additive path for resumable ZIP and manifest-driven folder uploads. It separates transport acceptance, quarantine, adaptation, canonical import, and audit readiness instead of treating “uploaded” as “safe and meaningful.”
+
+## Representative folders
+
+Measurements below describe the folders as supplied, before direct-folder packaging exclusions.
+
+| Example | ZIP size | Files | Current bounded result |
+| --- | --: | --: | --- |
+| CEL Go | 14.00 MiB | 831 | Reject: inventory, `.git`, and unsupported folder dialect |
+| Magnum | 29.48 MiB | 1,179 | Reject: compressed, expanded, per-file, inventory, and dialect limits |
+| Oxc Angular Compiler | 5.53 MiB | 733 | Reject: inventory, `.git`, and unsupported folder dialect |
+| Proposed maximum | 256 MiB | 10,000 | Accept up to 1 GiB expanded, subject to every safety check |
+
+The supported direct-folder packager was also exercised against all three folders. After automatic `.git`, `.DS_Store`, and `__MACOSX` exclusion, it produced manifests for 804 CEL files (8,214,354 bytes), 1,154 Magnum files (10,871,629 bytes), and 706 Oxc files (10,574,059 bytes).
+
+These sanitized trees summarize structure without publishing the archives or repository contents.
+
+### CEL Go
+
+```text
+cel-go-0.27.0-roadmap/
+├── instruction.md
+├── task.toml
+├── environment/
+│   ├── Dockerfile
+│   └── repo/…                 # Go source tree
+├── tests/
+│   ├── test.sh
+│   └── test_*.go
+├── solution/
+│   ├── changes.patch
+│   └── solve.sh
+├── .git/…                     # excluded or rejected
+└── .DS_Store                  # excluded
+```
+
+### Magnum
+
+```text
+magnum-2018.10-roadmap/
+├── instruction.md
+├── task.toml
+├── environment/
+│   ├── Dockerfile
+│   └── repo/…                 # C++ source tree
+├── tests/
+│   ├── test.sh
+│   └── test_*.cpp
+├── solution/
+│   ├── changes.patch
+│   └── solve.sh
+└── .git/…                     # excluded or rejected
+```
+
+### Oxc Angular Compiler
+
+```text
+oxc-angular-compiler-0.0.31-roadmap/
+├── instruction.md
+├── task.toml
+├── environment/
+│   ├── Dockerfile
+│   └── repo/…                 # Rust/source workspace
+├── tests/
+│   ├── test.sh
+│   └── test_*.rs
+├── solution/
+│   ├── changes.patch
+│   └── solve.sh
+└── .git/…                     # excluded or rejected
+```
+
+## Current and proposed profiles
+
+| Capability | Bounded profile now | `large-folder-v1` target |
+| --- | --: | --: |
+| Compressed input | 16 MiB per upload; 32 MiB combined | 256 MiB ZIP |
+| Expanded or direct bytes | 32 MiB | 1 GiB |
+| Regular files | 31 archive members | 10,000 |
+| Total ZIP records | 32 scanned objects including root | 20,000 including directories |
+| One file | Current source envelope | 256 MiB |
+| File-set manifest | Not supported | 8 MiB |
+| Transport | One create-only PUT | Create-only PUT or GCS resumable |
+| ZIP processing | Whole archive buffered | Range-read inventory; streamed entries |
+| Scan evidence | Inline attestation v1.1 | Sharded attestation v1.2 |
+| Folder dialect | Canonical `task.json` | Reviewed `roadmapbench-v1` draft |
+
+ZIP store and deflate are supported. ZIP64, encrypted or split ZIPs, nested archives, links, devices, traversal, portable-path collisions, and unsupported compression are rejected. Limits are enforced against both the declared inventory and actual streamed output.
+
+## Architecture decision
+
+| Option | Design | Decision |
+| --- | --- | --- |
+| Raise limits in place | Keep whole-archive buffering and increase constants | Rejected: unsafe RSS, timeout, and provenance behavior |
+| Streaming single importer | Range-read and process one entry at a time with a durable cursor | Viable low-infrastructure fallback, but slow for thousands of scans |
+| Staged source-bundle pipeline | Resumable transport, durable extraction/scanning fan-out, sharded attestations, native folder adapter | Selected |
+
+The selected pipeline uses deterministic per-entry work, exact object generations, create-only opaque staging names, and separate coordinator, extractor, scanner, and finalizer identities. Workers do not list buckets or receive object-admin authority. One request never attempts to process the whole bundle inside a 600-second window.
+
+## Resumable lifecycle
+
+Clients choose one transport:
+
+- `archive`: one ZIP with expected filename, media type, byte size, and SHA-256.
+- `file_set`: a canonical manifest of regular files with normalized path, byte size, SHA-256, media type, and Unix mode.
+
+Part-signing batches contain at most 100 parts. Files up to 8 MiB may use create-only PUTs. Larger files and every archive use GCS resumable sessions with 8 MiB chunks. Treat the returned session URI as a bearer credential: it is returned once and is never logged or persisted. If it is lost, request a new opaque part attempt.
+
+```text
+created → uploading → verifying → inventorying → scanning → ready
+              └──────────────→ rejected / failed / cancelled / expired
+```
+
+Completion is asynchronous and returns `202`. Only `ready` exposes an immutable `source_bundle_revision_id`. Sessions expire after 24 hours, each tenant may hold two active large sessions, and byte capacity is reserved before upload coordinates are minted.
+
+## Four separate trust gates
+
+| Gate | What it proves | What it does not prove |
+| --- | --- | --- |
+| Transport acceptance | Expected parts arrived at exact immutable generations and match declared sizes and hashes | Archive safety, malware safety, or artifact meaning |
+| Quarantine readiness | Complete inventory passed structural checks and exact staged bytes passed scanning | Canonical task completeness |
+| Canonical import | A reviewed adapter mapping produced immutable task and artifact revisions | Audit findings or certification |
+| Audit readiness | Canonical evidence, policies, protocol, and executable environment passed audit admission | Audit outcome |
+
+An upload path never assigns a semantic role. Transport manifests describe bytes. A reviewed adapter mapping decides whether an artifact is agent-visible, tool-mediated, verifier-only, or gold.
+
+## RoadmapBench review
+
+The `roadmapbench-v1` preview proposes this mapping:
+
+| Source path | Draft role |
+| --- | --- |
+| `instruction.md` | Prompt draft |
+| Supported `task.toml` fields | Metadata, resource, and timeout draft |
+| `environment/repo/**` | Agent-visible environment/source |
+| `environment/Dockerfile` | Tool-mediated environment |
+| `tests/**` | Verifier-only validation |
+| `solution/**` | Verifier-only gold |
+
+Unknown paths block review. Missing canonical author, reviewer, provenance, rubric, permission, or constraint fields also remain blocking actions; the adapter never invents them. Approval binds the adapter ID, version, mapping hash, exact entry hashes, and reviewed visibility roles into canonical import.
+
+## Package without VCS metadata
+
+Direct-folder clients automatically exclude:
+
+```text
+.git/
+.DS_Store
+__MACOSX/
+```
+
+A prebuilt ZIP containing `.git/**` fails with `VCS_METADATA_NOT_ALLOWED`. Repackage a tracked working tree without Git metadata:
+
+```sh
+git archive --format=zip --output=task-source.zip HEAD
+```
+
+Review the ZIP before upload: ignored and untracked files are not included by `git archive`. Repository history may be supplied only as an explicitly reviewed, hook-free `git bundle` bound as verifier-only history evidence. Git hooks are never materialized into an agent environment.
+
+## Contract preview
+
+The following route shapes are a roadmap contract, **not executable production API reference**:
+
+```text
+POST /api/v1/upload-sessions
+GET  /api/v1/upload-sessions/{id}
+POST /api/v1/upload-sessions/{id}/parts/sign
+POST /api/v1/upload-sessions/{id}/parts/finalize
+POST /api/v1/upload-sessions/{id}/complete
+POST /api/v1/upload-sessions/{id}/cancel
+GET  /api/v1/source-bundles/{source_bundle_revision_id}
+GET  /api/v1/source-bundles/{source_bundle_revision_id}/entries
+POST /api/v1/source-bundles/{id}/adapters/roadmapbench-v1/preview
+```
+
+At launch, the upload, import, and status pages will move into API reference only after external routing, identity, scanner, max-path, and rollback gates pass.
+
+## Stable errors
+
+Clients should branch on stable codes, not messages.
+
+| Code | Recommended action |
+| --- | --- |
+| `LARGE_FOLDER_PROFILE_DISABLED` | Keep using the bounded API or wait for tenant enablement |
+| `UPLOAD_SESSION_LIMIT_EXCEEDED` | Finish, cancel, or let another active session expire |
+| `TENANT_STORAGE_QUOTA_EXCEEDED` | Reduce the declared bundle or request quota |
+| `UPLOAD_SESSION_EXPIRED` | Create a new session |
+| `PART_HASH_MISMATCH` | Upload the exact declared bytes again |
+| `ARCHIVE_EXPANDED_SIZE_LIMIT_EXCEEDED` | Reduce expanded bytes; related size, entry, record, and path codes identify other limits |
+| `ARCHIVE_UNSUPPORTED_COMPRESSION` | Repackage as a non-ZIP64 store/deflate ZIP |
+| `VCS_METADATA_NOT_ALLOWED` | Remove `.git/**` and repackage |
+| `SCAN_MALWARE_DETECTED` | Remove the flagged input; do not retry unchanged bytes |
+| `ADAPTER_REVIEW_REQUIRED` | Resolve every blocking semantic mapping action |
+
+## Rollout status
+
+The source implementation is behind disabled admission and is not present in the production external route allowlist. Rollout begins with a tenant allowlist. General admission remains blocked until production-equivalent 256 MiB / 1 GiB / 10,000-file boundaries, a 160 MiB ZIP with more than 1,000 files, scanner-fingerprint binding, peak worker RSS below 512 MiB, IAM and route checks, cleanup recovery, and rollback drills all pass.
+
+Rollback disables new sessions while already-bound sessions safely finish, cancel, or expire.

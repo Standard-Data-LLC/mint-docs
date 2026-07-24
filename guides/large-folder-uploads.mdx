@@ -113,7 +113,7 @@ oxc-angular-compiler-0.0.31-roadmap/
 | Scan evidence | Inline attestation v1.1 | Sharded attestation v1.2 |
 | Folder dialect | Canonical `task.json` | Reviewed `roadmapbench-v1` draft |
 
-ZIP store and deflate are supported. ZIP64, encrypted or split ZIPs, nested archives and ZIP-based compound containers, links, devices, traversal, portable-path collisions, and unsupported compression are rejected. Limits are enforced against both the declared inventory and actual streamed output. Renamed ZIP/SFX payloads are recognized from a bounded terminal record even after a long executable preamble; production activation still requires approved-scanner corpus evidence for arbitrarily prefixed 7z/RAR SFX containers.
+ZIP store and deflate are supported. ZIP64, encrypted or split ZIPs, nested archives and ZIP-based compound containers, links, devices, traversal, portable-path collisions, and unsupported compression are rejected. Empty or directory-only ZIPs are rejected before extraction. Limits are enforced against both the declared inventory and actual streamed output. Renamed ZIP/SFX payloads are recognized from a bounded terminal record even after a long executable preamble; production activation still requires approved-scanner corpus evidence for arbitrarily prefixed 7z/RAR SFX containers.
 
 ## Architecture decision
 
@@ -141,7 +141,7 @@ created → uploading → verifying → inventorying → scanning → ready
               └──────────────→ rejected / failed / cancelled / expired
 ```
 
-Completion is asynchronous and returns `202`. Only `ready` exposes an immutable `source_bundle_revision_id`. Sessions expire after 24 hours, each tenant may hold two active large sessions, and byte capacity is reserved before upload coordinates are minted. File sets reserve `max(2 × payload bytes, 8 KiB × file count)`; archives reserve `1 GiB + 2 × declared compressed bytes` for the expanded ceiling plus quarantine and archive-root copies. Rejected, failed, cancelled, and expired inputs retain their byte and per-object metadata charge until exact-generation cleanup completes, with at most 32 retained sessions per tenant; the seven-day rejected-input window cannot be used to accumulate unmetered storage.
+Completion is asynchronous and returns `202`. Only `ready` exposes an immutable `source_bundle_revision_id`. Sessions expire after 24 hours, each tenant may hold two active large sessions, and byte capacity is reserved before upload coordinates are minted. File sets reserve `max(2 × payload bytes, 8 KiB × file count)`; archives reserve `1 GiB + 2 × declared compressed bytes` for the expanded ceiling plus quarantine and archive-root copies. Rejected, failed, cancelled, and expired inputs retain their byte and per-object metadata charge until exact-generation cleanup completes, with at most 32 retained sessions per tenant; the seven-day rejected-input window cannot be used to accumulate unmetered storage. Each reservation mutation records an internal `source_bundle.reservation_observed` snapshot with active count, retained count, and tenant-reserved bytes; these tenant aggregates are operational telemetry and are not returned in public session payloads.
 
 ## Preview CLI
 
@@ -179,7 +179,7 @@ Both commands wait for a terminal state. Use `--no-wait` to return the asynchron
 | Canonical import | A reviewed adapter mapping produced immutable task and artifact revisions | Audit findings or certification |
 | Audit readiness | Canonical evidence, policies, protocol, and executable environment passed audit admission | Audit outcome |
 
-An upload path never assigns a semantic role. Transport manifests describe bytes. A reviewed adapter mapping decides whether an artifact is agent-visible, tool-mediated, verifier-only, or gold.
+An upload path never assigns a semantic role. Transport manifests describe bytes. A reviewed adapter mapping decides whether an artifact is agent-visible, tool-mediated, verifier-only, or gold. Source-bundle revision and entry-inventory reads require a benchmark importer, reviewer, owner, or admin role; a generic tenant identity cannot enumerate paths, hashes, modes, or scanner results.
 
 ## RoadmapBench review
 

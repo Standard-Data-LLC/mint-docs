@@ -21,6 +21,13 @@
           "gdpx/benchmark-task-rubric-best-practices",
           "gdpx/audit-endpoint"
         ]
+      },
+      {
+        "group": "Guides",
+        "icon": "folder-open",
+        "pages": [
+          "guides/large-folder-uploads"
+        ]
       }
     ]
   },

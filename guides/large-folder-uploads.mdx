@@ -32,14 +32,9 @@ Measurements below describe the folders as supplied, before direct-folder packag
 
 The supported direct-folder packager was also exercised against all three folders. After automatic `.git`, `.DS_Store`, and `__MACOSX` exclusion, it produced manifests for 804 CEL files (8,214,354 bytes), 1,154 Magnum files (10,871,629 bytes), and 706 Oxc files (10,574,059 bytes).
 
-Two additional audit-evidence ZIPs were run through the exact range-inventory path with a file-backed, exact-generation object store. These are policy tests, not successful imports.
+A generated, non-customer store-mode ZIP completed the full local inventory, extraction, per-entry scan, and archive-root scan path. It contained 1,001 regular files, 1,002 records, 168,340,338 compressed bytes, and 168,168,000 expanded bytes. With 64 KiB exact-generation reads, one reusable 1 MiB scanner window with 16 KiB overlap, and `NODE_OPTIONS="--max-old-space-size=192 --max-semi-space-size=4"`, it was accepted in 8.605 seconds at 295,124,992 bytes (281.45 MiB) peak RSS. The harness records the effective V8 limit, flags, chunk size, peak heap/external/array-buffer bytes, and RSS by stage. This is local deterministic-scanner evidence; the production-equivalent scanner-fingerprint-bound max-path gate remains open.
 
-| ZIP | Raw ZIP inventory | Candidate files after packaging exclusions | Result | Peak RSS |
-| --- | --: | --: | --- | --: |
-| CAS13 shared validation | 189.93 MiB; 7,596 records; 6,605 files; 519,277,513 expanded bytes | 2,807 files; 518,658,439 bytes | `NESTED_ARCHIVE_NOT_ALLOWED` at `_source/corrected_TableS1.xlsx` before extraction | 269,975,552 bytes |
-| Organoid batch growth | 3.69 MiB; 3,054 records; 3,022 files; 3,344,774 expanded bytes | 1,495 files; 3,095,873 bytes | `NESTED_ARCHIVE_NOT_ALLOWED` at `bundle/dataroom/SOP_growth_analysis.docx` before extraction | 268,140,544 bytes |
-
-The CAS13 ZIP contains 41 XLSX files, six GZIP files, and one nested ZIP; the organoid ZIP contains one DOCX. Under the preview's strict nested-container policy, ZIP-based compound documents such as DOCX and XLSX are containers too. Convert them to a non-container format such as PDF, or unpack them into reviewed regular files, before rebuilding the outer ZIP. A bounded policy rejection is not quarantine readiness.
+Nested archives and ZIP-based compound documents such as DOCX and XLSX remain fail-closed in the preview. Convert them to a non-container format such as PDF, or unpack them into reviewed regular files, before rebuilding the outer ZIP. A bounded policy rejection is not quarantine readiness.
 
 These sanitized trees summarize structure without publishing the archives or repository contents.
 

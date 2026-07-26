@@ -133,4 +133,8 @@ Add a feature only when the task uses it.
 - Private chain-of-thought. Keep observable messages, tool activity, state changes, and final outputs.
 - Raw chat logs, preference pairs, or catalogs presented as runnable tasks. They use a separate intake path.
 
-Use the [audit endpoint](/gdpx/audit-endpoint) for document preflight. It does not validate a Harbor directory or RL delivery archive.
+## Test before canonical import
+
+Start with the [Claude-powered audit endpoint](/gdpx/audit-endpoint). It reviews one document using Standard Data-provided Claude credits and does not create canonical task records in Audit.
+
+After you have reviewed the findings and Standard Data has provisioned import access, follow [Import approved tasks](/gdpx/import-approved-tasks). That `/api/v2` workflow uploads the ZIP, creates a sanitized source bundle, and commits immutable task revisions to the Audit backend.

@@ -18,8 +18,9 @@
       {
         "group": "GDPx",
         "pages": [
-          "gdpx/benchmark-task-rubric-best-practices",
-          "gdpx/audit-endpoint"
+          "gdpx/audit-endpoint",
+          "gdpx/import-approved-tasks",
+          "gdpx/benchmark-task-rubric-best-practices"
         ]
       },
       {

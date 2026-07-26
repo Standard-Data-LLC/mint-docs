@@ -1,0 +1,125 @@
+---
+title: "Import approved tasks"
+sidebarTitle: "2. Import approved tasks"
+description: "Upload a tested task workspace into Audit and create durable immutable task revisions."
+keywords: ["GDPx", "Audit v2", "task import", "upload session", "immutable task revision"]
+---
+
+Use this workflow only after you have tested the task with the [Claude-powered audit endpoint](/gdpx/audit-endpoint), reviewed its findings, and resolved the issues you intend to fix.
+
+<Warning>
+  This is the canonical import path. It is not a dry run. The calls below create durable, tenant-scoped upload sessions, sanitized source bundles, adapter previews, import jobs, and immutable task revisions in the Audit backend.
+</Warning>
+
+## Before you import
+
+You need:
+
+- an Audit API base URL issued by Standard Data;
+- a bearer credential bound to your tenant;
+- the `uploads:write` and `imports:write` scopes;
+- `tasks:read` to view the imported revisions; and
+- a ZIP archive containing the task workspace.
+
+Import access is provisioned separately from the `/v1/evaluate` test endpoint. Do not assume that the task-feedback base URL hosts `/api/v2`. If canonical import admission is not enabled for your tenant, Audit rejects the request without creating an import.
+
+## Canonical import sequence
+
+| Stage | Method and path | Durable effect |
+| --- | --- | --- |
+| Create upload session | `POST /api/v2/upload-sessions` | Creates a tenant-scoped resumable upload session |
+| Create upload part | `POST /api/v2/upload-sessions/{id}/parts/sign` | Registers the single logical archive part |
+| Get upload capability | `GET /api/v2/upload-sessions/{id}/parts/1/capability` | Returns a short-lived resumable storage URL |
+| Upload bytes | `PUT {session_uri}` | Writes the ZIP to quarantined object storage |
+| Finalize upload | `POST /api/v2/upload-sessions/{id}/parts/finalize` | Binds the exact object generation, size, and media type |
+| Start processing | `POST /api/v2/upload-sessions/{id}/complete` | Queues hash verification, inventory, sanitation, and scanning |
+| Poll processing | `GET /api/v2/upload-sessions/{id}` | Returns a sanitized `source_bundle_id` when ready |
+| Preview mapping | `POST /api/v2/source-bundles/{source_bundle_id}/adapter-previews` | Detects the adapter and builds the proposed task mapping |
+| Poll preview | `GET /api/v2/adapter-previews/{preview_id}` | Returns the immutable `mapping_hash` and any blocking issues |
+| Commit import | `POST /api/v2/task-imports` | Creates the durable task-import job |
+| Poll import | `GET /api/v2/task-imports/{import_id}` | Returns the created immutable `task_revision_ids` |
+
+## 1. Create the upload session
+
+Hash the ZIP with SHA-256 before creating the session.
+
+```bash
+export AUDIT_API_BASE="<issued-audit-origin>"
+export STANDARD_DATA_API_KEY="<issued-separately>"
+
+curl --fail-with-body \
+  --request POST "${AUDIT_API_BASE}/api/v2/upload-sessions" \
+  --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
+  --header "Content-Type: application/json" \
+  --header "Idempotency-Key: upload-<stable-client-key>" \
+  --data '{
+    "filename": "task-workspace.zip",
+    "content_type": "application/zip",
+    "size_bytes": 12345678,
+    "sha256": "<64-lowercase-hex-characters>",
+    "intake_profile": "messy-workspace-v1"
+  }'
+```
+
+The response includes `upload_session_id`, `chunk_size_bytes`, and links for the next operations. The current contract accepts one ZIP archive up to 1 GiB.
+
+## 2. Upload and process the archive
+
+Create part `1`, follow its `capability_url`, and upload the ZIP to the returned `session_uri` using resumable `PUT` requests and `Content-Range` headers. Then:
+
+1. Call `parts/finalize` with part `1`, its exact size, and the final ETag when available.
+2. Call `complete` with an empty JSON object.
+3. Poll the upload-session resource until it returns `status: "ready"` and a `source_bundle_id`.
+
+Audit verifies the declared SHA-256 before reading ZIP members. It inventories, sanitizes, and scans retained files before the source bundle becomes available for import.
+
+## 3. Review the adapter mapping
+
+Start the preview:
+
+```bash
+curl --fail-with-body \
+  --request POST "${AUDIT_API_BASE}/api/v2/source-bundles/${SOURCE_BUNDLE_ID}/adapter-previews" \
+  --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
+  --header "Content-Type: application/json" \
+  --header "Idempotency-Key: preview-${SOURCE_BUNDLE_ID}" \
+  --data '{"adapter":"auto"}'
+```
+
+Poll the returned preview resource. Do not import while it is queued, running, blocked, or awaiting required review. A ready preview returns the detected adapter, proposed task mappings, warnings, blocking issues, and an immutable `mapping_hash`.
+
+## 4. Commit the import
+
+After an authorized person accepts the preview, create the import using the exact preview identity:
+
+```bash
+curl --fail-with-body \
+  --request POST "${AUDIT_API_BASE}/api/v2/task-imports" \
+  --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
+  --header "Content-Type: application/json" \
+  --header "Idempotency-Key: import-${SOURCE_BUNDLE_ID}-${MAPPING_HASH}" \
+  --data "{\"source_bundle_id\":\"${SOURCE_BUNDLE_ID}\",\"adapter_preview_id\":\"${ADAPTER_PREVIEW_ID}\",\"mapping_hash\":\"${MAPPING_HASH}\"}"
+```
+
+Poll `GET /api/v2/task-imports/{task_import_id}` until it reaches a terminal state. A successful response contains every created `task_revision_id`.
+
+## View imported revisions
+
+Use the tenant-scoped viewer endpoints after import:
+
+```text
+GET /api/v2/tasks
+GET /api/v2/tasks/{task_revision_id}
+GET /api/v2/tasks/{task_revision_id}/files
+GET /api/v2/tasks/{task_revision_id}/files/{file_id}
+```
+
+Wilderness consumes these same endpoints. Access to the Wilderness UI is not required; any authorized client can implement the import protocol directly.
+
+## Operational rules
+
+- Use a stable `Idempotency-Key` for every mutating request. Do not generate a new key merely because a response timed out.
+- Do not use canonical imports for rapid prompt iteration. Run `/v1/evaluate` first.
+- Cancelling at the adapter-preview screen creates no task revisions, but the sanitized source bundle remains subject to Audit retention policy.
+- An import creates a new immutable revision. It never edits an existing task revision in place.
+- Uploaded historical results remain supplied, unvalidated evidence unless a separate execution or evaluation workflow validates them.

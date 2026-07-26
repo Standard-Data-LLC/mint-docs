@@ -1,15 +1,23 @@
 ---
-title: "Audit endpoint"
-sidebarTitle: "Audit endpoint"
-description: "Submit one GDPx task specification or benchmark paper for preflight review."
-keywords: ["GDPx", "audit endpoint", "API", "task specification"]
+title: "Test with the audit endpoint"
+sidebarTitle: "1. Test with audit"
+description: "Use Standard Data-provided Claude credits to review a task before creating canonical Audit records."
+keywords: ["GDPx", "Claude audit", "preflight endpoint", "API", "task specification", "non-canonical test"]
 ---
 
-The audit API reviews one GDPx task specification or benchmark methodology paper. It returns structured blockers, warnings, evidence, and suggested fixes.
+Start with this endpoint before uploading a task workspace into Audit. It reviews one GDPx task specification or benchmark methodology paper and returns structured blockers, warnings, evidence, and suggested fixes.
+
+<Info>
+  This is the client testing path. It runs on Standard Data-provided Claude credits, so you do not supply an Anthropic API key. It does not create or modify canonical source bundles, task revisions, runs, or certificates in the Audit backend.
+</Info>
+
+Use the response to iterate on the document until you understand the remaining findings. Do not use the canonical import API for prompt or rubric iteration.
 
 <Warning>
   GDPx acceptance follows Standard Data v15. The live `/v1/evaluate` route still runs v14, so treat it as a one-document preflight, not a v15 certificate. The response records the applied version in `guidelines_version_applied`.
 </Warning>
+
+The feedback service may retain evaluation output and operational records for retrieval, rate limiting, and support. That retention is separate from canonical task ingestion: the submitted document does not become a task in Audit.
 
 For the complete task package, use the [task taxonomy](/quickstart). For content and grading requirements, use [Benchmark best practices](/gdpx/benchmark-task-rubric-best-practices).
 
@@ -89,7 +97,7 @@ Use JSON when the input is already text or base64-encoded bytes.
 
 `task_input.format` accepts `pdf`, `docx`, `markdown`, or `json`. PDF and DOCX content must be base64-encoded in JSON transport. Submit benchmark methodology papers as text-bearing PDFs on the current API revision.
 
-The live route accepts one document, not a Harbor directory or v15 bundle archive. For the proposed resumable folder path, see the [large-folder uploads roadmap preview](/guides/large-folder-uploads).
+The live route accepts one document, not a Harbor directory or bundle archive. After testing is complete and Standard Data has provisioned canonical import access, package the workspace as a ZIP and follow [Import approved tasks](/gdpx/import-approved-tasks).
 
 ## Response
 
@@ -131,3 +139,9 @@ curl --fail-with-body \
 - Idempotency keys: not supported
 
 Do not retry while the original request is still open. A retry can create a second evaluation. Errors return a top-level `detail` field.
+
+## Next: import the approved workspace
+
+Move to the canonical API only after you have completed testing, reviewed the findings, and received import access. The `/api/v2` workflow creates durable backend records and immutable task revisions; it is not another test endpoint.
+
+Follow [Import approved tasks](/gdpx/import-approved-tasks) for the resumable ZIP upload, adapter preview, explicit confirmation, and task-import sequence.

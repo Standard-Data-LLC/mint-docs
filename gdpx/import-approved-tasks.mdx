@@ -1,11 +1,13 @@
 ---
 title: "Import approved tasks"
 sidebarTitle: "2. Import approved tasks"
-description: "Upload a tested task workspace into Audit and create durable immutable task revisions."
+description: "Upload a tested task workspace into Wilderness."
 keywords: ["GDPx", "Audit v2", "task import", "upload session", "immutable task revision"]
 ---
 
-Use this workflow only after you have tested the task with the [Claude-powered audit endpoint](/gdpx/audit-endpoint), reviewed its findings, and resolved the issues you intend to fix.
+Wilderness is our internal system for 1) collecting benchmark tasks so we can run rollouts over them efficiently with standardized compute and harnessing and 2) collecting tasks such that we may assess their value for scaled up projects with lab partners.
+
+Use this workflow only after you have tested the task with the [audit endpoint](/gdpx/audit-endpoint), reviewed its findings, and resolved the issues you intend to fix. You will not upload tasks to our wilderness yet **until** we review tasks after you have it go through multiple rounds of the first stage audit endpoint and are comfortable in its integrity.
 
 <Warning>
   This is the canonical import path. It is not a dry run. The calls below create durable, tenant-scoped upload sessions, sanitized source bundles, adapter previews, import jobs, and immutable task revisions in the Audit backend.

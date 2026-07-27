@@ -1,14 +1,14 @@
 ---
 title: "Test with the audit endpoint"
 sidebarTitle: "1. Test with audit"
-description: "Use Standard Data-provided Claude credits to review a task before creating canonical Audit records."
+description: "Use Standard Data's internal review agent to review a task before creating canonical Audit records."
 keywords: ["GDPx", "Claude audit", "preflight endpoint", "API", "task specification", "non-canonical test"]
 ---
 
 Start with this endpoint before uploading a task workspace into Audit. It reviews one GDPx task specification or benchmark methodology paper and returns structured blockers, warnings, evidence, and suggested fixes.
 
 <Info>
-  This is the client testing path. It runs on Standard Data-provided Claude credits, so you do not supply an Anthropic API key. It does not create or modify canonical source bundles, task revisions, runs, or certificates in the Audit backend.
+  This is the client testing path. It runs on Standard Data-provided credits. It does not create or modify canonical source bundles, task revisions, runs, or certificates in the Audit backend.
 </Info>
 
 Use the response to iterate on the document until you understand the remaining findings. Do not use the canonical import API for prompt or rubric iteration.

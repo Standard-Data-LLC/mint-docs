@@ -34,7 +34,16 @@ The supported direct-folder packager was also exercised against all three folder
 
 A generated, non-customer store-mode ZIP completed the full local inventory, extraction, per-entry scan, and archive-root scan path. It contained 1,001 regular files, 1,004 records, 167,970,634 compressed bytes, and 167,772,160 expanded bytes. With 64 KiB exact-generation reads, one reusable 1 MiB scanner window with 16 KiB overlap, and `NODE_OPTIONS="--max-old-space-size=192 --max-semi-space-size=4"`, the final run—including the always-joined extraction pump—was accepted in 4.292 seconds at 335,806,464 bytes (320.25 MiB) peak RSS. The harness records the effective V8 limit, flags, chunk size, peak heap/external/array-buffer bytes, and RSS by stage. This is local deterministic-scanner evidence; the production-equivalent scanner-fingerprint-bound max-path gate remains open.
 
-Nested archives and ZIP-based compound documents such as DOCX and XLSX remain fail-closed in the preview. Convert them to a non-container format such as PDF, or unpack them into reviewed regular files, before rebuilding the outer ZIP. A bounded policy rejection is not quarantine readiness.
+The preview now supports one explicitly bounded embedded-container layer: regular ZIP, GZIP, and non-macro DOCX, XLSX, or PPTX. The scanner inventories ZIP and Office members or streams GZIP output, enforces CRC and actual expanded bytes, and scans every expanded member before binding aggregate evidence to the outer file. A second container layer, macro or active Office content, TAR, 7z/RAR, encryption, ZIP64, links, devices, and renamed containers remain fail-closed.
+
+Two sanitized validation bundles that previously stopped at their first Office document now complete the local path:
+
+| Workload | Outer files | Embedded containers | Outer expanded | Embedded expanded | Result |
+| --- | --: | --: | --: | --: | --- |
+| Scientific validation bundle | 2,807 | 48 | 518,658,439 bytes | 1,034,093,574 bytes | Accepted in 25.403 s at 396,460,032 bytes peak RSS |
+| Audit evidence bundle | 1,495 | 1 | 3,095,873 bytes | 834,215 bytes | Accepted in 1.429 s at 319,078,400 bytes peak RSS |
+
+These remain local deterministic-scanner results. They do not satisfy the production scanner-fingerprint, parser-corpus, IAM, or route activation gates.
 
 These sanitized trees summarize structure without publishing the archives or repository contents.
 
@@ -102,13 +111,15 @@ oxc-angular-compiler-0.0.31-roadmap/
 | Regular files | 31 archive members | 10,000 |
 | Total ZIP records | 32 scanned objects including root | 20,000 including directories |
 | One file | Current source envelope | 256 MiB |
+| Embedded containers | Not allowed | One ZIP/GZIP/DOCX/XLSX/PPTX layer |
+| Embedded expansion | Not allowed | 512 MiB each; 1 GiB per bundle |
 | File-set manifest | Not supported | 8 MiB |
 | Transport | One create-only PUT | Create-only PUT or GCS resumable |
 | ZIP processing | Whole archive buffered | Range-read inventory; streamed entries |
 | Scan evidence | Inline attestation v1.1 | Sharded attestation v1.2 |
 | Folder dialect | Canonical `task.json` | Reviewed `roadmapbench-v1` draft |
 
-ZIP store and deflate are supported. ZIP64, encrypted or split ZIPs, nested archives and ZIP-based compound containers, links, devices, traversal, portable-path collisions, and unsupported compression are rejected. Empty or directory-only ZIPs are rejected before extraction. Limits are enforced against both the declared inventory and actual streamed output. Renamed ZIP/SFX payloads are recognized from a bounded terminal record even after a long executable preamble; production activation still requires approved-scanner corpus evidence for arbitrarily prefixed 7z/RAR SFX containers.
+ZIP store and deflate are supported. One embedded ZIP/GZIP or non-macro Office compound-document layer is inspected without publishing its members as source entries. ZIP64, encrypted or split ZIPs, deeper nesting, active Office content, links, devices, traversal, portable-path collisions, and unsupported compression are rejected. Empty or directory-only ZIPs are rejected before extraction. Limits are enforced against both the declared inventory and actual streamed output. Renamed ZIP/SFX payloads are recognized from a bounded terminal record even after a long executable preamble; production activation still requires approved-scanner corpus evidence for arbitrarily prefixed 7z/RAR SFX containers.
 
 ## Architecture decision
 
@@ -264,14 +275,16 @@ Clients should branch on stable codes, not messages.
 | `PART_HASH_MISMATCH` | Upload the exact declared bytes again |
 | `ARCHIVE_EXPANDED_SIZE_LIMIT_EXCEEDED` | Reduce expanded bytes; related size, entry, record, and path codes identify other limits |
 | `ARCHIVE_UNSUPPORTED_COMPRESSION` | Repackage as a non-ZIP64 store/deflate ZIP |
-| `NESTED_ARCHIVE_NOT_ALLOWED` | Remove or unpack nested archives and ZIP-based compound documents before rebuilding the outer ZIP |
+| `EMBEDDED_CONTAINER_INVALID` | Repair the declared ZIP/GZIP/Office container or remove active or malformed content |
+| `EMBEDDED_CONTAINER_LIMIT_EXCEEDED` | Reduce embedded records or expanded bytes; split the evidence into separately reviewed source files |
+| `NESTED_ARCHIVE_NOT_ALLOWED` | Remove the second container layer or use a supported one-level container |
 | `VCS_METADATA_NOT_ALLOWED` | Remove `.git/**` and repackage |
 | `SCAN_MALWARE_DETECTED` | Remove the flagged input; do not retry unchanged bytes |
 | `ADAPTER_REVIEW_REQUIRED` | Resolve every blocking semantic mapping action |
 
 ## Rollout status
 
-The source implementation is behind disabled admission and is not present in the production external route allowlist. Rollout begins with a tenant allowlist. General admission remains blocked until production-equivalent 256 MiB / 1 GiB / 10,000-file boundaries, a 160 MiB ZIP with more than 1,000 files, scanner-fingerprint binding, peak worker RSS below 512 MiB, IAM and route checks, cleanup recovery, and rollback drills all pass.
+The source implementation is behind disabled admission and is not present in the production external route allowlist. Rollout begins with a tenant allowlist. General admission remains blocked until production-equivalent 256 MiB / 1 GiB / 10,000-file boundaries, a 160 MiB ZIP with more than 1,000 files, scanner-fingerprint binding, peak worker RSS below 512 MiB, IAM and route checks, cleanup recovery, and rollback drills all pass. The release must also pass the approved embedded-container parser and scanner corpus plus the exact 512 MiB-per-container and 1 GiB-per-bundle expansion boundaries.
 
 The dry-run IAM descriptor also gives every worker project-level Firestore mutation authority. Before activation, enforce stage-specific metadata transition APIs or scanner-authenticated result objects so a coordinator or extractor cannot forge a clean scan record that the finalizer signs. Separate worker processes and storage-prefix IAM do not by themselves establish this metadata trust boundary.
 

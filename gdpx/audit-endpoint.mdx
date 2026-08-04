@@ -5,10 +5,10 @@ description: "Audit one task document before creating canonical Audit records."
 keywords: ["GDPx", "audit endpoint", "task preflight", "API", "benchmark", "RL"]
 ---
 
-Use `POST /v1/evaluate` to review one task specification before canonical import. It returns structured findings and does not create source bundles, task revisions, runs, or certificates.
+Use `POST /v1/evaluate` before canonical import. The job of this endpoint is narrow: find defects in one task specification, return the evidence, and stop there. It does not create source bundles, task revisions, runs, or certificates.
 
 <Warning>
-  GDPx acceptance follows Standard Data v15. This endpoint is a v14 document preflight. Use the response to revise the task, not as a v15 acceptance result.
+  This endpoint still runs v14. GDPx acceptance runs on Standard Data v15, so a clean response is useful, not dispositive. Use it to fix the task, not to claim acceptance.
 </Warning>
 
 Use [Define the work](/gdpx/benchmark-task-rubric-best-practices#define-the-work) for prompt findings, [Grade observable work](/gdpx/benchmark-task-rubric-best-practices#grade-observable-work) for rubric and verifier findings, and [Set difficulty](/gdpx/benchmark-task-rubric-best-practices#set-difficulty) for pass@1. For the complete package, see the [task taxonomy](/quickstart).
@@ -66,12 +66,12 @@ http --form POST "${API_BASE}/v1/evaluate" \
 | `verbosity` | `summary` or `full` | Controls response detail |
 | `include_suggested_fixes` | Boolean | Includes or omits proposed fixes |
 
-Use `rl` when the task is for RL but the exact method is not fixed. Use `both` only when the same submission is intended for training and evaluation.
+Use `rl` when the task is for training but the exact RL method is not fixed. Use `both` only when the same task genuinely belongs in training and evaluation; it is not a shortcut around choosing.
 
-A supplied `declared_mode` is authoritative. The service skips document-kind classification, extracts the task, then applies mode-specific grading with the declared value. If the field is absent, the service infers mode.
+Declared mode wins. If you send `benchmark`, the endpoint grades the document as a benchmark task even when the extractor would have called it `sft`. Leave the field out only when you want the service to infer mode.
 
 <Note>
-  On `/v1/evaluate`, `end_target` is recorded but not enforced. Canonical customer and RFP checks use pinned `protocols.lab_specs` in Audit v2. The current Tencent Terminal-Bench checks are deferred in the static release; selecting that target is not a compliance certificate.
+  `end_target` is routing metadata here. It does not turn v1 into a customer RFP audit. Audit v2 owns that check through a pinned `protocols.lab_specs` revision. The current Tencent Terminal-Bench checks remain deferred in the static release, so selecting the target is not a compliance certificate.
 </Note>
 
 ## JSON request
@@ -128,7 +128,7 @@ Use JSON when the input is already text or base64-encoded bytes.
 
 `task_summary.detected_mode` reports the effective mode for backward compatibility. `audit_intent` is omitted when neither `declared_mode` nor `end_target` is supplied.
 
-Review `ungraded_sections` before relying on the verdict. Missing mappings can leave relevant content ungraded.
+Always read `ungraded_sections`. A clean verdict with material left ungraded is not a clean task.
 
 ## Retrieve an evaluation
 
@@ -156,4 +156,4 @@ Do not retry while the original request is open. A retry can create a second eva
 
 ## Import after review
 
-Once the task is ready and Standard Data has provisioned import access, follow [Import approved tasks](/gdpx/import-approved-tasks). Audit v2 uploads the ZIP, creates the sanitized bundle, and commits immutable task revisions.
+Move to [Import approved tasks](/gdpx/import-approved-tasks) only after you have worked through the findings and Standard Data has provisioned import access. Audit v2 uploads the ZIP, sanitizes the bundle, and commits the immutable task revision.

@@ -1,25 +1,17 @@
 ---
 title: "Test with the audit endpoint"
 sidebarTitle: "1. Test with audit"
-description: "Use Standard Data's internal review agent to review a task before creating canonical Audit records."
-keywords: ["GDPx", "Claude audit", "preflight endpoint", "API", "task specification", "non-canonical test"]
+description: "Audit one task document before creating canonical Audit records."
+keywords: ["GDPx", "audit endpoint", "task preflight", "API", "benchmark", "RL"]
 ---
 
-Start with this endpoint before uploading a task workspace into Audit. It reviews one GDPx task specification or benchmark methodology paper and returns structured blockers, warnings, evidence, and suggested fixes.
-
-<Info>
-  This is the client testing path. It runs on Standard Data-provided credits. It does not create or modify canonical source bundles, task revisions, runs, or certificates in the Audit backend.
-</Info>
-
-Use the response to iterate on the document until you understand the remaining findings. Do not use the canonical import API for prompt or rubric iteration.
+Use `POST /v1/evaluate` to review one task specification before canonical import. It returns structured findings and does not create source bundles, task revisions, runs, or certificates.
 
 <Warning>
-  GDPx acceptance follows Standard Data v15. The live `/v1/evaluate` route still runs v14, so treat it as a one-document preflight, not a v15 certificate. The response records the applied version in `guidelines_version_applied`.
+  GDPx acceptance follows Standard Data v15. This endpoint is a v14 document preflight. Use the response to revise the task, not as a v15 acceptance result.
 </Warning>
 
-The feedback service may retain evaluation output and operational records for retrieval, rate limiting, and support. That retention is separate from canonical task ingestion: the submitted document does not become a task in Audit.
-
-For the complete task package, use the [task taxonomy](/quickstart). For content and grading requirements, use [Benchmark best practices](/gdpx/benchmark-task-rubric-best-practices).
+Use [Define the work](/gdpx/benchmark-task-rubric-best-practices#define-the-work) for prompt findings, [Grade observable work](/gdpx/benchmark-task-rubric-best-practices#grade-observable-work) for rubric and verifier findings, and [Set difficulty](/gdpx/benchmark-task-rubric-best-practices#set-difficulty) for pass@1. For the complete package, see the [task taxonomy](/quickstart).
 
 ## Base URL
 
@@ -27,26 +19,17 @@ For the complete task package, use the [task taxonomy](/quickstart). For content
 https://task-feedback-vgmxhdw3ka-uc.a.run.app
 ```
 
-## Endpoints
+## Authenticate
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `POST` | `/v1/evaluate` | Audit one task specification or benchmark paper |
-| `GET` | `/v1/evaluations/{evaluation_id}` | Retrieve an evaluation |
-| `GET` | `/v1/whoami` | Validate an API key and read its rate limit |
-| `GET` | `/v1/healthz` | Check service health without authentication |
-
-## Authentication
-
-All routes except `/v1/healthz` require a bearer token.
+Every route except `/v1/healthz` requires a bearer token.
 
 ```bash
 export STANDARD_DATA_API_KEY="<issued-separately>"
 ```
 
-## Submit a file
+## Audit a file
 
-Use multipart form data. The file field must be named `file`.
+Send multipart form data. The file field must be named `file`.
 
 <CodeGroup>
 
@@ -56,8 +39,8 @@ API_BASE="https://task-feedback-vgmxhdw3ka-uc.a.run.app"
 curl --fail-with-body \
   --request POST "${API_BASE}/v1/evaluate" \
   --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
-  --form "file=@/absolute/path/to/task-spec.pdf;type=application/pdf" \
-  --form 'options={"checks_to_run":["all"],"verbosity":"full","include_suggested_fixes":true}' \
+  --form "file=@/absolute/path/to/instructions.docx" \
+  --form 'options={"declared_mode":"benchmark","end_target":"gdpx-v1","checks_to_run":["all"],"verbosity":"full","include_suggested_fixes":true}' \
   --max-time 1500 \
   --output evaluation.json
 ```
@@ -67,13 +50,29 @@ API_BASE="https://task-feedback-vgmxhdw3ka-uc.a.run.app"
 
 http --form POST "${API_BASE}/v1/evaluate" \
   Authorization:"Bearer ${STANDARD_DATA_API_KEY}" \
-  file@/absolute/path/to/task-spec.pdf \
-  'options={"checks_to_run":["all"],"verbosity":"full","include_suggested_fixes":true}'
+  file@/absolute/path/to/instructions.docx \
+  'options={"declared_mode":"benchmark","end_target":"gdpx-v1","checks_to_run":["all"],"verbosity":"full","include_suggested_fixes":true}'
 ```
 
 </CodeGroup>
 
-`options` is optional JSON. Use `verbosity: "full"` while fixing a submission.
+## Options
+
+| Field | Values | Behavior |
+| --- | --- | --- |
+| `declared_mode` | `benchmark`, `rl`, `sft`, `rlvr`, `rlhf`, `dpo`, `sdft`, `agentic`, `both` | Overrides inferred mode and selects the matching checks |
+| `end_target` | Lowercase slug such as `gdpx-v1` or `tencent-terminal-bench-v1` | Records the requested customer destination |
+| `checks_to_run` | `["all"]` or named sections | Limits the grader set |
+| `verbosity` | `summary` or `full` | Controls response detail |
+| `include_suggested_fixes` | Boolean | Includes or omits proposed fixes |
+
+Use `rl` when the task is for RL but the exact method is not fixed. Use `both` only when the same submission is intended for training and evaluation.
+
+A supplied `declared_mode` is authoritative. The service skips document-kind classification, extracts the task, then applies mode-specific grading with the declared value. If the field is absent, the service infers mode.
+
+<Note>
+  On `/v1/evaluate`, `end_target` is recorded but not enforced. Canonical customer and RFP checks use pinned `protocols.lab_specs` in Audit v2. The current Tencent Terminal-Bench checks are deferred in the static release; selecting that target is not a compliance certificate.
+</Note>
 
 ## JSON request
 
@@ -84,9 +83,11 @@ Use JSON when the input is already text or base64-encoded bytes.
   "task_input": {
     "format": "markdown",
     "content": "# Task title\n\nTask instructions...",
-    "filename": "task.md"
+    "filename": "instruction.md"
   },
   "options": {
+    "declared_mode": "benchmark",
+    "end_target": "gdpx-v1",
     "checks_to_run": ["all"],
     "guidelines_version": "v14",
     "verbosity": "full",
@@ -95,9 +96,7 @@ Use JSON when the input is already text or base64-encoded bytes.
 }
 ```
 
-`task_input.format` accepts `pdf`, `docx`, `markdown`, or `json`. PDF and DOCX content must be base64-encoded in JSON transport. Submit benchmark methodology papers as text-bearing PDFs on the current API revision.
-
-The live route accepts one document, not a Harbor directory or bundle archive. After testing is complete and Standard Data has provisioned canonical import access, package the workspace as a ZIP and follow [Import approved tasks](/gdpx/import-approved-tasks).
+`task_input.format` accepts `pdf`, `docx`, `markdown`, or `json`. PDF and DOCX content must be base64-encoded in JSON transport. The endpoint accepts one document, not a Harbor directory or ZIP.
 
 ## Response
 
@@ -105,24 +104,33 @@ The live route accepts one document, not a Harbor directory or bundle archive. A
 {
   "kind": "task_spec",
   "evaluation_id": "eval_...",
+  "task_summary": {
+    "detected_mode": "benchmark"
+  },
+  "audit_intent": {
+    "declared_mode": "benchmark",
+    "extracted_mode": "sft",
+    "effective_mode": "benchmark",
+    "mode_source": "customer_declared",
+    "end_target": "gdpx-v1",
+    "end_target_status": "recorded_not_enforced_by_v1"
+  },
   "aggregate_verdict": {
     "ready_to_submit": false,
     "blocking_issues_count": 2,
     "warning_count": 3,
-    "info_count": 1,
-    "estimated_fix_time_minutes": 45
+    "info_count": 1
   },
   "ungraded_sections": [],
-  "guidelines_version_applied": "v14",
-  "model_versions": {},
-  "latency_ms": 0,
-  "timestamp": "..."
+  "guidelines_version_applied": "v14"
 }
 ```
 
-`kind` is `task_spec` or `benchmark_paper`. Review `ungraded_sections` before trusting the verdict; material content may not have mapped to the expected document structure.
+`task_summary.detected_mode` reports the effective mode for backward compatibility. `audit_intent` is omitted when neither `declared_mode` nor `end_target` is supplied.
 
-Retrieve the same result later with:
+Review `ungraded_sections` before relying on the verdict. Missing mappings can leave relevant content ungraded.
+
+## Retrieve an evaluation
 
 ```bash
 curl --fail-with-body \
@@ -131,6 +139,12 @@ curl --fail-with-body \
   --output evaluation.json
 ```
 
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/v1/evaluations/{evaluation_id}` | Retrieve an evaluation owned by the API caller |
+| `GET` | `/v1/whoami` | Validate the key and read its rate limit |
+| `GET` | `/v1/healthz` | Check service health without authentication |
+
 ## Limits
 
 - Maximum file size: `10 MB`
@@ -138,10 +152,8 @@ curl --fail-with-body \
 - Rate limit: returned by `/v1/whoami`
 - Idempotency keys: not supported
 
-Do not retry while the original request is still open. A retry can create a second evaluation. Errors return a top-level `detail` field.
+Do not retry while the original request is open. A retry can create a second evaluation. Errors return a top-level `detail` field.
 
-## Next: import the approved workspace
+## Import after review
 
-Move to the canonical API only after you have completed testing, reviewed the findings, and received import access. The `/api/v2` workflow creates durable backend records and immutable task revisions; it is not another test endpoint.
-
-Follow [Import approved tasks](/gdpx/import-approved-tasks) for the resumable ZIP upload, adapter preview, explicit confirmation, and task-import sequence.
+Once the task is ready and Standard Data has provisioned import access, follow [Import approved tasks](/gdpx/import-approved-tasks). Audit v2 uploads the ZIP, creates the sanitized bundle, and commits immutable task revisions.

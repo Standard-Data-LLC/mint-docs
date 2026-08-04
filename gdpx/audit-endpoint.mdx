@@ -61,7 +61,7 @@ http --form POST "${API_BASE}/v1/evaluate" \
 | Field | Values | Behavior |
 | --- | --- | --- |
 | `declared_mode` | `benchmark`, `rl`, `sft`, `rlvr`, `rlhf`, `dpo`, `sdft`, `agentic`, `both` | Overrides inferred mode and selects the matching checks |
-| `end_target` | Lowercase slug such as `gdpx-v1` or `tencent-terminal-bench-v1` | Records the requested customer destination |
+| `end_target` | Lowercase slug such as `gdpx-v1` or `customer-rfp-v1` | Records the requested customer destination |
 | `checks_to_run` | `["all"]` or named sections | Limits the grader set |
 | `verbosity` | `summary` or `full` | Controls response detail |
 | `include_suggested_fixes` | Boolean | Includes or omits proposed fixes |
@@ -71,7 +71,7 @@ Use `rl` when the task is for training but the exact RL method is not fixed. Use
 Declared mode wins. If you send `benchmark`, the endpoint grades the document as a benchmark task even when the extractor would have called it `sft`. Leave the field out only when you want the service to infer mode.
 
 <Note>
-  `end_target` is routing metadata here. It does not turn v1 into a customer RFP audit. Audit v2 owns that check through a pinned `protocols.lab_specs` revision. The current Tencent Terminal-Bench checks remain deferred in the static release, so selecting the target is not a compliance certificate.
+  `end_target` is routing metadata here. It does not turn v1 into a customer RFP audit. Audit v2 owns that check through a pinned `protocols.lab_specs` revision, and any requirement without an evaluator stays deferred rather than being marked passed.
 </Note>
 
 ## JSON request
@@ -126,7 +126,7 @@ Use JSON when the input is already text or base64-encoded bytes.
 }
 ```
 
-`task_summary.detected_mode` reports the effective mode for backward compatibility. `audit_intent` is omitted when neither `declared_mode` nor `end_target` is supplied.
+`task_summary.detected_mode` reports the effective mode for backward compatibility. On task-spec responses, `audit_intent` is omitted when neither `declared_mode` nor `end_target` is supplied.
 
 Always read `ungraded_sections`. A clean verdict with material left ungraded is not a clean task.
 

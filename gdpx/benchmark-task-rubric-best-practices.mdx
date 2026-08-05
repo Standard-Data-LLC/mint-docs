@@ -86,7 +86,7 @@ If every model earns zero or near-zero partial credit, split or rework the task.
 
 ## GDPx standardized task bundle
 
-The [Harbor task](/quickstart#the-runnable-task) is the portable runtime core. GDPx adds a partner-facing delivery layer so we can isolate the grader, reproduce a score, and normalize the task into the v15 bundle.
+The [Harbor task](/quickstart#the-runnable-task) is the portable runtime core. GDPx adds a canonical per-task layer so we can isolate the grader, reproduce a score, and normalize the task into the v15 bundle. This is the normalization target: you may author it directly or provide the batch evidence package below for reviewed adaptation.
 
 ```text
 <TASK_ID>/
@@ -148,9 +148,274 @@ Numeric examples in templates are illustrative. Set criterion count, verifier mi
 4. Keep the rubric atomic. Each criterion has one claim, a weight, a failure tag, and one declared aggregation rule.
 5. Maintain one reward ledger. Record deterministic output, judge output, and final contribution per criterion.
 
+## Package a delivery batch for upload
+
+The single-task bundle above is the canonical normalized unit. A multi-task delivery uses an upstream batch envelope so the runnable task, complete rollout corpus, and QA documentation remain isolated from one another. Audit first stores the ZIP as a source bundle; an adapter preview must map its contents into canonical task units before import.
+
+Do not copy the whole authoring bundle into the runtime directory. Export only the approved runnable task under `tasks/`. Keep trajectories under `trajectory/` and supporting material under `docs/`.
+
+<Info>
+  The batch handoff uses `trajectory/` in the singular. Every task name must match exactly across `tasks/`, `trajectory/`, and `docs/`.
+</Info>
+
+### Batch archive layout
+
+Create one top-level directory named `<dataset>-<batch>-<num>/` and package that directory as a ZIP.
+
+```text
+<dataset>-<batch>-<num>/
+├── tasks/                                      # required: runnable tasks only
+│   └── <task_name>/
+│       ├── task.toml
+│       ├── instruction.md
+│       ├── environment/                        # Dockerfile and workspace
+│       ├── tests/
+│       │   └── test.sh                         # writes /logs/verifier/reward.json
+│       └── solution/
+│           └── solve.sh                        # optional when the Oracle has another form
+├── trajectory/                                 # required: full rollout evidence
+│   └── <task_name>/
+│       └── <model_name>/
+│           └── rollout_<harness@version>_<n>/
+│               ├── trajectory.json             # ATIF-format full trace
+│               ├── reward.json
+│               └── failure_analysis/
+│                   └── failure_analysis.md      # required for every failed rollout
+├── environment/                                # required only for private images
+│   ├── README.md                                # image-to-task map
+│   └── <image_name>/
+│       ├── <loadable image or full build context>
+│       └── manifest.md                          # name:tag, digest, and load/build steps
+└── docs/                                        # required: never part of the agent runtime
+    ├── README.md
+    ├── failure_analysis_metadata.md
+    ├── reward_hacking.md
+    └── <task_name>/
+        ├── README.md
+        ├── report.md
+        ├── context_info.md
+        └── edit_history/                        # strongly encouraged
+            ├── v0/
+            │   └── task/
+            └── v1/
+                ├── task/
+                ├── review/
+                └── v0_v1_patch.diff
+```
+
+The archive may contain more evidence under `trajectory/` and `docs/`, but `tasks/` must stay harness-ready. Do not place reports, review notes, hidden grading values, or rollout analysis inside a runnable task.
+
+Keep the authoring artifacts from the standardized task bundle:
+
+| Authoring artifact | Batch destination |
+| --- | --- |
+| Approved unstructured kickoff | `tasks/<task_name>/instruction.md` |
+| Structured kickoff, `TASK.json`, provenance, and rubric rationale | `docs/<task_name>/` or its documented subdirectories |
+| Agent environment and tool definitions | `tasks/<task_name>/environment/` |
+| Deterministic grader | `tasks/<task_name>/tests/` with verifier-only runtime visibility |
+| Oracle or reference solution | `tasks/<task_name>/solution/` or an equivalent verifier-only reference |
+| Rollouts, run envelope, rewards, and failure analyses | `trajectory/<task_name>/...` |
+| Known-good and known-bad calibration artifacts | `docs/<task_name>/` as grader-only evidence |
+
+Keep the complete rollout corpus in the batch archive. A normalized per-task `samples/` directory may contain a representative subset, but `RUN_MANIFEST.json` and `reward_ledger.json` must reconcile to the complete delivered evidence.
+
+### Prepare the ZIP
+
+1. Verify that every task has matching entries under `tasks/`, `trajectory/`, and `docs/`.
+2. Remove `.git/`, `.DS_Store`, `__MACOSX/`, symbolic links, secrets, temporary files, and unrelated build output.
+3. Confirm that each environment builds from the delivered files alone. Pin or include every base image, dependency, workspace asset, tool definition, and skill document.
+4. Put exactly one batch root in the archive. Do not upload several unrelated roots or a directory-only ZIP.
+5. Record the final filename, byte size, media type `application/zip`, and SHA-256 of the exact bytes you will upload.
+6. Test the methodology document with the [audit endpoint](/gdpx/audit-endpoint), then upload the ZIP as a source bundle through the [canonical Audit API](/gdpx/import-approved-tasks) after approval.
+
+<Warning>
+  The document preflight endpoint accepts one PDF, DOCX, Markdown, or JSON document. It does not accept this ZIP. The canonical flow performs the resumable upload, quarantine, scanning, and adapter preview. A successful byte upload is not task acceptance: stop if the preview is blocked, incomplete, or does not map every task and visibility boundary exactly.
+</Warning>
+
+Raw preference pairs, pure trajectory collections, catalogs, and other data that cannot be represented as verifiable runnable tasks use a separate intake path. Do not force them into this archive shape.
+
+### Make environments self-contained
+
+Every task environment must build from the delivered files without access to an undisclosed registry or local workstation state. Pin dependencies and include the complete workspace and build context.
+
+If a task uses a private image, add the root-level `environment/` package. Supply a loadable or reproducible artifact such as an exported image, OCI layout, or Dockerfile with its full build context. Its manifest must record the exact `name:tag`, digest, registry when applicable, and load or build instructions. The root `environment/README.md` maps each image to every dependent task.
+
+Public images should be pinned by digest. Do not submit a task that depends on an image the reviewer or execution worker cannot retrieve or reconstruct.
+
+## Pass the acceptance gates
+
+Run these gates after the final image and task bytes are fixed. Any failure returns the task for rework.
+
+| Gate | Check | Pass condition | Failure meaning |
+| --- | --- | --- | --- |
+| G0 | Buildable environment | The environment builds from delivered files with no missing dependencies, base images, or workspace assets | Unbuildable or incomplete environment |
+| G1 | Oracle = 1.0 | The reference solution produces reward exactly `1.0` when a reasonable Oracle can be supplied | Missing or broken Oracle |
+| G2 | No-op = 0.0 | Doing nothing produces reward exactly `0.0` | Reward leakage or vacuous tests |
+
+`tests/test.sh` must write the final reward to `/logs/verifier/reward.json`. Do not pre-generate this file in the task. The harness must keep tests, solutions, gold material, and hidden grading values unreadable to the agent.
+
+The shell Oracle is optional only when it is the wrong representation for the task. GDPx still requires an equivalent known-good artifact and a reproducible way to prove that it passes.
+
+## Record the rollout envelope
+
+Use full, untruncated trajectories. Pin the model, harness, harness version, prompts, tool definitions, sampling settings, turn budget, timeout, context policy, retry policy, and judge version.
+
+For a delivery-ready difficulty study, use this minimum per-task envelope. These are two required anchors within the broader three-tier calibration described above; include at least one additional tier.
+
+| Tier | Minimum evidence | Difficulty condition |
+| --- | --- | --- |
+| Baseline reasoning model | At least 16 independent rollouts | Resolve rate strictly below `50%`; at 16 runs, no more than 7 resolves |
+| Frontier model | At least 5 independent rollouts | At most 2 resolves, or `40%` |
+
+Use Hy3 Preserve Thinking for the baseline when that evaluation profile is requested. Use GPT 5.6 Sol or Fable 5 for the frontier tier; GPT 4.8 or 5.5 is acceptable only for older data. Highlight tasks where the frontier model resolves consistently while the baseline consistently fails.
+
+If both tiers resolve a task zero times, do not infer difficulty from failure alone. Demonstrate that the task is non-broken with the calibrated hint procedure below. Recompute every pass rate after excluding confirmed reward-hacked runs.
+
+You may summarize a rollout set in `task.toml`:
+
+```toml
+[rollout_baseline.model]
+name = "<full-model-name>"
+harness = "<harness-name>"
+rollout_n = 16
+reward_mean = 0.25
+reward_std = 0.43
+reward_min = 0.0
+reward_max = 1.0
+pass_rate = 0.25
+mean_steps = 54.0
+mean_cost_usd = 0.42
+mean_prompt_tokens = 12500
+mean_completion_tokens = 4200
+```
+
+Treat these values as a summary of the delivered `reward.json` files, not as a substitute for them.
+
+## Use hints as causal probes
+
+A hint has two purposes: show that a zero-resolve task is solvable in principle and test whether a proposed failure mode caused the observed failure.
+
+For each probe:
+
+1. Select a failed trajectory and identify its likely root cause. A symptom such as “the patch is wrong” is not a root cause.
+2. Write a hint that addresses the suspected cause without giving away the answer.
+3. Add the hint to the instruction and rerun the same pinned evaluation envelope.
+4. Record the exact hint, calibration rationale, rerun outcome, and interpretation.
+
+A calibrated hint occupies the narrow band between two bad extremes:
+
+- **Over-specified:** It names the exact file, function, constraint, or solution the agent was expected to discover.
+- **Under-specified:** It asks the agent to “try harder,” “pay attention,” or otherwise gives no actionable direction.
+- **Calibrated:** It names the dimension that needs attention—such as exploration completeness, regression safety, edge cases, or API contracts—while leaving the actual discovery to the agent.
+
+Partial progress can validate a failure label when the hinted run gets past the original failure and later fails elsewhere. Demonstrating that a zero-resolve task is non-broken is stricter: a calibrated partial hint must enable an agent to solve the task without directly revealing the solution.
+
+Interpret outcomes explicitly:
+
+- The agent surpasses the failure after a calibrated hint: the proposed failure mode has causal support.
+- The hint does not change behavior: the label remains unverified and may be wrong.
+- Only an answer-revealing hint works: investigate a broken environment, false negative, false positive, or task-construction defect.
+
+Unvalidated labels are hypotheses, not confirmed failure modes.
+
+## Analyze every failed trajectory
+
+Every failed rollout needs `trajectory/<task_name>/<model_name>/rollout_<harness@version>_<n>/failure_analysis/failure_analysis.md`. The required baseline and frontier anchors produce at least 21 rollout attempts per task; only failed attempts require a failure-analysis file.
+
+Each file must include:
+
+- the failure-mode label or labels;
+- root-cause reasoning rather than a surface symptom;
+- the exact calibrated hint;
+- why the hint is neither over-specified nor under-specified;
+- the rerun result; and
+- the causal interpretation, including broken-environment, false-negative, or false-positive concerns.
+
+Characterize each task as concentrated when failures cluster around one or two modes, or diverse when it exhibits 10 or more distinct reasons. Neither pattern is automatically better; explain the evaluation or training signal it provides.
+
+The root `docs/failure_analysis_metadata.md` must contain both methodology and distribution:
+
+1. **Methodology:** the complete taxonomy and definitions, how reviewers inspect trajectories and assign causes, how hints validate labels, how hints are calibrated, how outcomes are interpreted, and how the analysis itself is quality-checked.
+2. **Distribution and insights:** cumulative frequency of every failure mode, what dominates or remains rare, and a histogram of task counts by number of distinct failure modes per task.
+
+## Preserve context and edit history
+
+Every `docs/<task_name>/README.md` and `context_info.md` must state the task’s origin: annotator-invented, derived from a real practitioner workflow, or derived from reviewed user, platform, commit, or completion history. Include the larger workflow, upstream inputs, downstream use, practitioner context, rights, and sanitization.
+
+An expanded `edit_history/` is strongly encouraged. Do not provide only a changelog. Materialize every version as a full task snapshot:
+
+```text
+edit_history/
+├── v0/
+│   └── task/                  # the task exactly as first authored
+├── v1/
+│   ├── task/                  # complete v1 snapshot
+│   ├── review/                # comments that triggered v1
+│   └── v0_v1_patch.diff
+└── v2/
+    ├── task/
+    ├── review/
+    └── v1_v2_patch.diff
+```
+
+`v0/` contains no review or diff because it is the origin. Every later version includes the complete task, the human, automated, or model-assisted review that triggered the change, and the exact patch from the prior version. Document the review pipeline and identify qualified human reviewers so each revision is attributable.
+
+## Document reward hacking
+
+Reward hacking means receiving reward by gaming the verifier instead of solving the intended task. Examples include hardcoding expected outputs, editing or disabling tests, exploiting verifier paths, or exiting early after fabricating a reward file. Audit passing trajectories as well as failed ones; suspicious success is often the strongest signal.
+
+The root `docs/reward_hacking.md` must cover four areas:
+
+1. **Observation:** identify affected tasks, models, and trajectories and describe the exploit. If none were found, say so and describe the breadth of the audit.
+2. **Detection:** explain manual, automated, or judge-assisted review; include signals such as unusually short runs, test modification, out-of-band reward-file writes, and passes without work on the intended surface.
+3. **Prevention:** document verifier hardening, intended-surface checks, and task revisions made to close loopholes. Link those changes to `edit_history/`.
+4. **Suggestions:** record residual risks, structurally vulnerable task patterns, and downstream mitigations such as judge-based verification.
+
+Exclude every confirmed hacked run from resolves and recompute difficulty statistics. Record the adjustment.
+
+## Write complete reports
+
+`docs/<task_name>/report.md` must be detailed enough to support review; a one-page summary is not sufficient. Cover task context, provenance, edit history, rollout envelope, hint-validated failures, failure distribution, reward-hacking observations, and non-brokenness evidence when required.
+
+At the dataset level:
+
+- `docs/README.md` states scope, task inventory, provenance, model and harness pins, and known limitations.
+- `docs/failure_analysis_metadata.md` contains the cross-task methodology and distributions.
+- `docs/reward_hacking.md` contains observations, detection, prevention, suggestions, exclusions, and residual risk.
+
+Justify quality across each component and relationship:
+
+| Surface | What to prove |
+| --- | --- |
+| Instruction ↔ environment | Information is placed deliberately; the instruction is minimal, while discoverable facts remain in the environment |
+| Instruction ↔ verifier | The verifier checks exactly what the instruction requests; a mismatch is a severe defect |
+| Tests and verifier | Coverage is comprehensive, resists reward hacking, and controls false positives and false negatives |
+| Model-assisted judge | The judge is callable through the approved execution interface and its model, prompt, version, and evidence inputs are pinned |
+| Solution or reference | It passes for the intended reason; report whether it also has instructional value |
+| Configuration | Timeouts, resources, and settings are sensible; express memory as an integer number of MB |
+| Documentation | Every claim is accurate, complete, attributable, and consistent with task, rollout, and reward evidence |
+
+## Batch acceptance checklist
+
+- One ZIP contains one correctly named batch root.
+- Task names match exactly across `tasks/`, `trajectory/`, and `docs/`.
+- `tasks/` contains only runnable task material.
+- Every environment is complete, pinned, resettable, and buildable from delivered files.
+- Private images include a loadable artifact or full build context, exact tag and digest, instructions, and task mapping.
+- G0, G1, and G2 pass on the final delivered bytes.
+- Every verifier writes `/logs/verifier/reward.json` at runtime.
+- Model, harness, version, prompt, tool, sampling, budget, timeout, context, judge, and retry settings are pinned.
+- Baseline and frontier rollout counts and pass rates meet the declared difficulty envelope.
+- Zero-resolve tasks include calibrated non-brokenness evidence.
+- Every failed rollout has root-cause and hint-validation analysis.
+- Dataset-level failure taxonomy, distributions, and task-count histogram are complete.
+- Reward hacking is documented, passing trajectories were audited, and hacked runs are excluded from pass rates.
+- Per-task context, provenance, reports, and any edit history are complete and attributable.
+- Agent-visible, verifier-only, solution, and gold boundaries are enforced by the runtime, not merely described in prose.
+
 ## Partner delivery and Standard Data review
 
-The first delivery is the task bundle above. Partners supply the facts Standard Data cannot invent: source assets, provenance, rights, practitioner context, rubric rationale, tool definitions, and known-good or known-bad artifacts.
+The complete handoff includes either the canonical task bundle above or a batch evidence archive that can be mapped into it without inventing missing facts. Partners supply the source assets, provenance, rights, practitioner context, rubric rationale, tool definitions, and known-good or known-bad artifacts that Standard Data cannot create on their behalf.
 
 Standard Data runs the integrity pass:
 

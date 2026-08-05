@@ -1,8 +1,8 @@
 ---
 title: "RL and benchmark task taxonomy"
-description: "Taxonomy Requirements for RL and Benchmark Tasks"
+description: "Required delivery package, evidence, and failure-analysis taxonomy for RL and benchmark tasks."
 sidebarTitle: "Task taxonomy"
-keywords: ["Harbor", "RL tasks", "benchmark tasks", "task format"]
+keywords: ["Harbor", "RL tasks", "benchmark tasks", "task format", "failure analysis", "rollout evidence"]
 ---
 
 An RL task and a benchmark task share the same runnable core. The difference is the evidence around it: a benchmark needs enough evidence to defend a score, while an RL delivery needs enough rollout and reward data to train from the task.
@@ -18,6 +18,9 @@ For multi-lab work, Harbor is the common intake format we use. OpenAI and Anthro
 | Layer | Benchmark | RL | What it proves |
 | --- | --- | --- | --- |
 | Runnable Harbor task | Required | Required | The task can run, reset, and produce a reward |
+| Delivery package | Required | Required | Runnable tasks, rollout evidence, and documentation stay isolated |
+| Failed-rollout analysis | Required | Required | Every observed failure has an evidence-backed cause and status |
+| Failure taxonomy and distributions | Required | Required | Failure patterns can be compared across models and tasks |
 | Gold or Oracle solution | Required by Standard Data | Strongly recommended | The task is solvable and the verifier can recognize a correct result |
 | Rubric and calibration anchors | Required when judgment is involved | Conditional | The reward matches the intended capability |
 | Trial rollouts | Required for calibration | Required for training delivery | What the agent did and what reward it received |
@@ -67,6 +70,66 @@ Optional in generic Harbor, but required by Standard Data when an Oracle check c
 
 The agent must never be able to read the solution or verifier-only material during its run.
 
+## Required delivery package
+
+Submit one top-level directory named `<dataset>-<batch>-<num>/`. A single-task delivery uses the same envelope with one task child. Keep runnable task bytes, rollout evidence, and review material in separate roots.
+
+```text
+<dataset>-<batch>-<num>/
+├── tasks/                                      # required: runnable task material only
+│   └── <task_name>/
+│       ├── task.toml
+│       ├── instruction.md
+│       ├── environment/
+│       ├── tests/
+│       │   └── test.sh
+│       └── solution/
+│           └── solve.sh                        # optional when the reference has another form
+├── trajectory/                                 # required: complete delivered rollout evidence
+│   └── <task_name>/<model_name>/
+│       └── rollout_<harness@version>_<n>/
+│           ├── trajectory.json
+│           ├── reward.json
+│           └── failure_analysis/
+│               └── failure_analysis.md         # required when this rollout failed
+├── environment/                                # required only for private images
+│   ├── README.md
+│   └── <image_name>/
+│       ├── <loadable image or full build context>
+│       └── manifest.md
+└── docs/
+    ├── failure_analysis_metadata.md            # required
+    ├── README.md                               # recommended batch summary
+    ├── reward_hacking.md                       # recommended reward-integrity review
+    └── <task_name>/
+        └── report.md                           # recommended task report
+```
+
+<Info>
+  The package uses `trajectory/` in the singular. Each `task_name` must match across `tasks/`, `trajectory/`, and `docs/`. Keep reports, traces, hidden grading values, and failure analysis out of the runnable `tasks/` tree.
+</Info>
+
+Every task environment must build from the delivered files alone. Pin or include dependencies, workspace assets, tool definitions, and base images. When an image is private, the root `environment/` package must include a loadable artifact or full build context, exact `name:tag`, digest, optional registry, build or load instructions, and a map to every dependent task.
+
+### Required taxonomy metadata
+
+Record these fields in the task or batch manifest:
+
+| Field | Required value |
+| --- | --- |
+| Mode and use | `benchmark`, `rl`, or `both`; dual-mode deliveries identify each task's target use and partition rationale |
+| Theme | One task-level scenario label from a declared, versioned theme taxonomy |
+| Capability slice | Training band, held-out evaluation, or contamination probe |
+| Value tier | A declared scale such as high-judgment, mixed, or commodity |
+| Verification class | Fully verifiable, partially verifiable, or not automatable |
+| Runtime surface | Harness, harness version, tools, action space, resources, context policy, budgets, and immutable environment identity |
+| Scoring | Atomic criteria, weights, failure tags, pass threshold, aggregation rule, and observable evidence requirements |
+| Source and rights | Minimal source, rights, sanitization, and overlap-risk metadata |
+
+Tasks that are not verifiable by automation may still be useful for demonstrations or supervised training, but they are not automated-reward RL tasks. Raw preference pairs, pure trajectory collections, and catalogs use a separate intake path.
+
+Detailed contextual-information files and full edit-history snapshots are not part of this required package.
+
 ## Benchmark task
 
 A benchmark task measures capability. In addition to the runnable task, the delivery needs:
@@ -74,7 +137,7 @@ A benchmark task measures capability. In addition to the runnable task, the deli
 - a scoring contract, including deterministic checks and any judge rubric;
 - a known-good output and known-bad calibration anchors;
 - representative trial rollouts and a run manifest;
-- task provenance, rights, and practitioner context; and
+- source, rights, sanitization, and overlap-risk metadata; and
 - enough environment and grader metadata to reproduce the score.
 
 GDPx uses a stricter bundle and visibility model. See [Benchmark best practices](/gdpx/benchmark-task-rubric-best-practices#gdpx-standardized-task-bundle) for the exact partner handoff.
@@ -83,33 +146,112 @@ Cross-model difficulty, grader bias, contamination, and manual calibration are r
 
 ## RL task
 
-An RL task uses the same Harbor core. The training delivery adds evidence around repeated trials:
+An RL task uses the same Harbor core. Its delivery adds repeated trial evidence under the required package above.
 
-```text
-rl-delivery/
-├── tasks/
-│   └── <task-id>/
-├── trajectories/
-│   └── <task-id>/<model>/<harness>/<run>/
-├── docs/
-└── environments/        # only for private images
-```
+### `trajectory/`
 
-### `trajectories/`
+Required for an RL delivery and for any benchmark delivery that supplies calibration runs. Preserve every delivered full, untruncated observable trace, tool call and result, relevant state transition, final output, reward, pass threshold, model and harness version, per-rollout configuration, and timing or token data. A trajectory is evidence about a task; it is not the task itself.
 
-Required for an RL delivery. Preserve the full, untruncated trace, tool calls and results, reward, model and harness versions, and run-level timing or token data. A trajectory is evidence about a task; it is not the task itself.
-
-Failed trajectories need a failure analysis that separates model failure from environment, harness, verifier, and task-construction defects. Audit passing runs too; reward hacking often appears in successful trajectories first.
+Bind every rollout to `task_name`, `model_name`, `harness_name`, `harness_version`, and an attempt index. Summary fields such as `rollout_n`, `reward_mean`, `reward_std`, `reward_min`, `reward_max`, `pass_rate`, `mean_steps`, `mean_cost_usd`, `mean_prompt_tokens`, and `mean_completion_tokens` are useful, but they never replace the underlying rewards and traces. Always declare the pass threshold used to compute `pass_rate`.
 
 ### `docs/`
 
-Required for the delivery, outside `tasks/` so the runnable package stays clean. Keep dataset-level scope and provenance here, plus per-task context, failure analysis, reward-hacking notes, and any expert reviews used during development.
+Required outside `tasks/` so the runnable package stays clean. The only required document in this taxonomy is `failure_analysis_metadata.md`. Batch summaries, reward-integrity notes, and per-task reports are recommended.
 
-Preserve the task snapshot, the review that triggered each revision, and the exact diff. Do not overwrite the history.
+### `environment/`
 
-### `environments/`
+Conditional at the package root. Use it only when a task depends on an image that cannot be pulled publicly. Include the image artifact, exact tag and digest, load or build instructions, and a map from the image to every dependent task.
 
-Conditional. Use a root-level environment package only when a task depends on an image that cannot be pulled publicly. Include the image artifact, exact tag and digest, load or build instructions, and a map from the image to every dependent task.
+## Required failure analysis and distributions
+
+Every failed rollout must include:
+
+`trajectory/<task_name>/<model_name>/rollout_<harness@version>_<n>/failure_analysis/failure_analysis.md`
+
+### Per failed rollout
+
+Each analysis must contain:
+
+- the bound task and rollout identity;
+- one or more stable failure-mode IDs from the declared taxonomy;
+- a root-cause account grounded in observable messages, actions, tool results, state transitions, artifacts, and grader output rather than a surface symptom;
+- exact evidence references such as turn, tool-call, rubric-criterion, prompt-segment, or artifact identifiers;
+- a solvability check asking whether a qualified practitioner could complete the task with exactly the same context and tools;
+- a status of confirmed, hypothesis, or ambiguous-needs-human-review, with confidence and reviewer method; and
+- when a causal probe was run, its exact probe text, calibration rationale, rerun reference, outcome, and interpretation.
+
+<Warning>
+  Do not request, infer, retain, or expose private chain-of-thought. Observable messages, tool activity, state changes, artifacts, and final outputs are the evidence surface.
+</Warning>
+
+### Failure taxonomy
+
+Use a versioned label set. Start with these cross-domain classes and extend them only when a domain needs finer resolution:
+
+- capability failure;
+- prompt defect, including underspecified, contradictory, buried-context, unstated-domain, format-gap, and rubric-drift;
+- scaffolding or environment defect, including tool-absent, tool-broken, tool-silent-failure, action-mismatch, state-passing, context-exhausted, and feedback-absent;
+- rubric or verifier defect;
+- training-data defect;
+- orchestration defect;
+- triangulation failure, where task, prompt, and grader disagree; and
+- ambiguous-needs-human-review.
+
+A label without evidence is a hypothesis, not a confirmed failure mode. Retain ambiguous cases instead of forcing a category.
+
+### Dataset-level distribution
+
+The required root `docs/failure_analysis_metadata.md` must include:
+
+1. **Methodology:** taxonomy version and label definitions, analysis procedure, solvability gate, validation and confidence method, reviewer or judge calibration, and quality-assurance checks.
+2. **Per-model distribution:** counts and frequencies by model family, sample sizes, uncertainty caveats, and representative evidence-backed examples for material buckets.
+3. **Cross-task distribution:** aggregate counts and frequencies for every mode, named task or tool clusters, dominant and rare patterns, and structural failure flags.
+4. **Task histogram:** the number of tasks with one, two, three, and so on distinct failure modes.
+
+You may describe one or two distinct modes as concentrated and ten or more as diverse. For tasks between those ranges, report the exact count without forcing a label. Summary statistics must reconcile to the delivered rollout corpus.
+
+## Recommended QA and calibration
+
+The following practices are strongly recommended and should inform feedback, but they are not required fields in the task taxonomy.
+
+### Acceptance checks
+
+Run these checks against the final delivered bytes:
+
+- the environment builds and resets from the delivery alone;
+- a supplied reference solution or equivalent known-good artifact receives reward `1.0`; and
+- doing nothing receives reward `0.0`.
+
+Keep verifier material, reference solutions, and hidden grading values inaccessible to the agent. A shell Oracle is not required when another reference form is more faithful.
+
+### Difficulty evidence
+
+Prefer at least three model capability tiers and enough independent rollouts to report uncertainty. For an early delivery study, 16 baseline runs and 5 frontier runs are a practical minimum; treat the associated `<50%` and `<=40%` resolve-rate targets as calibration guidance, not universal acceptance gates.
+
+For published estimates, report `pass@1`, unbiased `pass@10` when `n >= 10`, `mean@10`, mean score, per-criterion pass rates, reward variance, token and cost distributions, wall-clock distributions, failures, and timeouts. Use multiple seeds and keep model, harness, prompt, tools, sampling, budget, timeout, context, retry, and judge revisions pinned.
+
+For RL, the productive core usually centers on `pass@1 = 0.5` with a `[0.25, 0.75]` training band and optional declared curriculum tails. For benchmarks, prefer a discrimination range where at least one frontier model scores above `0.30` and no model exceeds `0.85`. These are distributional diagnostics, not rigid per-task gates.
+
+A task with zero passes at `pass@10` or `pass@16` is unsolved at current capability. Do not claim that zero solves alone proves intrinsic difficulty, non-brokenness, or suitability for RL.
+
+### Hints as causal probes
+
+A calibrated hint is an advisory diagnostic, not a required taxonomy field or completion aid.
+
+1. Select a failed trajectory and identify a suspected root cause.
+2. Write a hint that names the dimension needing attention without revealing the answer.
+3. Rerun the same pinned evaluation condition.
+4. Record the exact hint, calibration rationale, rerun outcome, and interpretation.
+
+An over-specified hint gives away a file, function, constraint, or solution. An under-specified hint says only to try harder or pay attention. A calibrated hint redirects attention while leaving the reasoning and discovery to the agent.
+
+Partial progress can support a failure hypothesis when the rerun clears the original failure point and then fails elsewhere. A non-brokenness demonstration is stricter: the task must become solvable without the hint disclosing the answer. Keep hinted and unhinted runs in separate evaluation conditions and never pool their pass rates.
+
+### Reward integrity and reports
+
+Audit passing trajectories as well as failed ones. A recommended `docs/reward_hacking.md` covers observed verifier exploitation, detection methods, prevention, residual risk, and suggestions. If none was observed, state that and describe the breadth of the review. Retain confirmed exploited trajectories as evidence, exclude them from resolves, and recompute every affected aggregate.
+
+Detailed per-task reports and batch summaries are recommended. They should cover the rollout envelope, failure analysis and distributions, reward-integrity observations, limitations, and non-brokenness evidence when relevant. A detailed contextual-information package and full edit history are not required.
 
 ## Conditional Harbor features
 
@@ -127,6 +269,9 @@ Add a feature only when the task uses it.
 ## Not required by default
 
 - A task-level `README.md`, Python test file, Compose file, MCP server, simulated user, or skills directory when the task does not use it.
+- A detailed `context_info.md` narrative, version-by-version task snapshots, review folders, or patch history. Keep only the minimal source, rights, and sanitization metadata required above.
+- A hint rerun for every failure. If no causal probe was run, mark the label as a hypothesis or ambiguous.
+- A reward-integrity report or detailed per-task report. Both are recommended, not required taxonomy fields.
 - Pre-generated verifier reward files.
 - Training checkpoints, reward curves, optimizer state, or KL logs for a pure benchmark.
 - A private image package when every image can be pulled by digest from a public registry.
@@ -135,6 +280,8 @@ Add a feature only when the task uses it.
 
 ## Test before canonical import
 
-Start with the [audit endpoint](/gdpx/audit-endpoint). It reviews one document using Standard Data-provided Claude credits and does not create canonical task records in Audit.
+Start with the [audit endpoint](/gdpx/audit-endpoint). Submit one Markdown or JSON document that describes the runnable task, required delivery package, rollout bindings, failed-rollout analyses, and dataset distribution metadata. The endpoint returns preflight feedback on the document and does not create canonical task records in Audit.
+
+The live one-document endpoint is a preflight surface, not proof that the complete ZIP satisfies every required package or v15 evaluation control. Review `ungraded_sections` and the applied guideline version in every response.
 
 After you have reviewed the findings and Standard Data has provisioned import access, follow [Import approved tasks](/gdpx/import-approved-tasks). That `/api/v2` workflow uploads the ZIP, creates a sanitized source bundle, and commits immutable task revisions to the Audit backend.

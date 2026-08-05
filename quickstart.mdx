@@ -1,13 +1,13 @@
 ---
 title: "RL and benchmark task taxonomy"
-description: "How runnable tasks, benchmark evidence, and RL evidence fit together."
+description: "Taxonomy Requirements for RL and Benchmark Tasks"
 sidebarTitle: "Task taxonomy"
 keywords: ["Harbor", "RL tasks", "benchmark tasks", "task format"]
 ---
 
 An RL task and a benchmark task share the same runnable core. The difference is the evidence around it: a benchmark needs enough evidence to defend a score, while an RL delivery needs enough rollout and reward data to train from the task.
 
-For multi-lab work, Harbor is the common intake format we use. OpenAI and Anthropic are destination exports: keep Harbor as the source of truth, then translate it into the required native schema.
+For multi-lab work, Harbor is the common intake format we use. OpenAI and Anthropic are destination exports as we keep Harbor as the source of truth and then translate it into the required native schema.
 
 <Info>
   Harbor defines one portable task package, not separate RL and benchmark formats. Start with the [task structure](https://www.harborframework.com/docs/tasks), then add the evidence your use case needs.

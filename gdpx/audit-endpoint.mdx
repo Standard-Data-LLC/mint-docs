@@ -75,6 +75,12 @@ http --form POST "${API_BASE}/v1/evaluate" \
 
 `options` is optional JSON. Use `verbosity: "full"` while fixing a submission.
 
+To preflight a taxonomy-aligned task, include the delivery-package outline, required task metadata, rollout evidence bindings, failed-rollout analyses, and dataset-level failure taxonomy and distributions in the submitted Markdown or JSON document. The endpoint evaluates that document as content; these are not separate request fields.
+
+<Warning>
+  The current v1 parser does not enforce the new taxonomy contract. Review `ungraded_sections`, and do not treat an absence of findings as package acceptance. Canonical import validation remains the source of truth.
+</Warning>
+
 ## JSON request
 
 Use JSON when the input is already text or base64-encoded bytes.

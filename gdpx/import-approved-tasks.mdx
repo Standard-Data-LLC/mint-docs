@@ -115,16 +115,21 @@ Canonical v2 errors use this safe envelope:
     "message": "Safe summary",
     "request_id": "req_...",
     "retryable": false,
-    "details": [{ "path": "/field", "code": "INVALID_FIELD" }]
+    "details": [{ "path": "/field", "code": "INVALID_FIELD" }],
+    "links": {
+      "regenerate_preview": "/api/v2/source-bundles/sourcebundle_.../adapter-previews"
+    }
   }
 }
 ```
+
+`error.links` is optional and contains only bounded, same-origin API paths. When `code` is `PREFLIGHT_POLICY_CHANGED`, discard the stale preview and follow `links.regenerate_preview` with the documented adapter-preview request, or start a new workspace submission with the same corrected ZIP. Never display an API path as an end-user URL, and never follow an unknown relation or a cross-origin value.
 
 | Status | Typical meaning |
 | --- | --- |
 | `401` | Missing, malformed, expired, inactive, or revoked credential |
 | `403` | Missing tenant binding or required scope |
-| `409` | Idempotency reuse, policy change, or immutable mapping conflict |
+| `409` | Idempotency reuse, policy change requiring preview regeneration, or immutable mapping conflict |
 | `422` | Invalid archive, blocked mapping, or failed v15 admission |
 | `503` | Global submission mode or required infrastructure is unavailable; honor `Retry-After` |
 | `421` | `/api/v2` was sent to a legacy task-feedback origin; retry against the returned canonical origin |

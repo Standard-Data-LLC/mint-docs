@@ -1,17 +1,17 @@
 ---
 title: "Large-folder uploads"
 sidebarTitle: "Large-folder uploads"
-description: "Roadmap preview for resumable ZIP and folder uploads through the staged source-bundle pipeline."
+description: "Roadmap preview for manifest-driven direct-folder uploads through the staged source-bundle pipeline."
 icon: "folder-up"
 tag: "Roadmap preview"
 keywords: ["large folder uploads", "ZIP uploads", "source bundles", "RoadmapBench", "resumable uploads"]
 ---
 
 <Warning>
-  **Roadmap preview — not available in production.** The upload-session implementation exists in application source, but large-folder admission and external routing remain disabled. Do not build a production client against the route shapes on this page yet.
+  **Direct-folder roadmap preview — not available in production.** The 10,000-file manifest-driven implementation exists in application source, but its admission and external routing remain disabled. For a workspace ZIP, use the capability-driven [workspace submission API](/gdpx/import-approved-tasks) instead of the route shapes on this page.
 </Warning>
 
-The existing v15 import path is intentionally bounded. It is not suitable for a 160 MiB ZIP or a source folder with hundreds of files: it permits 16 MiB per upload, 32 MiB compressed and expanded, 31 archive members, buffers archives in memory, and expects the canonical `task.json` dialect.
+The measurements and comparisons on this page are retained as design evidence for direct, unzipped file sets. They do not describe the current `/api/v2/workspace-submissions` ZIP limit, which is returned by `GET /api/v2/intake-capabilities` and is currently at most 1 GiB.
 
 <Note>
   The live `/v1/evaluate` endpoint is unchanged. It remains a synchronous, **single-document API with a 10 MB file limit**. It does not accept a folder, Harbor directory, or v15 source bundle.
@@ -143,24 +143,26 @@ A `ready` session remains charged while two bounded manifest sweeps prune only s
 ## Preview CLI
 
 <Warning>
-  Admission is disabled by default. These commands work only for an allowlisted preview tenant after the external routes and workers are deployed. A normal production tenant receives `LARGE_FOLDER_PROFILE_DISABLED`.
+  The manifest-driven direct-folder profile remains disabled by default. These commands work only when its external routes and workers are deployed and the capability response reports `ready`. This gate is global, not customer-specific.
 </Warning>
 
 Run the client from `services/audit`. Supply the API origin and bearer token through explicit flags or a shell-local environment populated by your secret manager:
 
 ```sh
-export STANDARD_DATA_API_BASE="https://audit.example.com"
-export STANDARD_DATA_API_TOKEN="<read from your secret manager>"
+export STANDARD_DATA_API_BASE="https://<standard-data-api-host>"
+export STANDARD_DATA_API_KEY="<read from your secret manager>"
 
 pnpm exec tsx tools/standard-data-cli.ts upload-folder ./roadmap-task \
+  --token "${STANDARD_DATA_API_KEY}" \
   --purpose benchmark_task \
   --concurrency 4
 
 # A prebuilt ZIP is always resumable.
 pnpm exec tsx tools/standard-data-cli.ts upload-archive ./roadmap-task.zip \
+  --token "${STANDARD_DATA_API_KEY}" \
   --purpose benchmark_task
 
-unset STANDARD_DATA_API_TOKEN
+unset STANDARD_DATA_API_KEY
 ```
 
 `upload-folder` prepares a canonical manifest, excludes `.git`, `.DS_Store`, and `__MACOSX`, signs no more than 100 parts at a time, and streams create-only PUTs or 8 MiB resumable chunks. `upload-archive` streams the ZIP's SHA-256 before any API request, verifies a stable non-symlink snapshot, enforces the 256 MiB ceiling, and always uses a resumable session. A prebuilt ZIP receives no client-side rewrite. Bounded server inventory validates `.DS_Store` and `__MACOSX/**` against every record, path, size, and expansion limit and then omits them from the source bundle. `.git/**` is never omitted; it is rejected.
@@ -191,9 +193,9 @@ The `roadmapbench-v1` preview proposes this mapping:
 | `tests/**` | Verifier-only validation |
 | `solution/**` | Verifier-only gold |
 
-Unknown paths block review. Missing canonical author, reviewer, provenance, rubric, permission, or constraint fields also remain blocking actions; the adapter never invents them. Approval binds the adapter ID, version, mapping hash, exact entry hashes, and reviewed visibility roles into canonical import.
+Unknown paths block admission. Missing canonical author, reviewer, provenance, rubric, permission, or constraint fields also remain blockers; the adapter never invents them. An eligible mapping binds the adapter ID, version, mapping hash, exact entry hashes, and resolved visibility roles into canonical import.
 
-For a large mapping, canonical import may submit `artifact_bindings: []` as a compact approval marker. The server reconstructs every deterministic preview binding only when the adapter identity, `mapping_hash`, exact entry inventory, and parsed `task.toml` projection retained in `task_manifest.source_adapter` all match. Supplying any bindings switches to strict full-list mode. This keeps a 10,000-entry role map within the canonical import envelope without letting a client omit, relabel, or expose artifacts.
+For a large mapping, canonical import may submit `artifact_bindings: []` as a compact deterministic marker. The server reconstructs every preview binding only when the adapter identity, `mapping_hash`, exact entry inventory, and parsed `task.toml` projection retained in `task_manifest.source_adapter` all match. Supplying any bindings switches to strict full-list mode. This keeps a 10,000-entry role map within the canonical import envelope without letting a client omit, relabel, or expose artifacts.
 
 ## Package without VCS metadata
 
@@ -271,7 +273,7 @@ Clients should branch on stable codes, not messages.
 
 ## Rollout status
 
-The source implementation is behind disabled admission and is not present in the production external route allowlist. Rollout begins with a tenant allowlist. General admission remains blocked until production-equivalent 256 MiB / 1 GiB / 10,000-file boundaries, a 160 MiB ZIP with more than 1,000 files, scanner-fingerprint binding, peak worker RSS below 512 MiB, IAM and route checks, cleanup recovery, and rollback drills all pass.
+The direct-folder source implementation remains behind disabled admission and is not present in the production external route allowlist. Rollout begins with staging and internal synthetic canaries, not a customer allowlist. General admission remains blocked until production-equivalent 256 MiB / 1 GiB / 10,000-file boundaries, a 160 MiB ZIP with more than 1,000 files, scanner-fingerprint binding, peak worker RSS below 512 MiB, IAM and route checks, cleanup recovery, and rollback drills all pass.
 
 The dry-run IAM descriptor also gives every worker project-level Firestore mutation authority. Before activation, enforce stage-specific metadata transition APIs or scanner-authenticated result objects so a coordinator or extractor cannot forge a clean scan record that the finalizer signs. Separate worker processes and storage-prefix IAM do not by themselves establish this metadata trust boundary.
 

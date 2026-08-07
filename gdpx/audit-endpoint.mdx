@@ -1,60 +1,60 @@
 ---
 title: "Test with the audit endpoint"
 sidebarTitle: "1. Test with audit"
-description: "Use Standard Data's internal review agent to review a task before creating canonical Audit records."
-keywords: ["GDPx", "Claude audit", "preflight endpoint", "API", "task specification", "non-canonical test"]
+description: "Review one task document before submitting the complete workspace."
+keywords: ["GDPx", "document feedback", "preflight endpoint", "API", "task specification"]
 ---
 
-Start with this endpoint before uploading a task workspace into Audit. It reviews one GDPx task specification or benchmark methodology paper and returns structured blockers, warnings, evidence, and suggested fixes.
+`POST /v1/evaluate` reviews one task specification or benchmark methodology paper and returns structured blockers, warnings, evidence, and suggested fixes. Use it while you are still revising task content.
 
 <Info>
-  This is the client testing path. It runs on Standard Data-provided credits. It does not create or modify canonical source bundles, task revisions, runs, or certificates in the Audit backend.
+  Document feedback does not create or modify source bundles, task revisions, runs, or certificates. The authoritative import gate is the v15 preflight of the exact workspace ZIP submitted through `/api/v2/workspace-submissions`.
 </Info>
 
-Use the response to iterate on the document until you understand the remaining findings. Do not use the canonical import API for prompt or rubric iteration.
-
 <Warning>
-  GDPx acceptance follows Standard Data v15. The live `/v1/evaluate` route still runs v14, so treat it as a one-document preflight, not a v15 certificate. The response records the applied version in `guidelines_version_applied`.
+  The legacy `aggregate_verdict.ready_to_submit` field describes only the document that `/v1/evaluate` received. It never authorizes a ZIP, even when its value is `true`.
 </Warning>
 
-The feedback service may retain evaluation output and operational records for retrieval, rate limiting, and support. That retention is separate from canonical task ingestion: the submitted document does not become a task in Audit.
+The feedback service may retain evaluation output and operational records for retrieval, rate limiting, and support. The submitted document does not become a canonical task.
 
-For the complete task package, use the [task taxonomy](/quickstart). For content and grading requirements, use [Benchmark best practices](/gdpx/benchmark-task-rubric-best-practices).
+For the complete package, use the [task taxonomy](/quickstart). For content and grading requirements, use [Benchmark best practices](/gdpx/benchmark-task-rubric-best-practices).
 
-## Base URL
+## Configure one API origin and key
 
-```text
-https://task-feedback-vgmxhdw3ka-uc.a.run.app
+Both API namespaces use the same partner-facing origin and tenant-scoped key:
+
+```bash
+export STANDARD_DATA_API_BASE="https://<standard-data-api-host>"
+export STANDARD_DATA_API_KEY="<your-standard-data-api-key>"
 ```
-
-## Endpoints
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `POST` | `/v1/evaluate` | Audit one task specification or benchmark paper |
+| `GET` | `/v1/whoami` | Read identity, scopes, rate limit, and canonical-submission state |
+| `POST` | `/v1/evaluate` | Review one task specification or benchmark paper |
 | `GET` | `/v1/evaluations/{evaluation_id}` | Retrieve an evaluation |
-| `GET` | `/v1/whoami` | Validate an API key and read its rate limit |
 | `GET` | `/v1/healthz` | Check service health without authentication |
+| `GET` | `/api/v2/intake-capabilities` | Read server-authoritative workspace-intake readiness |
 
-## Authentication
-
-All routes except `/v1/healthz` require a bearer token.
+Validate the key and discover the next step before presenting a submission action:
 
 ```bash
-export STANDARD_DATA_API_KEY="<issued-separately>"
+curl --fail-with-body \
+  --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
+  "${STANDARD_DATA_API_BASE}/v1/whoami"
 ```
 
-## Submit a file
+`canonical_submission.state` is `ready`, `missing_access`, `temporarily_unavailable`, or `incompatible`. Follow its same-origin links; do not construct an `/api/v2` URL from an old task-feedback hostname.
+
+## Submit a document
 
 Use multipart form data. The file field must be named `file`.
 
 <CodeGroup>
 
 ```bash cURL
-API_BASE="https://task-feedback-vgmxhdw3ka-uc.a.run.app"
-
 curl --fail-with-body \
-  --request POST "${API_BASE}/v1/evaluate" \
+  --request POST "${STANDARD_DATA_API_BASE}/v1/evaluate" \
   --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
   --form "file=@/absolute/path/to/task-spec.pdf;type=application/pdf" \
   --form 'options={"checks_to_run":["all"],"verbosity":"full","include_suggested_fixes":true}' \
@@ -63,9 +63,7 @@ curl --fail-with-body \
 ```
 
 ```bash HTTPie
-API_BASE="https://task-feedback-vgmxhdw3ka-uc.a.run.app"
-
-http --form POST "${API_BASE}/v1/evaluate" \
+http --form POST "${STANDARD_DATA_API_BASE}/v1/evaluate" \
   Authorization:"Bearer ${STANDARD_DATA_API_KEY}" \
   file@/absolute/path/to/task-spec.pdf \
   'options={"checks_to_run":["all"],"verbosity":"full","include_suggested_fixes":true}'
@@ -75,10 +73,10 @@ http --form POST "${API_BASE}/v1/evaluate" \
 
 `options` is optional JSON. Use `verbosity: "full"` while fixing a submission.
 
-To preflight a taxonomy-aligned task, include the delivery-package outline, required task metadata, rollout evidence bindings, failed-rollout analyses, and dataset-level failure taxonomy and distributions in the submitted Markdown or JSON document. The endpoint evaluates that document as content; these are not separate request fields.
+To review a taxonomy-aligned task, include the delivery-package outline, required task metadata, rollout evidence bindings, failed-rollout analyses, and dataset-level failure taxonomy and distributions in the Markdown or JSON document. These are document contents, not separate v1 request fields.
 
 <Warning>
-  The current v1 parser does not enforce the new taxonomy contract. Review `ungraded_sections`, and do not treat an absence of findings as package acceptance. Canonical import validation remains the source of truth.
+  The v1 parser does not enforce the complete v15 workspace contract. Review `ungraded_sections` and `guidelines_version_applied`; an absence of v1 findings is not package acceptance.
 </Warning>
 
 ## JSON request
@@ -101,9 +99,7 @@ Use JSON when the input is already text or base64-encoded bytes.
 }
 ```
 
-`task_input.format` accepts `pdf`, `docx`, `markdown`, or `json`. PDF and DOCX content must be base64-encoded in JSON transport. Submit benchmark methodology papers as text-bearing PDFs on the current API revision.
-
-The live route accepts one document, not a Harbor directory or bundle archive. After testing is complete and Standard Data has provisioned canonical import access, package the workspace as a ZIP and follow [Import approved tasks](/gdpx/import-approved-tasks).
+`task_input.format` accepts `pdf`, `docx`, `markdown`, or `json`. PDF and DOCX content must be base64-encoded in JSON transport. The route accepts one document, not a Harbor directory or ZIP.
 
 ## Response
 
@@ -112,42 +108,51 @@ The live route accepts one document, not a Harbor directory or bundle archive. A
   "kind": "task_spec",
   "evaluation_id": "eval_...",
   "aggregate_verdict": {
-    "ready_to_submit": false,
-    "blocking_issues_count": 2,
+    "ready_to_submit": true,
+    "blocking_issues_count": 0,
     "warning_count": 3,
     "info_count": 1,
-    "estimated_fix_time_minutes": 45
+    "estimated_fix_time_minutes": 20
   },
   "ungraded_sections": [],
   "guidelines_version_applied": "v14",
-  "model_versions": {},
-  "latency_ms": 0,
-  "timestamp": "..."
+  "canonical_submission": {
+    "state": "ready",
+    "reason_code": "READY",
+    "tenant_id": "tenant_...",
+    "effective_scopes": [
+      "evaluations:read",
+      "evaluations:write",
+      "imports:write",
+      "tasks:read",
+      "uploads:write"
+    ],
+    "required_scopes": ["imports:write", "tasks:read", "uploads:write"],
+    "missing_scopes": [],
+    "api_base_url": "https://<standard-data-api-host>",
+    "document_feedback_authorizes_submission": false
+  }
 }
 ```
 
-`kind` is `task_spec` or `benchmark_paper`. Review `ungraded_sections` before trusting the verdict; material content may not have mapped to the expected document structure.
-
-Retrieve the same result later with:
+`kind` is `task_spec` or `benchmark_paper`. Both response kinds include the caller-specific `canonical_submission` projection. Retrieve the result later with:
 
 ```bash
 curl --fail-with-body \
   --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
-  "${API_BASE}/v1/evaluations/eval_..." \
+  "${STANDARD_DATA_API_BASE}/v1/evaluations/eval_..." \
   --output evaluation.json
 ```
 
-## Limits
+## Limits and errors
 
-- Maximum file size: `10 MB`
+- Maximum document size: `10 MB`
 - Request ceiling: approximately `15 minutes`
 - Rate limit: returned by `/v1/whoami`
-- Idempotency keys: not supported
+- v1 evaluations do not support idempotency keys; do not retry while the original request remains open
 
-Do not retry while the original request is still open. A retry can create a second evaluation. Errors return a top-level `detail` field.
+Legacy v1 failures retain their backward-compatible `detail` field. If a client sends `/api/v2` to a legacy task-feedback origin, the service returns `421 WRONG_API_ORIGIN` with the canonical origin and remediation; it never redirects a bearer credential.
 
-## Next: import the approved workspace
+## Next: submit the workspace
 
-Move to the canonical API only after you have completed testing, reviewed the findings, and received import access. The `/api/v2` workflow creates durable backend records and immutable task revisions; it is not another test endpoint.
-
-Follow [Import approved tasks](/gdpx/import-approved-tasks) for the resumable ZIP upload, adapter preview, explicit confirmation, and task-import sequence.
+When `GET /api/v2/intake-capabilities` returns `state: "ready"`, package the exact workspace as a ZIP and follow [Submit a workspace](/gdpx/import-approved-tasks). One explicit submission starts the durable upload, sanitation, mapping, v15 preflight, and automatic import workflow.

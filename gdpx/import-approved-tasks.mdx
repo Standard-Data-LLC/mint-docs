@@ -1,127 +1,145 @@
 ---
-title: "Import approved tasks"
-sidebarTitle: "2. Import approved tasks"
-description: "Upload a tested task workspace into Wilderness."
-keywords: ["GDPx", "Audit v2", "task import", "upload session", "immutable task revision"]
+title: "Submit a workspace"
+sidebarTitle: "2. Submit a workspace"
+description: "Upload, preflight, and automatically import a complete task workspace."
+keywords: ["GDPx", "Audit v2", "workspace submission", "resumable upload", "immutable task revision"]
 ---
 
-Wilderness is our internal system for 1) collecting benchmark tasks so we can run rollouts over them efficiently with standardized compute and harnessing and 2) collecting tasks such that we may assess their value for scaled up projects with lab partners.
-
-Use this workflow only after you have tested the task with the [audit endpoint](/gdpx/audit-endpoint), reviewed its findings, and resolved the issues you intend to fix. You will not upload tasks to our wilderness yet **until** we review tasks after you have it go through multiple rounds of the first stage audit endpoint and are comfortable in its integrity.
+Wilderness collects runnable benchmark tasks for standardized rollouts and scaled evaluation. The canonical submission API accepts one workspace ZIP, sanitizes and maps it, runs the pinned v15 static admission policy against every mapped task, and creates immutable task revisions automatically when the complete workspace is eligible.
 
 <Warning>
-  This is the canonical import path. It is not a dry run. The calls below create durable, tenant-scoped upload sessions, sanitized source bundles, adapter previews, import jobs, and immutable task revisions in the Audit backend.
+  This is a durable workflow, not document feedback. A successful `/v1/evaluate` response—including `ready_to_submit: true`—never authorizes the ZIP. Only the v15 workspace preflight can make this submission eligible for automatic import.
 </Warning>
 
-## Before you import
+There is no hidden customer approval step. Availability is expressed by the authenticated capability endpoint and the global service mode.
 
-You need:
-
-- an Audit API base URL issued by Standard Data;
-- a bearer credential bound to your tenant;
-- the `uploads:write` and `imports:write` scopes;
-- `tasks:read` to view the imported revisions; and
-- a ZIP archive containing the task workspace.
-
-Import access is provisioned separately from the `/v1/evaluate` test endpoint. Do not assume that the task-feedback base URL hosts `/api/v2`. If canonical import admission is not enabled for your tenant, Audit rejects the request without creating an import.
-
-## Canonical import sequence
-
-| Stage | Method and path | Durable effect |
-| --- | --- | --- |
-| Create upload session | `POST /api/v2/upload-sessions` | Creates a tenant-scoped resumable upload session |
-| Create upload part | `POST /api/v2/upload-sessions/{id}/parts/sign` | Registers the single logical archive part |
-| Get upload capability | `GET /api/v2/upload-sessions/{id}/parts/1/capability` | Returns a short-lived resumable storage URL |
-| Upload bytes | `PUT {session_uri}` | Writes the ZIP to quarantined object storage |
-| Finalize upload | `POST /api/v2/upload-sessions/{id}/parts/finalize` | Binds the exact object generation, size, and media type |
-| Start processing | `POST /api/v2/upload-sessions/{id}/complete` | Queues hash verification, inventory, sanitation, and scanning |
-| Poll processing | `GET /api/v2/upload-sessions/{id}` | Returns a sanitized `source_bundle_id` when ready |
-| Preview mapping | `POST /api/v2/source-bundles/{source_bundle_id}/adapter-previews` | Detects the adapter and builds the proposed task mapping |
-| Poll preview | `GET /api/v2/adapter-previews/{preview_id}` | Returns the immutable `mapping_hash` and any blocking issues |
-| Commit import | `POST /api/v2/task-imports` | Creates the durable task-import job |
-| Poll import | `GET /api/v2/task-imports/{import_id}` | Returns the created immutable `task_revision_ids` |
-
-## 1. Create the upload session
-
-Hash the ZIP with SHA-256 before creating the session.
+## Configure one API origin and key
 
 ```bash
-export AUDIT_API_BASE="<issued-audit-origin>"
-export STANDARD_DATA_API_KEY="<issued-separately>"
+export STANDARD_DATA_API_BASE="https://<standard-data-api-host>"
+export STANDARD_DATA_API_KEY="<your-standard-data-api-key>"
+```
 
+The same key may call `/v1` document feedback and `/api/v2` canonical submission. Workspace submission requires `uploads:write`, `imports:write`, and `tasks:read` in addition to the evaluation scopes.
+
+<Note>
+  Store long-lived customer keys in a managed secret store such as Google Secret Manager, AWS Secrets Manager, Azure Key Vault, or a server-side encrypted credential vault. Inject them at runtime. Never commit them, paste them into task archives, include them in logs, or store them in browser `localStorage`. Wilderness browser sessions use short-lived Firebase credentials instead of customer API keys.
+</Note>
+
+## 1. Check intake readiness
+
+Do this before showing a file picker or attempting a mutation:
+
+```bash
 curl --fail-with-body \
-  --request POST "${AUDIT_API_BASE}/api/v2/upload-sessions" \
+  --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
+  "${STANDARD_DATA_API_BASE}/api/v2/intake-capabilities" \
+  --output intake-capabilities.json
+```
+
+The response state is:
+
+| State | Meaning |
+| --- | --- |
+| `ready` | The key, v15 policy, upload service, scanner, queue, worker, and storage are ready |
+| `missing_access` | The tenant binding or required scopes are missing |
+| `temporarily_unavailable` | Global submission or required infrastructure is not ready; retry later |
+| `incompatible` | The client or deployed policy contract is incompatible and must be updated |
+
+The response also returns `reason_code`, effective and missing scopes, ZIP limits, the pinned `protocolrev_dq_v15_15_0_0` policy, component readiness, and same-origin links. Create a submission only when `state` is `ready`.
+
+## 2. Create one durable submission
+
+Hash the ZIP with SHA-256, choose a stable idempotency key for this exact operation, and send:
+
+```bash
+curl --fail-with-body \
+  --request POST "${STANDARD_DATA_API_BASE}/api/v2/workspace-submissions" \
   --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
   --header "Content-Type: application/json" \
-  --header "Idempotency-Key: upload-<stable-client-key>" \
+  --header "Idempotency-Key: workspace-<stable-client-operation-id>" \
   --data '{
     "filename": "task-workspace.zip",
     "content_type": "application/zip",
     "size_bytes": 12345678,
     "sha256": "<64-lowercase-hex-characters>",
-    "intake_profile": "messy-workspace-v1"
-  }'
+    "commit_policy": "automatic_when_eligible"
+  }' \
+  --output workspace-submission.json
 ```
 
-The response includes `upload_session_id`, `chunk_size_bytes`, and links for the next operations. The current contract accepts one ZIP archive up to 1 GiB.
+A successful creation returns `201`, a `Location` header, `workspace_submission_id`, `state`, the existing upload-session projection under `upload`, and same-origin links for polling and upload controls. The current ZIP limit is `1 GiB`.
 
-## 2. Upload and process the archive
+Reusing the same `Idempotency-Key` with the same body returns the same durable workflow. Reusing it with a different body returns `409 IDEMPOTENCY_KEY_REUSED`.
 
-Create part `1`, follow its `capability_url`, and upload the ZIP to the returned `session_uri` using resumable `PUT` requests and `Content-Range` headers. Then:
+## 3. Upload the ZIP
 
-1. Call `parts/finalize` with part `1`, its exact size, and the final ETag when available.
-2. Call `complete` with an empty JSON object.
-3. Poll the upload-session resource until it returns `status: "ready"` and a `source_bundle_id`.
+Follow links from the response rather than constructing paths:
 
-Audit verifies the declared SHA-256 before reading ZIP members. It inventories, sanitizes, and scans retained files before the source bundle becomes available for import.
+1. Call `links.sign_parts` to register archive part `1`.
+2. Fetch the returned part capability. It contains a short-lived write-only resumable GCS session URI.
+3. Upload the ZIP with resumable `PUT` requests and exact `Content-Range` headers. Do not send the Standard Data API key to GCS.
+4. Call `links.finalize_parts` with part `1`, its exact size, and the final ETag.
+5. Call `links.complete_upload` with an empty JSON object.
 
-## 3. Review the adapter mapping
+Audit binds the declared bytes and SHA-256, inventories ZIP entries, sanitizes paths and retained content, and scans the immutable object generation before mapping begins. Signed upload capabilities are bearer credentials: keep them in memory, never log or persist them, and discard them after upload.
 
-Start the preview:
+## 4. Poll one workspace resource
+
+Poll `links.self` with the Standard Data API key. Closing the browser does not stop server-side processing.
 
 ```bash
 curl --fail-with-body \
-  --request POST "${AUDIT_API_BASE}/api/v2/source-bundles/${SOURCE_BUNDLE_ID}/adapter-previews" \
   --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
-  --header "Content-Type: application/json" \
-  --header "Idempotency-Key: preview-${SOURCE_BUNDLE_ID}" \
-  --data '{"adapter":"auto"}'
+  "${STANDARD_DATA_API_BASE}/api/v2/workspace-submissions/workspacesubmission_..."
 ```
 
-Poll the returned preview resource. Do not import while it is queued, running, blocked, or awaiting required review. A ready preview returns the detected adapter, proposed task mappings, warnings, blocking issues, and an immutable `mapping_hash`.
+The durable states are:
 
-## 4. Commit the import
-
-After an authorized person accepts the preview, create the import using the exact preview identity:
-
-```bash
-curl --fail-with-body \
-  --request POST "${AUDIT_API_BASE}/api/v2/task-imports" \
-  --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
-  --header "Content-Type: application/json" \
-  --header "Idempotency-Key: import-${SOURCE_BUNDLE_ID}-${MAPPING_HASH}" \
-  --data "{\"source_bundle_id\":\"${SOURCE_BUNDLE_ID}\",\"adapter_preview_id\":\"${ADAPTER_PREVIEW_ID}\",\"mapping_hash\":\"${MAPPING_HASH}\"}"
+```text
+awaiting_upload -> uploading -> sanitizing -> mapping -> preflighting -> importing -> succeeded
 ```
 
-Poll `GET /api/v2/task-imports/{task_import_id}` until it reaches a terminal state. A successful response contains every created `task_revision_id`.
+`blocked`, `failed`, `expired`, and `cancelled` are terminal. The response progressively adds the sanitized source-bundle ID, adapter preview, public-safe v15 admission attestation, task import, blocking issues, and created task revision IDs.
+
+The workflow imports all mapped tasks or none. Warnings do not block. Missing required checks, degraded evaluation, ambiguous mappings, review-required results, or any task blocker produce `blocked` and create no task revisions. Historical results in the ZIP remain supplied, unvalidated evidence unless a separate execution workflow validates them.
+
+## Structured errors
+
+Canonical v2 errors use this safe envelope:
+
+```json
+{
+  "error": {
+    "code": "MACHINE_STABLE_CODE",
+    "message": "Safe summary",
+    "request_id": "req_...",
+    "retryable": false,
+    "details": [{ "path": "/field", "code": "INVALID_FIELD" }]
+  }
+}
+```
+
+| Status | Typical meaning |
+| --- | --- |
+| `401` | Missing, malformed, expired, inactive, or revoked credential |
+| `403` | Missing tenant binding or required scope |
+| `409` | Idempotency reuse, policy change, or immutable mapping conflict |
+| `422` | Invalid archive, blocked mapping, or failed v15 admission |
+| `503` | Global submission mode or required infrastructure is unavailable; honor `Retry-After` |
+| `421` | `/api/v2` was sent to a legacy task-feedback origin; retry against the returned canonical origin |
+
+Do not convert every error to “not found.” Preserve the HTTP status, `error.code`, `request_id`, `retryable`, details, workflow stage, and `Retry-After` when presenting remediation.
 
 ## View imported revisions
 
-Use the tenant-scoped viewer endpoints after import:
+After `state: "succeeded"`, use the tenant-scoped viewer endpoints:
 
 ```text
 GET /api/v2/tasks
 GET /api/v2/tasks/{task_revision_id}
+GET /api/v2/tasks/{task_revision_id}/workspace
 GET /api/v2/tasks/{task_revision_id}/files
-GET /api/v2/tasks/{task_revision_id}/files/{file_id}
 ```
 
-Wilderness consumes these same endpoints. Access to the Wilderness UI is not required; any authorized client can implement the import protocol directly.
-
-## Operational rules
-
-- Use a stable `Idempotency-Key` for every mutating request. Do not generate a new key merely because a response timed out.
-- Do not use canonical imports for rapid prompt iteration. Run `/v1/evaluate` first.
-- Cancelling at the adapter-preview screen creates no task revisions, but the sanitized source bundle remains subject to Audit retention policy.
-- An import creates a new immutable revision. It never edits an existing task revision in place.
-- Uploaded historical results remain supplied, unvalidated evidence unless a separate execution or evaluation workflow validates them.
+An import creates new immutable revisions; it never edits an existing revision in place. Wilderness consumes these same records and presents the semantic Results, Solution, Environment, and All Files views.

@@ -217,7 +217,7 @@ Keep the complete rollout corpus in the batch archive. A normalized per-task `sa
 3. Confirm that each environment builds from the delivered files alone. Pin or include every base image, dependency, workspace asset, tool definition, and skill document.
 4. Put exactly one batch root in the archive. Do not upload several unrelated roots or a directory-only ZIP.
 5. Record the final filename, byte size, media type `application/zip`, and SHA-256 of the exact bytes you will upload.
-6. Test the methodology document with the [audit endpoint](/gdpx/audit-endpoint), then upload the ZIP as a source bundle through the [canonical Audit API](/gdpx/import-approved-tasks) after approval.
+6. Test the methodology document with the [audit endpoint](/gdpx/audit-endpoint). When intake capability reports `ready`, [submit the workspace ZIP](/gdpx/import-approved-tasks); the exact archive must pass v15 admission before automatic import.
 
 <Warning>
   The document preflight endpoint accepts one PDF, DOCX, Markdown, or JSON document. It does not accept this ZIP. The canonical flow performs the resumable upload, quarantine, scanning, and adapter preview. A successful byte upload is not task acceptance: stop if the preview is blocked, incomplete, or does not map every task and visibility boundary exactly.
@@ -419,4 +419,4 @@ If experts review rollouts during development, keep a simple log in `samples/`. 
 - Agent-visible, grader-only, and gold files are isolated correctly.
 - Source, rights, sanitization, and overlap-risk metadata are complete.
 
-Use the [audit endpoint](/gdpx/audit-endpoint) for non-canonical document testing before handoff. A clean audit is one input to review, not a certification result. Import the workspace through the [canonical Audit API](/gdpx/import-approved-tasks) only after testing and approval.
+Use the [audit endpoint](/gdpx/audit-endpoint) for non-canonical document feedback while authoring. A clean document audit is not a v15 workspace result, and its legacy `ready_to_submit` field never authorizes a ZIP. When the capability endpoint reports `ready`, [submit the workspace](/gdpx/import-approved-tasks); the exact archive must pass the pinned v15 preflight before automatic import.

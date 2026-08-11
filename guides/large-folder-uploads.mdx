@@ -149,7 +149,7 @@ A `ready` session remains charged while two bounded manifest sweeps prune only s
 Run the client from `services/audit`. Supply the API origin and bearer token through explicit flags or a shell-local environment populated by your secret manager:
 
 ```sh
-export STANDARD_DATA_API_BASE="https://<standard-data-api-host>"
+export STANDARD_DATA_API_BASE="https://api.standarddata.io"
 export STANDARD_DATA_API_KEY="<read from your secret manager>"
 
 pnpm exec tsx tools/standard-data-cli.ts upload-folder ./roadmap-task \

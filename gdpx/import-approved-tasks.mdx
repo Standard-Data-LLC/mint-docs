@@ -13,10 +13,12 @@ Wilderness collects runnable benchmark tasks for standardized rollouts and scale
 
 There is no hidden customer approval step. Availability is expressed by the authenticated capability endpoint and the global service mode.
 
+For benchmark Pass 3, keep full traces, rewards, and failure analyses under `trajectory/`. Index those root-relative artifacts in `tasks/<task_name>/TASK.json.rollouts`. Audit reads this intake manifest but keeps it out of the agent runtime. Uploaded results are supplied evidence; Audit does not claim to have executed them.
+
 ## Configure one API origin and key
 
 ```bash
-export STANDARD_DATA_API_BASE="https://<standard-data-api-host>"
+export STANDARD_DATA_API_BASE="https://api.standarddata.io"
 export STANDARD_DATA_API_KEY="<your-standard-data-api-key>"
 ```
 
@@ -47,6 +49,8 @@ The response state is:
 | `incompatible` | The client or deployed policy contract is incompatible and must be updated |
 
 The response also returns `reason_code`, effective and missing scopes, ZIP limits, the pinned `protocolrev_dq_v15_15_0_0` policy, component readiness, and same-origin links. Create a submission only when `state` is `ready`.
+
+For benchmark Pass 3, follow `links.task_json_schema` to fetch the exact `TASK.json.rollouts` contract before building the ZIP.
 
 ## 2. Create one durable submission
 
@@ -102,7 +106,7 @@ awaiting_upload -> uploading -> sanitizing -> mapping -> preflighting -> importi
 
 `blocked`, `failed`, `expired`, and `cancelled` are terminal. The response progressively adds the sanitized source-bundle ID, adapter preview, public-safe v15 admission attestation, task import, blocking issues, and created task revision IDs.
 
-The workflow imports all mapped tasks or none. Warnings do not block. Missing required checks, degraded evaluation, ambiguous mappings, review-required results, or any task blocker produce `blocked` and create no task revisions. Historical results in the ZIP remain supplied, unvalidated evidence unless a separate execution workflow validates them.
+The workflow imports all mapped tasks or none. Warnings do not block. Missing required checks, degraded evaluation, ambiguous mappings, review-required results, or any task blocker produce `blocked` and create no task revisions. Results in the ZIP remain supplied, unvalidated evidence unless a separate execution workflow validates them.
 
 ## Structured errors
 

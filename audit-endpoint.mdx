@@ -1,6 +1,6 @@
 ---
 title: "Test with the audit endpoint"
-sidebarTitle: "1. Test with audit"
+sidebarTitle: "Audit Endpoint"
 description: "Review one task document before submitting the complete workspace."
 keywords: ["GDPx", "document feedback", "preflight endpoint", "API", "task specification"]
 ---
@@ -152,7 +152,3 @@ curl --fail-with-body \
 - v1 evaluations do not support idempotency keys; do not retry while the original request remains open
 
 Legacy v1 failures retain their backward-compatible `detail` field. If a client sends `/api/v2` to a legacy task-feedback origin, the service returns `421 WRONG_API_ORIGIN` with the canonical origin and remediation; it never redirects a bearer credential.
-
-## Next: submit the workspace
-
-When `GET /api/v2/intake-capabilities` returns `state: "ready"`, package the exact workspace as a ZIP and follow [Submit a workspace](/gdpx/import-approved-tasks). One explicit submission starts the durable upload, sanitation, mapping, v15 preflight, and automatic import workflow.

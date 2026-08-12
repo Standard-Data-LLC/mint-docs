@@ -12,18 +12,18 @@
       {
         "group": "Task formats",
         "pages": [
-          "quickstart"
+          "gdpx/quickstart"
         ]
       },
       {
         "group": "GDPx",
         "pages": [
-          "gdpx/benchmark-task-rubric-best-practices",
+          "benchmark-task-rubric-best-practices",
           "gdpx/benchmark-task-design",
           "gdpx/benchmark-task-package",
           "gdpx/benchmark-task-evaluation",
           "gdpx/benchmark-task-delivery",
-          "gdpx/audit-endpoint",
+          "audit-endpoint",
           "gdpx/import-approved-tasks"
         ]
       },

@@ -1,0 +1,79 @@
+---
+title: "Design and grade benchmark tasks"
+sidebarTitle: "Design and grade"
+description: "Define the work, build the environment, and make the rubric observable."
+keywords: ["GDPx", "benchmark", "task design", "rubrics", "environment"]
+---
+
+## Define the work
+
+Start with the capability, not the file type. Name the practitioner, the decision or state change, and the errors that matter.
+
+| Weak | Better |
+| --- | --- |
+| Produce a spreadsheet | Reconcile conflicting operating data and leave a decision-ready forecast with traceable assumptions |
+| Summarize the documents | Triage an escalation across product, contract, and account history, then recommend the next action under policy |
+| Use the tools correctly | Update a live operating artifact without breaking formulas or downstream dependencies |
+
+Each task family should state who does the work, what outcome matters, and what a strong practitioner notices. Renaming companies or changing numbers does not create a new task family.
+
+## Write both kickoffs
+
+Ship two versions of the same job:
+
+1. `kickoff.md`: the unstructured message a manager, client, or colleague would actually send.
+2. `kickoff_structured.md`: the role, objective, constraints, and deliverable stated directly.
+
+Both are required. The real-world version can rely on normal practitioner judgment, but every private policy, definition, and source fact must be discoverable in the environment.
+
+Good ambiguity makes the model recover context. Bad ambiguity makes the task unsolvable.
+
+## Build the environment
+
+Use native files and realistic state. Do not replace a workbook, document, codebase, CAD file, or system record with a prose description of it.
+
+For stateful or editable work, ship:
+
+- the starting state and expected final state;
+- intended changes and forbidden side effects;
+- reset behavior between rollouts; and
+- reopen, render, formula, executable, or diff checks that match the artifact.
+
+The action space is a coding agent with provisioned CLI tools. List each tool and include its definition and skill documentation. Convert computer-use workflows into tool calls before submission.
+
+## Grade observable work
+
+Use deterministic checks for facts code can settle: values, schemas, formulas, compilation, geometry, state transitions, reconciliations, and artifact integrity. Use a judge for evidence-based recommendations, prioritization, material contradictions, and caveats that require practitioner judgment.
+
+Each rubric criterion needs:
+
+- a stable ID and one independently gradable claim;
+- a weight and failure-mode tag;
+- the observable evidence required to pass; and
+- one aggregation rule for the task.
+
+Report two scores: strict full-pass against the declared threshold, and a continuous capability score based on criteria met. Keep deterministic and judge results separate in the reward ledger.
+
+Do not grade private reasoning or one preferred workflow. Alternate valid methods should pass.
+
+## Calibrate the grader
+
+Before cross-model runs, include a practitioner reference output, one to three known-bad outputs, and a partial-credit output when practical. State the expected per-criterion result for each anchor.
+
+Change response length, order, and formatting without changing substance. The score should remain stable. Add plausible but irrelevant detail. The score should not improve.
+
+False positives are more damaging than false negatives because they inflate measured capability. A benchmark item is not ready when the grader merely agrees with its author.
+
+## Recommended: calibrate difficulty
+
+For publishable difficulty claims, prefer at least three model tiers and enough independent rollouts to estimate pass@1 and criterion-level behavior. Regardless of the calibration envelope, pin the model, harness, prompts, tools, sampling settings, turn budget, timeout, judge version, context policy, and retry policy for every supplied rollout.
+
+Review mean rubric score and per-criterion pass rates alongside pass@1. Treat a zero-pass item as unsolved at current capability, not as automatically difficult or broken. Before claiming that it is non-broken or suitable for the intended use, gather the following evidence when practical:
+
+- a qualified practitioner can solve it with the exact context and tools;
+- the practitioner output passes both grading layers;
+- the environment is reliable;
+- at least one model shows meaningful partial progress, or the task is explicitly beyond frontier; and
+- the grader handles known-good, known-bad, and partial-credit anchors correctly.
+
+If every model earns zero or near-zero partial credit, consider splitting or reworking the task. Items above roughly 50% pass@1 can serve as anchors, but they generally should not dominate the benchmark.

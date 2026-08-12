@@ -1,0 +1,126 @@
+---
+title: "Partner delivery and review"
+sidebarTitle: "Partner delivery"
+description: "Run the required partner evaluation and prepare the final handoff."
+keywords: ["GDPx", "partner delivery", "rollouts", "quality control", "TASK.json"]
+---
+
+## Partner delivery and Standard Data review
+
+Submit the canonical task bundle above, or a batch archive that maps to it without requiring us to invent missing facts. You are responsible for the source assets, rights and sanitization notes, rubric rationale, tool definitions, and calibration artifacts.
+
+### Pass 1: Construction integrity
+
+We run every task to confirm that the environment and tools work and the verifier scores correctly. This separates genuine difficulty from broken tools, malformed verifiers, and packaging errors. Construction problems come back to you for repair. We repeat the pass until the task is sound.
+
+### Pass 2: Difficulty and reward integrity
+
+We use frontier models in their listed harnesses to test real difficulty, pass-condition tightness, and reward hacking. If a task is too easy, you harden it and we run this pass again. We also check leakage, grader bias, false positives, and false negatives.
+
+### Pass 3: Partner-run benchmark evaluation
+
+Run 16 completed API rollouts per task for every model–harness pairing below. All ten pairings are required, for 160 subject rollouts per task. Use the listed harness for each model. Extra models and alternate harnesses do not replace a required pairing.
+
+| Model | Harness | `TASK.json` key |
+| --- | --- | --- |
+| Opus 5 (Claude) | Claude Code | `opus-5-claude` |
+| GPT 5.6 Sol | Codex | `gpt-5.6-sol` |
+| Fable 5 | Codex | `fable-5` |
+| Gemini 3.6 | Native | `gemini-3.6` |
+| Spark 1.2 | Native | `spark-1.2` |
+| Meta | Muse Code | `meta` |
+| GLM | Z Code | `glm` |
+| Deep Code | Native | `deep-code` |
+| Code Buddy | Code Buddy Code | `code-buddy` |
+| Quench Old | Native | `quench-old` |
+
+An attempt counts only when it has a final reward, a pass threshold, a `passed` or `failed` outcome, and the required artifacts. Infrastructure failures and retries do not count toward 16. Keep hinted runs, Oracle runs, and calibration anchors out of the subject set.
+
+#### Record results in `TASK.json`
+
+`TASK.json` is the Standard Data intake manifest shipped with the Harbor task. Put it beside `task.toml` under `tasks/<task_name>/`. Its `rollouts` field indexes the result set. Full traces, rewards, and failure analyses stay under the root-level `trajectory/` directory.
+
+Fetch the authoritative contract from `GET /api/v2/intake-schemas/task-json` with your API key. The intake-capability response links to the same route.
+
+Add `rollouts` to the existing task-taxonomy manifest; do not remove the identity, construct, runtime, scoring, horizon, evidence, or provenance fields described above. The shortened example below shows the rollout extension.
+
+```json
+{
+  "task_id": "<task_name>",
+  "rollouts": {
+    "task_content_sha256": "sha256:<64-lowercase-hex>",
+    "environment_image_digest": "sha256:<64-lowercase-hex>",
+    "harbor_version": "1.4",
+    "private_reasoning_omitted": true,
+    "models": {
+      "opus-5-claude": {
+        "model": "Opus 5 (Claude)",
+        "provider": "<provider>",
+        "provider_model_id": "<provider-model-id>",
+        "execution_mode": "api",
+        "harness": "Claude Code",
+        "harness_version": "<pinned-version>",
+        "run_config": {
+          "prompt": { "prompt_sha256": "sha256:<64-lowercase-hex>" },
+          "tool_config_sha256": "sha256:<64-lowercase-hex>",
+          "sampling": { "temperature": 0 },
+          "context_policy": "<pinned-policy>",
+          "turn_budget": 100,
+          "timeout_seconds": 3600,
+          "retry_policy": { "max_attempts": 2, "backoff_seconds": 5 }
+        },
+        "attempts": [
+          {
+            "rollout_id": "<stable-id>",
+            "ordinal": 1,
+            "kind": "subject",
+            "status": "failed",
+            "reward": 0,
+            "pass_threshold": 1,
+            "wall_time_seconds": 842,
+            "usage": { "prompt_tokens": 12500, "completion_tokens": 4200 },
+            "cost_usd": 0.42,
+            "artifacts": {
+              "trajectory": { "path": "trajectory/<task_name>/opus-5-claude/1/trajectory.json", "sha256": "sha256:<64-lowercase-hex>", "size_bytes": 123456, "media_type": "application/json" },
+              "reward": { "path": "trajectory/<task_name>/opus-5-claude/1/reward.json", "sha256": "sha256:<64-lowercase-hex>", "size_bytes": 456, "media_type": "application/json" },
+              "failure_analysis": { "path": "trajectory/<task_name>/opus-5-claude/1/failure_analysis/failure_analysis.md", "sha256": "sha256:<64-lowercase-hex>", "size_bytes": 2345, "media_type": "text/markdown" }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+Include all ten model keys and put exactly 16 completed `subject` attempts in each one, with ordinals `1` through `16`. Use one pass threshold across the task. Reference, hinted, and infrastructure attempts must use a different `kind` and do not count toward the 160 subjects.
+
+Pin the prompt, tool configuration, sampling, context policy, budget, timeout, and retry policy in `run_config`. Every digest uses the `sha256:<64-lowercase-hex>` form, and every artifact path is relative to the batch root. A failed attempt needs `failure_analysis`; a passing attempt does not. Never include private reasoning, credentials, or raw provider events.
+
+Compute `task_content_sha256` over the canonical JSON inventory of every task-local file except `TASK.json`, sorted by path. The schema response gives the exact fields and digest expression. Audit rejects any path, size, media type, or hash that does not match the scanned ZIP.
+
+### Standardized Harbor runtime
+
+Run Pass 3 on the standardized Harbor runtime. Bind every result to the exact task bytes, environment digest, Harbor release, harness release, and run configuration. Custom reward or environment-interaction extensions are fine when they run inside Harbor and are fully declared. They do not replace a listed model harness. Replace custom agents or runtimes with the standard runnable agent before Pass 3; results from an incompatible runtime do not count.
+
+`TASK.json` is task-local intake metadata, not an agent file. Never mount it, `trajectory/`, `docs/`, tests, solutions, or hidden grading material into the agent runtime.
+
+### Pass 4: Analysis and normalization
+
+We review the full rollout set, investigate false positives and false negatives, and run extra harness checks when they answer a real question. This pass determines final inclusion. We normalize accepted tasks and evidence after that decision.
+
+If experts review rollouts during development, keep a simple log in `samples/`. Record the reviewer, task revision, decision, and rationale so later agreement analysis can use the original review data.
+
+## Partner checklist
+
+- A qualified practitioner can solve the task using only the supplied context and tools.
+- Both kickoffs ask for the same job.
+- Native inputs open, and the environment resets cleanly.
+- The reference output passes; known-bad outputs fail for the intended reason.
+- Deterministic checks cover everything code can settle.
+- Every judge criterion is atomic and cites observable evidence.
+- Alternate valid methods are not penalized.
+- Agent-visible, grader-only, and gold files are isolated correctly.
+- Source, rights, sanitization, and overlap-risk metadata are complete.
+
+Use the [audit endpoint](/gdpx/audit-endpoint) for non-canonical document feedback while authoring. A clean document audit is not a v15 workspace result, and its legacy `ready_to_submit` field never authorizes a ZIP. When the capability endpoint reports `ready`, [submit the workspace](/gdpx/import-approved-tasks); the exact archive must pass the pinned v15 preflight before automatic import.

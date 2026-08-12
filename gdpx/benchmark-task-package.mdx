@@ -1,0 +1,157 @@
+---
+title: "Package a benchmark task"
+sidebarTitle: "Package the task"
+description: "Assemble the Harbor task, task taxonomy, ZIP, and self-contained environment."
+keywords: ["GDPx", "Harbor", "task package", "TASK.json", "workspace ZIP"]
+---
+
+## GDPx standardized task bundle
+
+The [Harbor task](/quickstart#the-runnable-task) is the portable runtime core. GDPx adds a canonical per-task layer so we can isolate the grader, reproduce a score, and normalize the task into the v15 bundle. This is the normalization target: you may author it directly or provide the batch evidence package below for reviewed adaptation.
+
+```text
+<TASK_ID>/
+├── TASK.json
+├── agent/
+│   ├── kickoff.md
+│   ├── kickoff_structured.md
+│   ├── env/
+│   └── tools/
+├── grader/
+│   ├── deterministic/
+│   ├── rubric.json
+│   └── validation.py        # or validation.ipynb
+├── gold/
+│   ├── reference_solution.*
+│   └── adversarial/
+└── samples/
+    ├── rollouts/
+    ├── RUN_MANIFEST.json
+    └── reward_ledger.json
+```
+
+<Warning>
+  Everything the model can access belongs under `agent/`. Nothing under `grader/` or `gold/` may be readable from the agent runtime. If grading needs a value, keep it in `grader/`, not in the environment the model explores.
+</Warning>
+
+### What each folder owns
+
+| Path | Requirement | Contents |
+| --- | --- | --- |
+| `TASK.json` | Required | One machine-readable manifest for the task |
+| `agent/` | Required | Both kickoffs, the native data room or environment, and docs for each provisioned tool |
+| `grader/` | Required | Deterministic checks where applicable, the atomic rubric, and a script or notebook proving the signal exists in the data |
+| `gold/` | Required | A strong-practitioner reference output and 1–3 known-bad responses that must fail |
+| `samples/` | Required | A few full, untruncated rollouts, their run envelope, and the per-criterion reward ledger |
+
+`RUN_MANIFEST.json` records the model and harness envelope plus token, tool, cost, and wall-clock data for each rollout. `reward_ledger.json` keeps deterministic output, judge output, and the final criterion contribution separate.
+
+### `TASK.json`
+
+Keep the manifest to the partner-supplied fields below. Standard Data adds revision IDs, hashes, bindings, and other canonical metadata during normalization.
+
+| Group | Fields | Rules |
+| --- | --- | --- |
+| Identity | `task_id`, `partner`, `domain`, `family` | Folder name and `task_id` must match |
+| Construct | `construct`, `turns`, `stateful`, `value_tier` | `turns` is `single` or `multi`; value tier is `high-judgment`, `mixed`, or `commodity` |
+| Runtime | `action_space`, `tools`, `input_format`, `output_format` | `action_space` is `coding-agent`; every declared tool needs agent-visible docs |
+| Scoring | `verifier_mix`, `scoring`, `difficulty` | Verifier weights sum to 1; record criterion count, full-pass threshold, calibration model, and target pass@1 |
+| Horizon | `horizon`, `dual_paradigm_tested` | Record expected wall time and output tokens; test both modes when a direct-versus-tool choice exists |
+| Evidence | `artifacts`, `provenance` | List agent, grader, and gold artifacts; state source, sanitization, rights, and overlap risk |
+
+Numeric examples in templates are illustrative. Set criterion count, verifier mix, horizon, and threshold from the task. Use the GDPx difficulty band above.
+
+### Five format rules
+
+1. Ship both kickoff variants. A task with one is incomplete.
+2. Use a coding agent with provisioned CLI tools. Do not submit a computer-use task.
+3. Ship and grade native artifacts. Stateful work also needs pre-state, post-state, intended deltas, and forbidden side effects.
+4. Keep the rubric atomic. Each criterion has one claim, a weight, a failure tag, and one declared aggregation rule.
+5. Maintain one reward ledger. Record deterministic output, judge output, and final contribution per criterion.
+
+## Package a delivery batch for upload
+
+The single-task bundle above is the canonical normalized unit. A multi-task delivery uses an upstream batch envelope so the runnable task, complete rollout corpus, and QA documentation remain isolated from one another. Audit first stores the ZIP as a source bundle; an adapter preview must map its contents into canonical task units before import.
+
+Do not copy the whole authoring bundle into the runtime directory. Export the approved task and its intake-only `TASK.json` under `tasks/`. Keep trajectories under `trajectory/` and supporting material under `docs/`.
+
+<Info>
+  The batch handoff uses `trajectory/` in the singular. Every task name must match exactly across `tasks/`, `trajectory/`, and `docs/`.
+</Info>
+
+### Batch archive layout
+
+Create one top-level directory named `<dataset>-<batch>-<num>/` and package that directory as a ZIP.
+
+```text
+<dataset>-<batch>-<num>/
+├── tasks/                                      # required: task-local package
+│   └── <task_name>/
+│       ├── TASK.json                            # intake metadata; never agent-visible
+│       ├── task.toml
+│       ├── instruction.md
+│       ├── environment/                        # Dockerfile and workspace
+│       ├── tests/
+│       │   └── test.sh                         # writes /logs/verifier/reward.json
+│       └── solution/
+│           └── solve.sh                        # optional when the Oracle has another form
+├── trajectory/                                 # required: full rollout evidence
+│   └── <task_name>/
+│       └── <model_name>/
+│           └── rollout_<harness@version>_<n>/
+│               ├── trajectory.json             # ATIF-format full trace
+│               ├── reward.json
+│               └── failure_analysis/
+│                   └── failure_analysis.md      # required for every failed rollout
+├── environment/                                # required only for private images
+│   ├── README.md                                # image-to-task map
+│   └── <image_name>/
+│       ├── <loadable image or full build context>
+│       └── manifest.md                          # name:tag, digest, and load/build steps
+└── docs/                                        # required: never part of the agent runtime
+    ├── failure_analysis_metadata.md             # required
+    ├── README.md                                # recommended batch summary
+    ├── reward_hacking.md                        # recommended reward-integrity review
+    └── <task_name>/
+        └── report.md                            # recommended task report
+```
+
+The archive may contain more evidence under `trajectory/` and `docs/`, but `tasks/` must stay harness-ready. Do not place reports, review notes, hidden grading values, or rollout analysis inside a runnable task.
+
+Keep the authoring artifacts from the standardized task bundle:
+
+| Authoring artifact | Batch destination |
+| --- | --- |
+| Approved unstructured kickoff | `tasks/<task_name>/instruction.md` |
+| `TASK.json` rollout index | `tasks/<task_name>/TASK.json`; intake-only and excluded from the runtime |
+| Structured kickoff, provenance, and rubric rationale | `docs/<task_name>/` or its documented subdirectories |
+| Agent environment and tool definitions | `tasks/<task_name>/environment/` |
+| Deterministic grader | `tasks/<task_name>/tests/` with verifier-only runtime visibility |
+| Oracle or reference solution | `tasks/<task_name>/solution/` or an equivalent verifier-only reference |
+| Rollouts, run envelope, rewards, and failure analyses | `trajectory/<task_name>/...` |
+| Known-good and known-bad calibration artifacts | `docs/<task_name>/` as grader-only evidence |
+
+Keep the complete rollout corpus in the batch archive. A normalized per-task `samples/` directory may contain a representative subset, but `RUN_MANIFEST.json` and `reward_ledger.json` must reconcile to the complete delivered evidence.
+
+### Prepare the ZIP
+
+1. Verify that every task has matching entries under `tasks/`, `trajectory/`, and `docs/`.
+2. Remove `.git/`, `.DS_Store`, `__MACOSX/`, symbolic links, secrets, temporary files, and unrelated build output.
+3. Confirm that each environment builds from the delivered files alone. Pin or include every base image, dependency, workspace asset, tool definition, and skill document.
+4. Put exactly one batch root in the archive. Do not upload several unrelated roots or a directory-only ZIP.
+5. Record the final filename, byte size, media type `application/zip`, and SHA-256 of the exact bytes you will upload.
+6. Test the methodology document with the [audit endpoint](/gdpx/audit-endpoint). When intake capability reports `ready`, [submit the workspace ZIP](/gdpx/import-approved-tasks); the exact archive must pass v15 admission before automatic import.
+
+<Warning>
+  The document preflight endpoint accepts one PDF, DOCX, Markdown, or JSON document. It does not accept this ZIP. The canonical flow performs the resumable upload, quarantine, scanning, and adapter preview. A successful byte upload is not task acceptance: stop if the preview is blocked, incomplete, or does not map every task and visibility boundary exactly.
+</Warning>
+
+Raw preference pairs, pure trajectory collections, catalogs, and other data that cannot be represented as verifiable runnable tasks use a separate intake path. Do not force them into this archive shape.
+
+### Make environments self-contained
+
+Every task environment must build from the delivered files without access to an undisclosed registry or local workstation state. Pin dependencies and include the complete workspace and build context.
+
+If a task uses a private image, add the root-level `environment/` package. Supply a loadable or reproducible artifact such as an exported image, OCI layout, or Dockerfile with its full build context. Its manifest must record the exact `name:tag`, digest, registry when applicable, and load or build instructions. The root `environment/README.md` maps each image to every dependent task.
+
+Public images should be pinned by digest. Do not submit a task that depends on an image the reviewer or execution worker cannot retrieve or reconstruct.

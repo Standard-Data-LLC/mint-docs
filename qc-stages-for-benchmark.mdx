@@ -1,38 +1,24 @@
 ---
-title: "QC Stages (For Benchmark)"
+title: "QC stages for benchmarks"
 hidden: true
 ---
 
-Whereas our QC process can be divided into the following stages:
+Before a task enters QC, it must use the [benchmark task package](/gdpx/benchmark-task-package). Track progress in the [live GDPx tracker](https://docs.google.com/spreadsheets/d/1GWSp8RJw3Jpw4gFVUbOx9FAcr8-BlpnWgBKkjKxfLvg/edit?gid=544407692#gid=544407692).
 
-Ingest Tasks from Partners ([Live Tracker here](https://docs.google.com/spreadsheets/d/1GWSp8RJw3Jpw4gFVUbOx9FAcr8-BlpnWgBKkjKxfLvg/edit?gid=544407692#gid=544407692))
-
-Before a task can run through any QC, it must be in an [ingestible format](/gdpx/benchmark-task-package).
-
-<Accordion title="(1) Qc pass 1: Integrity in construction">
-  1. Run 1 rollout 5.6 luna smoke test for verifier integrity testing
-  2. Run rollout analysis over this and make sure these are legitimate failures
-  3. Reformat verifiers and tools if needed; task content if needed; loop until correct
-     1. If there exist unfixable errors for which reversion back to the task partner is needed, feedback is sent over slack to partners on exact revisions/additional context needed
+<Accordion title="QC1: Integrity in construction">
+  Run one GPT-5.6 Luna smoke rollout on the exact task revision. Confirm that the environment, tools, source files, and verifier work. Fix construction defects and repeat until one current-revision smoke is clean.
 </Accordion>
 
-<Accordion title="(2) Qc pass 2: reward integrity/reward hacking">
-  1. Evaluate task in native frontier harness (CC and Codex) for difficulty (GPT 5.6 Sol or Opus 5 equivalents)
-  2. Look for legitimate model failure modes for difficulty calibration - can have an agent do rollout analysis
-  3. If too easy (e.g. frontier model scores 0.8\+), notify partner over slack that task is too easy (with associated frontier model trace) and get confirmation on a fix or dropping from benchmark
+<Accordion title="QC2: Difficulty and reward integrity">
+  Run repeated native frontier-harness rollouts. Confirm that rewards are stable, interpretable, and resistant to reward hacking. Review false positives and false negatives. If Luna is already saturated, keep the task in QC1, harden or drop it, and rerun. Saturated smoke results do not count as QC2.
 </Accordion>
 
-<Accordion title="(3) Qc pass 3: actual eval">
-  1. Run 16 rollouts on frontier over API in native harnesses
-  2. Rollout Analysis:
-     1. Are these legitimate failure modes?  FP/FN Classification
-     2. Was it difficult for the model?
-     3. Are there any other markers of poor bench results (extremely wide standard deviation, reward hacking, unintended behavior or verifier design issues)?
-  3. Compile failure mode analysis (Pass@16 for each task) to consider a task **complete for benchmark**
+<Accordion title="QC3: Benchmark evaluation">
+  Run 16 completed subject rollouts for each pairing in the current evaluation matrix. Analyze model failures, reward variance, unintended behavior, and verifier issues. Infrastructure retries, Oracle runs, and hinted runs do not count toward the 16 subjects.
 </Accordion>
 
-<Accordion title="(4) Qc pass 4: Post-eval analysis and normalization (accompanies research paper)">
-  1. Additional harness testing (opportunistically)
-  2. Failure mode clustering meta-analysis
-  3. Last minute task phase-ins and phase-outs from partners
+<Accordion title="QC4: Analysis and normalization">
+  Review false positives and false negatives, cluster failure modes, run useful cross-harness checks, and decide final inclusion. Normalize accepted task and evidence revisions after that decision.
 </Accordion>
+
+See [Partner delivery and review](/gdpx/benchmark-task-delivery) for the full evidence contract.

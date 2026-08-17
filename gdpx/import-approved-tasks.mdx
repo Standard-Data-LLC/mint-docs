@@ -13,7 +13,7 @@ Wilderness collects runnable benchmark tasks for standardized rollouts and scale
 
 There is no hidden customer approval step. Availability is expressed by the authenticated capability endpoint and the global service mode.
 
-For benchmark Pass 3, keep full traces, rewards, and failure analyses under `trajectory/`. Index those root-relative artifacts in `tasks/<task_name>/TASK.json.rollouts`. Audit reads this intake manifest but keeps it out of the agent runtime. Uploaded results are supplied evidence; Audit does not claim to have executed them.
+For benchmark QC3, keep full traces, rewards, and failure analyses under `trajectory/`. Index those root-relative artifacts in `tasks/<task_name>/TASK.json.rollouts`. Audit reads this intake manifest but keeps it out of the agent runtime. Uploaded results are supplied evidence; Audit does not claim to have executed them.
 
 ## Configure one API origin and key
 
@@ -50,7 +50,7 @@ The response state is:
 
 The response also returns `reason_code`, effective and missing scopes, ZIP limits, the pinned `protocolrev_dq_v15_15_0_0` policy, component readiness, and same-origin links. Create a submission only when `state` is `ready`.
 
-For benchmark Pass 3, follow `links.task_json_schema` to fetch the exact `TASK.json.rollouts` contract before building the ZIP.
+For benchmark QC3, follow `links.task_json_schema` to fetch the exact `TASK.json.rollouts` contract before building the ZIP.
 
 ## 2. Create one durable submission
 

@@ -78,7 +78,7 @@ Submit one top-level directory named `<dataset>-<batch>-<num>/`. A single-task d
 <dataset>-<batch>-<num>/
 ├── tasks/                                      # required: task-local package
 │   └── <task_name>/
-│       ├── TASK.json                           # intake metadata for benchmark Pass 3
+│       ├── TASK.json                           # intake metadata for benchmark QC3
 │       ├── task.toml
 │       ├── instruction.md
 │       ├── environment/
@@ -143,7 +143,7 @@ A benchmark task measures capability. In addition to the runnable task, the deli
 
 GDPx uses a stricter bundle and visibility model. See [Benchmark best practices](/gdpx/benchmark-task-rubric-best-practices#gdpx-standardized-task-bundle) for the exact partner handoff.
 
-For benchmark Pass 3, you run the [required model–harness matrix](/gdpx/benchmark-task-rubric-best-practices#partner-delivery-and-standard-data-review). Store full evidence under `trajectory/` and index those root-relative artifacts in `tasks/<task_name>/TASK.json`.
+For benchmark QC3, run 16 completed subject rollouts for each pairing in the [current evaluation matrix](/gdpx/benchmark-task-delivery#qc3-benchmark-evaluation). Store full evidence under `trajectory/` and index those root-relative artifacts in `tasks/<task_name>/TASK.json`.
 
 Submit the required attempt evidence. We derive the normalized cross-model difficulty, grader bias, contamination, and calibration findings during review; do not prewrite those conclusions.
 
@@ -153,7 +153,7 @@ An RL task uses the same Harbor core. Its delivery adds repeated trial evidence 
 
 ### `trajectory/`
 
-Required for an RL delivery and benchmark Pass 3. Use it for optional benchmark calibration runs as well. Preserve every delivered full, untruncated observable trace, tool call and result, relevant state transition, final output, reward, pass threshold, model and harness version, per-rollout configuration, and timing or token data. A trajectory is evidence about a task; it is not the task itself.
+Required for an RL delivery and benchmark QC3. Use it for optional benchmark calibration runs as well. Preserve every delivered full, untruncated observable trace, tool call and result, relevant state transition, final output, reward, pass threshold, model and harness version, per-rollout configuration, and timing or token data. A trajectory is evidence about a task; it is not the task itself.
 
 Bind every rollout to `task_name`, `model_name`, `harness_name`, `harness_version`, and an attempt index. Summary fields such as `rollout_n`, `reward_mean`, `reward_std`, `reward_min`, `reward_max`, `pass_rate`, `mean_steps`, `mean_cost_usd`, `mean_prompt_tokens`, and `mean_completion_tokens` are useful, but they never replace the underlying rewards and traces. Always declare the pass threshold used to compute `pass_rate`.
 
@@ -229,7 +229,7 @@ Keep verifier material, reference solutions, and hidden grading values inaccessi
 
 ### Difficulty evidence
 
-This is optional authoring calibration. It does not replace the required partner-run Pass 3 matrix.
+This is optional authoring calibration. It does not replace the required QC3 evaluation matrix.
 
 Prefer at least three model capability tiers and enough independent rollouts to report uncertainty. For an early delivery study, 16 baseline runs and 5 frontier runs are a practical minimum; treat the associated `<50%` and `<=40%` resolve-rate targets as calibration guidance, not universal acceptance gates.
 

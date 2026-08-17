@@ -18,12 +18,12 @@
       {
         "group": "GDPx",
         "pages": [
-          "benchmark-task-rubric-best-practices",
+          "gdpx/benchmark-task-rubric-best-practices",
           "gdpx/benchmark-task-design",
           "gdpx/benchmark-task-package",
           "gdpx/benchmark-task-evaluation",
           "gdpx/benchmark-task-delivery",
-          "audit-endpoint",
+          "gdpx/audit-endpoint",
           "gdpx/import-approved-tasks"
         ]
       },
@@ -40,12 +40,27 @@
   "redirects": [
     {
       "source": "/",
-      "destination": "/quickstart",
+      "destination": "/gdpx/quickstart",
       "permanent": true
     },
     {
       "source": "/index",
-      "destination": "/quickstart",
+      "destination": "/gdpx/quickstart",
+      "permanent": true
+    },
+    {
+      "source": "/quickstart",
+      "destination": "/gdpx/quickstart",
+      "permanent": true
+    },
+    {
+      "source": "/benchmark-task-rubric-best-practices",
+      "destination": "/gdpx/benchmark-task-rubric-best-practices",
+      "permanent": true
+    },
+    {
+      "source": "/audit-endpoint",
+      "destination": "/gdpx/audit-endpoint",
       "permanent": true
     }
   ]

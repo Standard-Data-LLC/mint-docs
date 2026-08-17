@@ -9,34 +9,25 @@ keywords: ["GDPx", "partner delivery", "rollouts", "quality control", "TASK.json
 
 Submit the canonical task bundle above, or a batch archive that maps to it without requiring us to invent missing facts. You are responsible for the source assets, rights and sanitization notes, rubric rationale, tool definitions, and calibration artifacts.
 
-### Pass 1: Construction integrity
+### QC1: Integrity in construction
 
-We run every task to confirm that the environment and tools work and the verifier scores correctly. This separates genuine difficulty from broken tools, malformed verifiers, and packaging errors. Construction problems come back to you for repair. We repeat the pass until the task is sound.
+Run one smoke rollout on the exact task revision with GPT-5.6 Luna. QC1 checks that the environment builds and resets, tools and source files are available, and the verifier returns a valid score. It does not establish difficulty.
 
-### Pass 2: Difficulty and reward integrity
+Fix task, tool, source, or verifier defects and repeat the smoke test. A task stays in QC1 until one clean current-revision run shows that failures come from model behavior rather than broken construction.
 
-We use frontier models in their listed harnesses to test real difficulty, pass-condition tightness, and reward hacking. If a task is too easy, you harden it and we run this pass again. We also check leakage, grader bias, false positives, and false negatives.
+### QC2: Difficulty and reward integrity
 
-### Pass 3: Partner-run benchmark evaluation
+Run repeated rollouts in the task's native frontier harness. Check that rewards are stable and interpretable, successful runs solved the intended task, and failed runs are legitimate model failures. Review reward hacking, leakage, grader bias, false positives, and false negatives.
+
+A task advances only when the signal is non-saturated. If Luna already passes nearly every run or scores at the ceiling, keep the task in QC1, harden or drop it, and rerun the current revision. A saturated smoke result is not QC2 evidence.
+
+### QC3: Benchmark evaluation
 
 <Info>
-  Important - not necessary until first two QC passes are done correctly
+  Do not start QC3 until QC1 and QC2 are complete.
 </Info>
 
-Run 16 completed API rollouts per task for every model–harness pairing below. All ten pairings are required, for 160 subject rollouts per task. Use the listed harness for each model. Extra models and alternate harnesses do not replace a required pairing.
-
-| Model | Harness | `TASK.json` key |
-| --- | --- | --- |
-| Opus 5 (Claude) | Claude Code | `opus-5-claude` |
-| GPT 5.6 Sol | Codex | `gpt-5.6-sol` |
-| Fable 5 | Codex | `fable-5` |
-| Gemini 3.6 | Native | `gemini-3.6` |
-| Spark 1.2 | Native | `spark-1.2` |
-| Meta | Muse Code | `meta` |
-| GLM | Z Code | `glm` |
-| Deep Code | Native | `deep-code` |
-| Code Buddy | Code Buddy Code | `code-buddy` |
-| Quench Old | Native | `quench-old` |
+Run 16 completed subject rollouts per task for each model–harness pairing in the current evaluation matrix. Standard Data provides the matrix with the evaluation window. Use the listed native harness and pinned task revision. Extra models and alternate harnesses do not replace a required pairing.
 
 An attempt counts only when it has a final reward, a pass threshold, a `passed` or `failed` outcome, and the required artifacts. Infrastructure failures and retries do not count toward 16. Keep hinted runs, Oracle runs, and calibration anchors out of the subject set.
 
@@ -57,8 +48,8 @@ Add `rollouts` to the existing task-taxonomy manifest; do not remove the identit
     "harbor_version": "1.4",
     "private_reasoning_omitted": true,
     "models": {
-      "opus-5-claude": {
-        "model": "Opus 5 (Claude)",
+      "<model-key>": {
+        "model": "<model-name>",
         "provider": "<provider>",
         "provider_model_id": "<provider-model-id>",
         "execution_mode": "api",
@@ -85,9 +76,9 @@ Add `rollouts` to the existing task-taxonomy manifest; do not remove the identit
             "usage": { "prompt_tokens": 12500, "completion_tokens": 4200 },
             "cost_usd": 0.42,
             "artifacts": {
-              "trajectory": { "path": "trajectory/<task_name>/opus-5-claude/1/trajectory.json", "sha256": "sha256:<64-lowercase-hex>", "size_bytes": 123456, "media_type": "application/json" },
-              "reward": { "path": "trajectory/<task_name>/opus-5-claude/1/reward.json", "sha256": "sha256:<64-lowercase-hex>", "size_bytes": 456, "media_type": "application/json" },
-              "failure_analysis": { "path": "trajectory/<task_name>/opus-5-claude/1/failure_analysis/failure_analysis.md", "sha256": "sha256:<64-lowercase-hex>", "size_bytes": 2345, "media_type": "text/markdown" }
+              "trajectory": { "path": "trajectory/<task_name>/<model-key>/1/trajectory.json", "sha256": "sha256:<64-lowercase-hex>", "size_bytes": 123456, "media_type": "application/json" },
+              "reward": { "path": "trajectory/<task_name>/<model-key>/1/reward.json", "sha256": "sha256:<64-lowercase-hex>", "size_bytes": 456, "media_type": "application/json" },
+              "failure_analysis": { "path": "trajectory/<task_name>/<model-key>/1/failure_analysis/failure_analysis.md", "sha256": "sha256:<64-lowercase-hex>", "size_bytes": 2345, "media_type": "text/markdown" }
             }
           }
         ]
@@ -97,7 +88,7 @@ Add `rollouts` to the existing task-taxonomy manifest; do not remove the identit
 }
 ```
 
-Include all ten model keys and put exactly 16 completed `subject` attempts in each one, with ordinals `1` through `16`. Use one pass threshold across the task. Reference, hinted, and infrastructure attempts must use a different `kind` and do not count toward the 160 subjects.
+Include every model key in the current evaluation matrix and put exactly 16 completed `subject` attempts in each one, with ordinals `1` through `16`. Use one pass threshold across the task. Reference, hinted, and infrastructure attempts must use a different `kind` and do not count toward the subject set.
 
 Pin the prompt, tool configuration, sampling, context policy, budget, timeout, and retry policy in `run_config`. Every digest uses the `sha256:<64-lowercase-hex>` form, and every artifact path is relative to the batch root. A failed attempt needs `failure_analysis`; a passing attempt does not. Never include private reasoning, credentials, or raw provider events.
 
@@ -105,11 +96,11 @@ Compute `task_content_sha256` over the canonical JSON inventory of every task-lo
 
 ### Standardized Harbor runtime
 
-Run Pass 3 on the standardized Harbor runtime. Bind every result to the exact task bytes, environment digest, Harbor release, harness release, and run configuration. Custom reward or environment-interaction extensions are fine when they run inside Harbor and are fully declared. They do not replace a listed model harness. Replace custom agents or runtimes with the standard runnable agent before Pass 3; results from an incompatible runtime do not count.
+Run QC3 on the standardized Harbor runtime. Bind every result to the exact task bytes, environment digest, Harbor release, harness release, and run configuration. Custom reward or environment-interaction extensions are fine when they run inside Harbor and are fully declared. They do not replace a required model harness. Replace custom agents or runtimes with the standard runnable agent before QC3; results from an incompatible runtime do not count.
 
 `TASK.json` is task-local intake metadata, not an agent file. Never mount it, `trajectory/`, `docs/`, tests, solutions, or hidden grading material into the agent runtime.
 
-### Pass 4: Analysis and normalization
+### QC4: Analysis and normalization
 
 We review the full rollout set, investigate false positives and false negatives, and run extra harness checks when they answer a real question. This pass determines final inclusion. We normalize accepted tasks and evidence after that decision.
 

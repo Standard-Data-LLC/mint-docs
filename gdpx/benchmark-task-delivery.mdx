@@ -15,11 +15,15 @@ Run one smoke rollout on the exact task revision with GPT-5.6 Luna. QC1 checks t
 
 Fix task, tool, source, or verifier defects and repeat the smoke test. A task stays in QC1 until one clean current-revision run shows that failures come from model behavior rather than broken construction.
 
+You may use [rollout analysis](/gdpx/benchmark-rollout-analysis) to separate a model failure from a task, verifier, environment, provider, or orchestration defect. Its recommendation supports review but does not move the task out of QC1.
+
 ### QC2: Difficulty and reward integrity
 
 Run repeated rollouts in the task's native frontier harness. Check that rewards are stable and interpretable, successful runs solved the intended task, and failed runs are legitimate model failures. Review reward hacking, leakage, grader bias, false positives, and false negatives.
 
 A task advances only when the signal is non-saturated. If Luna already passes nearly every run or scores at the ceiling, keep the task in QC1, harden or drop it, and rerun the current revision. A saturated smoke result is not QC2 evidence.
+
+One `legitimate_model_failure` result does not establish QC2. Review the repeated current-revision rollout set for stable, non-saturated difficulty and reward integrity.
 
 ### QC3: Benchmark evaluation
 

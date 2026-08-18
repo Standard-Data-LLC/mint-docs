@@ -71,6 +71,8 @@ Unvalidated labels are hypotheses, not confirmed failure modes.
 
 Every delivered failed rollout needs `trajectory/<task_name>/<model_name>/rollout_<harness@version>_<n>/failure_analysis/failure_analysis.md`. The declared evaluation plan determines the rollout count; every failed attempt in the delivered corpus needs its own analysis.
 
+Use [Analyze a benchmark rollout](/gdpx/benchmark-rollout-analysis) to produce a grounded first-pass classification for one normalized rollout. Preserve its fingerprints and evidence citations in the review record. The result is judge-assisted evidence, not a QC decision; resolve human-review cases and apply the complete solvability and integrity gates below.
+
 Each file must include:
 
 - the failure-mode label or labels from a versioned taxonomy;

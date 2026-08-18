@@ -32,6 +32,7 @@ export STANDARD_DATA_API_KEY="<your-standard-data-api-key>"
 | --- | --- | --- |
 | `GET` | `/v1/whoami` | Read identity, scopes, rate limit, and canonical-submission state |
 | `POST` | `/v1/evaluate` | Review one task specification or benchmark paper |
+| `POST` | `/v1/benchmark-rollout-analyses` | Classify one observable rollout and assess failure legitimacy |
 | `GET` | `/v1/evaluations/{evaluation_id}` | Retrieve an evaluation |
 | `GET` | `/v1/healthz` | Check service health without authentication |
 | `GET` | `/api/v2/intake-capabilities` | Read server-authoritative workspace-intake readiness |
@@ -45,6 +46,8 @@ curl --fail-with-body \
 ```
 
 `canonical_submission.state` is `ready`, `missing_access`, `temporarily_unavailable`, or `incompatible`. Follow its same-origin links; do not construct an `/api/v2` URL from an old task-feedback hostname.
+
+Use [Analyze a benchmark rollout](/gdpx/benchmark-rollout-analysis) after a rollout completes. That endpoint accepts one strict JSON rollout projection and returns judge-assisted QC evidence. It does not replace this document review or the canonical workspace gate.
 
 ## Submit a document
 

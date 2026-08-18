@@ -22,6 +22,7 @@
           "gdpx/benchmark-task-design",
           "gdpx/benchmark-task-package",
           "gdpx/benchmark-task-evaluation",
+          "gdpx/benchmark-rollout-analysis",
           "gdpx/benchmark-task-delivery",
           "gdpx/audit-endpoint",
           "gdpx/import-approved-tasks"

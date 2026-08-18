@@ -6,11 +6,11 @@ hidden: true
 Before a task enters QC, it must use the [benchmark task package](/gdpx/benchmark-task-package). Track progress in the [live GDPx tracker](https://docs.google.com/spreadsheets/d/1GWSp8RJw3Jpw4gFVUbOx9FAcr8-BlpnWgBKkjKxfLvg/edit?gid=544407692#gid=544407692).
 
 <Accordion title="QC1: Integrity in construction">
-  Run one GPT-5.6 Luna smoke rollout on the exact task revision. Confirm that the environment, tools, source files, and verifier work. Fix construction defects and repeat until one current-revision smoke is clean.
+  Run one GPT-5.6 Luna smoke rollout on the exact task revision. Confirm that the environment, tools, source files, and verifier work. Fix construction defects and repeat until one current-revision smoke is clean. Use [rollout analysis](/gdpx/benchmark-rollout-analysis) as judge-assisted evidence when the failure origin is unclear; it does not advance the task.
 </Accordion>
 
 <Accordion title="QC2: Difficulty and reward integrity">
-  Run repeated native frontier-harness rollouts. Confirm that rewards are stable, interpretable, and resistant to reward hacking. Review false positives and false negatives. If Luna is already saturated, keep the task in QC1, harden or drop it, and rerun. Saturated smoke results do not count as QC2.
+  Run repeated native frontier-harness rollouts. Confirm that rewards are stable, interpretable, and resistant to reward hacking. Review false positives and false negatives. One `legitimate_model_failure` analysis is not enough to pass this stage. If Luna is already saturated, keep the task in QC1, harden or drop it, and rerun. Saturated smoke results do not count as QC2.
 </Accordion>
 
 <Accordion title="QC3: Benchmark evaluation">

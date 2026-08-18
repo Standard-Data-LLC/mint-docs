@@ -6,6 +6,7 @@ Mintlify source for Standard Data task-format and GDPx documentation.
 
 - `quickstart.mdx`: RL and benchmark task taxonomy
 - `gdpx/benchmark-task-rubric-best-practices.mdx`: GDPx task design, grading, packaging, and calibration
+- `gdpx/benchmark-rollout-analysis.mdx`: one-rollout failure classification API
 - `gdpx/audit-endpoint.mdx`: audit API reference
 
 ## Local preview

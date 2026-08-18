@@ -1,74 +1,32 @@
 ---
 title: "QC stages for benchmarks"
+hidden: true
 sidebarTitle: "QC stages"
 description: "Run benchmark QC and integrate rollout analysis without automating stage decisions."
 ---
 
-Before a task enters QC, it must use the [benchmark task package](/gdpx/benchmark-task-package). Track progress in the [live GDPx tracker](https://docs.google.com/spreadsheets/d/1GWSp8RJw3Jpw4gFVUbOx9FAcr8-BlpnWgBKkjKxfLvg/edit?gid=544407692#gid=544407692).
+Before a task enters QC, it must use the [benchmark task package](/gdpx/benchmark-task-package). 
+
+Partner Task Iteration (Until August 25th):
 
 <Accordion title="QC1: Integrity in construction">
-  Run one GPT-5.6 Luna smoke rollout on the exact task revision. Confirm that the environment, tools, source files, and verifier work. Fix construction defects and repeat until one current-revision smoke is clean. Use [rollout analysis](/gdpx/benchmark-rollout-analysis) as judge-assisted evidence when the failure origin is unclear; it does not advance the task.
+  Run one GPT-5.6 Luna smoke rollout on the exact task revision. Confirm that the environment, tools, source files, and verifier work. Fix construction defects and repeat until one current-revision smoke is clean.
 </Accordion>
 
 <Accordion title="QC2: Difficulty and reward integrity">
-  Run repeated native frontier-harness rollouts. Confirm that rewards are stable, interpretable, and resistant to reward hacking. Review false positives and false negatives. One `legitimate_model_failure` analysis is not enough to pass this stage. If Luna is already saturated, keep the task in QC1, harden or drop it, and rerun. Saturated smoke results do not count as QC2.
+  Run repeated native frontier-harness rollouts. Confirm that rewards are stable, interpretable, and resistant to reward hacking. Review false positives and false negatives. If Luna is already saturated, keep the task in QC1, harden or drop it, and rerun. Saturated smoke results do not count as QC2.
 </Accordion>
+
+Final Evals for Benchmark Results (and iteration):
 
 <Accordion title="QC3: Benchmark evaluation">
   Run 16 completed subject rollouts for each pairing in the current evaluation matrix. Analyze model failures, reward variance, unintended behavior, and verifier issues. Infrastructure retries, Oracle runs, and hinted runs do not count toward the 16 subjects.
 </Accordion>
+
+Research Paper Writeout Co-Development:
 
 <Accordion title="QC4: Analysis and normalization">
   Review false positives and false negatives, cluster failure modes, run useful cross-harness checks, and decide final inclusion. Normalize accepted task and evidence revisions after that decision.
 </Accordion>
 
 See [Partner delivery and review](/gdpx/benchmark-task-delivery) for the full evidence contract.
-
-## QC endpoints
-
-Use one API origin and tenant-scoped key. Each endpoint answers a different question.
-
-| Endpoint | Use it for | It does not do |
-| --- | --- | --- |
-| `POST /v1/evaluate` | Review one task document while authoring | Validate or import the complete workspace |
-| `POST /v1/benchmark-rollout-analyses` | Diagnose one completed rollout after the verifier runs | Advance QC, certify a task, or import evidence |
-| `POST /api/v2/workspace-submissions` | Submit the exact workspace for v15 admission and automatic import | Replace rollout-level QC review |
-
-## Build rollout analysis into your runner
-
-Call rollout analysis after the task revision, rollout, verifier result, and runtime outcome are immutable. Create a bounded, sanitized evidence projection rather than forwarding the raw rollout archive.
-
-```bash
-curl --fail-with-body \
-  --request POST "${STANDARD_DATA_API_BASE}/v1/benchmark-rollout-analyses" \
-  --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
-  --header "Content-Type: application/json" \
-  --data-binary @rollout-analysis-request.json \
-  --max-time 200 \
-  --output rollout-analysis-response.json
-```
-
-Your integration should:
-
-1. Bind the request to the exact task revision and completed rollout.
-2. Include observable trajectory, verifier, Oracle, runtime, provider, and orchestration evidence.
-3. Remove private reasoning, credentials, signed URLs, and raw storage paths.
-4. Submit one rollout per request.
-5. Retain the request and response with their task, rollout, prompt, schema, model, input, and output fingerprints.
-6. Route the result for review; never mutate QC state from the endpoint response alone.
-
-Route on `failure_legitimacy` and `qc_recommendation`, not on `deep_swe_tag` by itself.
-
-| Result | Runner action |
-| --- | --- |
-| `legitimate_model_failure` + `accept_as_legitimate_failure` | Attach the analysis as QC1 evidence, then apply the full stage requirements |
-| `passing_rollout` + `harden_and_rerun` | Treat the Luna pass as saturation evidence; harden or drop the task if QC needs a genuine failure |
-| `non_model_failure` + `repair_and_rerun` | Route `benchmark_fix` to the named task, verifier, environment, provider, or orchestration owner |
-| `cheated_or_invalid_pass` | Quarantine the pass, inspect leakage or reward hacking, then repair and rerun |
-| `needs_human_review` | Queue qualified review with the listed `missing_inputs`; do not infer a model failure |
-
-<Warning>
-  A legitimate model-failure result can support QC1, but it never advances the task automatically. One result does not establish repeated-run QC2 evidence, and a legitimate Luna pass never counts as a failure for QC2.
-</Warning>
-
-The endpoint is synchronous, accepts up to `2 MiB`, and requires `evaluations:write`. It is not a raw-trajectory storage service. See [Analyze a benchmark rollout](/gdpx/benchmark-rollout-analysis) for the complete schema, taxonomy, evidence rules, limits, and error handling.

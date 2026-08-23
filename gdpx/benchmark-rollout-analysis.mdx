@@ -9,6 +9,8 @@ keywords: ["GDPx", "rollout analysis", "failure analysis", "DeepSWE", "Luna", "Q
 
 <Warning>
   This endpoint returns judge-assisted QC evidence. It does not advance a task through QC, create or update a canonical task or rollout, authorize workspace import, or issue a certificate. A reviewer must resolve `needs_human_review` results and apply the [QC stage rules](/qc-stages-for-benchmark).
+
+  This call does not retain or import the rollout for Wilderness. Keep the analysis response, then include the underlying trajectory, reward, grading evidence, and produced artifacts in the workspace ZIP under the [reviewer-visible rollout evidence contract](/gdpx/benchmark-task-package#preserve-reviewer-visible-rollout-evidence).
 </Warning>
 
 <Info>

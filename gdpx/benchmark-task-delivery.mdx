@@ -35,6 +35,8 @@ Run 16 completed subject rollouts per task for each model–harness pairing in t
 
 An attempt counts only when it has a final reward, a pass threshold, a `passed` or `failed` outcome, and the required artifacts. Infrastructure failures and retries do not count toward 16. Keep hinted runs, Oracle runs, and calibration anchors out of the subject set.
 
+The required artifacts must satisfy the [reviewer-visible rollout evidence contract](/gdpx/benchmark-task-package#preserve-reviewer-visible-rollout-evidence). Metadata-only rows and provider references do not count as completed attempts.
+
 #### Record results in `TASK.json`
 
 `TASK.json` is the Standard Data intake manifest shipped with the Harbor task. Put it beside `task.toml` under `tasks/<task_name>/`. Its `rollouts` field indexes the result set. Full traces, rewards, and failure analyses stay under the root-level `trajectory/` directory.
@@ -95,6 +97,8 @@ Add `rollouts` to the existing task-taxonomy manifest; do not remove the identit
 Include every model key in the current evaluation matrix and put exactly 16 completed `subject` attempts in each one, with ordinals `1` through `16`. Use one pass threshold across the task. Reference, hinted, and infrastructure attempts must use a different `kind` and do not count toward the subject set.
 
 Pin the prompt, tool configuration, sampling, context policy, budget, timeout, and retry policy in `run_config`. Every digest uses the `sha256:<64-lowercase-hex>` form, and every artifact path is relative to the batch root. A failed attempt needs `failure_analysis`; a passing attempt does not. Never include private reasoning, credentials, or raw provider events.
+
+Every artifact path must resolve to the exact uploaded bytes and match its declared hash, size, and media type. The trajectory must expose the observable execution, and generated work products must be included as inspectable native artifacts. IDs, scores, and aggregate statistics are indexes and summaries, not rollout evidence.
 
 Compute `task_content_sha256` over the canonical JSON inventory of every task-local file except `TASK.json`, sorted by path. The schema response gives the exact fields and digest expression. Audit rejects any path, size, media type, or hash that does not match the scanned ZIP.
 

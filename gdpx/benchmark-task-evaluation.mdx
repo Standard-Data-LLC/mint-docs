@@ -21,7 +21,7 @@ The shell Oracle is optional when it is the wrong representation for the task. P
 
 ## Recommended difficulty evidence
 
-Use full, untruncated trajectories. Pin the model, harness, harness version, prompts, tool definitions, sampling settings, turn budget, timeout, context policy, retry policy, and judge version.
+Use full, untruncated trajectories. Pin the model, harness, harness version, prompts, tool definitions, sampling settings, turn budget, timeout, context policy, retry policy, and judge version. Run IDs, provider links, scores, and summary statistics do not replace the underlying reviewer-visible evidence.
 
 This is optional authoring calibration. It does not replace Pass 3, which requires 16 completed API rollouts for every model–harness pairing below.
 
@@ -136,6 +136,7 @@ Required:
 - Every environment is complete, pinned, resettable, and buildable from delivered files.
 - Private images include a loadable artifact or full build context, exact tag and digest, instructions, and task mapping.
 - Every verifier writes `/logs/verifier/reward.json` at runtime.
+- Every countable rollout satisfies the [reviewer-visible evidence contract](/gdpx/benchmark-task-package#preserve-reviewer-visible-rollout-evidence), including inspectable native work products.
 - Model, harness, version, prompt, tool, sampling, budget, timeout, context, judge, and retry settings are pinned for every supplied rollout.
 - Every failed rollout has evidence-backed root-cause analysis, a taxonomy label, solvability status, and confidence or ambiguity status.
 - Dataset-level failure taxonomy, per-model and cross-task distributions, and the task-count histogram are complete.

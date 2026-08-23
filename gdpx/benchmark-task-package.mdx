@@ -133,6 +133,40 @@ Keep the authoring artifacts from the standardized task bundle:
 
 Keep the complete rollout corpus in the batch archive. A normalized per-task `samples/` directory may contain a representative subset, but `RUN_MANIFEST.json` and `reward_ledger.json` must reconcile to the complete delivered evidence.
 
+### Preserve reviewer-visible rollout evidence
+
+Every rollout that counts toward QC, difficulty assessment, or benchmark results must be independently reviewable from the delivered bytes. A rollout ID, score, cost, token count, provider link, or aggregate summary does not satisfy this requirement.
+
+For every countable attempt, retain:
+
+- the exact task revision and all agent-visible instructions and source materials;
+- the complete ordered observable trajectory, including visible messages, tool calls, sanitized tool inputs, tool results, relevant state transitions, and the final response;
+- the produced work products themselves, such as the completed workbook, document, code patch, or other native artifact, with stable artifact references and hashes;
+- the final reward, pass threshold, outcome, per-test results, and criterion-level grading decisions;
+- the model, provider, harness, prompt and tool configuration, budgets, timeout, stop reason, timing, and usage envelope; and
+- immutable task, run, rollout, and artifact bindings so the evidence cannot be attached to a different execution.
+
+Route the evidence into the canonical rollout sections. Do not bury a transcript or test log inside a generic result summary.
+
+| Section | Required reviewer-visible content |
+| --- | --- |
+| `problem` | Exact task instruction, problem identity, and task-revision binding |
+| `setup_logs` | Environment build and startup, dependency resolution, reset state, and tool-handshake evidence |
+| `agent_logs` | Ordered visible messages, tool calls, sanitized inputs, tool outputs, observations, errors, and relevant state transitions |
+| `results` | Final response, output summary, completion status, stop reason, and references to every produced work product |
+| `test_logs` | Per-test execution output, passed and total counts, errors, skips, and verifier-runtime diagnostics |
+| `grading` | Final reward, pass threshold, outcome, criterion-level decisions, weights or contributions, hard-gate results, and grader version |
+
+Also retain run-level model, provider, harness, harness version, compute, infrastructure, start and completion times, duration, turn count, token usage, cost, retry lineage, and structured stop reason. Use `null` only when the source genuinely did not emit a value; a required section with a null body makes the rollout diagnostic-only.
+
+Keep generated work products beside the attempt under `trajectory/<task_name>/<model_name>/rollout_<harness@version>_<n>/artifacts/`. Reference them from the trajectory or its attempt manifest. Preserve native formats so reviewers can inspect formulas, cell values, document content, and other task-specific details directly.
+
+Omit hidden or private reasoning, credentials, signed URLs, and raw provider-private payloads. Record each omission explicitly. Do not replace observable content with the word `restricted`, an empty event list, or a provider identifier.
+
+<Warning>
+  `TASK.json` indexes rollout evidence; it does not replace the evidence. Audit does not reconstruct missing bodies from Harbor, Prime Intellect, or another provider. A metadata-only rollout is diagnostic evidence only. It cannot count toward QC1, QC2, QC3, reviewer acceptance, or a published difficulty claim. Reviewer permissions cannot recover evidence that was never uploaded.
+</Warning>
+
 ### Prepare the ZIP
 
 1. Verify that every task has matching entries under `tasks/`, `trajectory/`, and `docs/`.
@@ -140,7 +174,8 @@ Keep the complete rollout corpus in the batch archive. A normalized per-task `sa
 3. Confirm that each environment builds from the delivered files alone. Pin or include every base image, dependency, workspace asset, tool definition, and skill document.
 4. Put exactly one batch root in the archive. Do not upload several unrelated roots or a directory-only ZIP.
 5. Record the final filename, byte size, media type `application/zip`, and SHA-256 of the exact bytes you will upload.
-6. Test the methodology document with the [audit endpoint](/gdpx/audit-endpoint). When intake capability reports `ready`, [submit the workspace ZIP](/gdpx/import-approved-tasks); the exact archive must pass v15 admission before automatic import.
+6. Open at least one packaged attempt for every task and model pairing. Confirm that the prompt, observable transcript, tool I/O, output artifacts, tests, and grading evidence are present and readable from the archive alone.
+7. Test the methodology document with the [audit endpoint](/gdpx/audit-endpoint). When intake capability reports `ready`, [submit the workspace ZIP](/gdpx/import-approved-tasks); the exact archive must pass v15 admission before automatic import.
 
 <Warning>
   The document preflight endpoint accepts one PDF, DOCX, Markdown, or JSON document. It does not accept this ZIP. The canonical flow performs the resumable upload, quarantine, scanning, and adapter preview. A successful byte upload is not task acceptance: stop if the preview is blocked, incomplete, or does not map every task and visibility boundary exactly.

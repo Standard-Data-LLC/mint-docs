@@ -108,6 +108,14 @@ awaiting_upload -> uploading -> sanitizing -> mapping -> preflighting -> importi
 
 The workflow imports all mapped tasks or none. Warnings do not block. Missing required checks, degraded evaluation, ambiguous mappings, review-required results, or any task blocker produce `blocked` and create no task revisions. Results in the ZIP remain supplied, unvalidated evidence unless a separate execution workflow validates them.
 
+## Verify reviewer evidence after import
+
+After a submission succeeds, open at least one rollout for every task and model pairing in Wilderness. Confirm that the exact prompt and task context, observable transcript, tool inputs and outputs, final response, tests, criterion-level grading, and native work-product artifacts are present.
+
+A visible score with unavailable rollout detail is a source-evidence gap, not a reviewer-permission issue. Do not count that attempt toward QC or difficulty assessment. Recover the exact original execution evidence, rebuild the archive, and submit it as a new immutable revision. Do not substitute a different model run or attach evidence from another task revision.
+
+See [Preserve reviewer-visible rollout evidence](/gdpx/benchmark-task-package#preserve-reviewer-visible-rollout-evidence) for the mandatory delivery contract and permitted omissions.
+
 ## Structured errors
 
 Canonical v2 errors use this safe envelope:

@@ -81,8 +81,10 @@ Every task submitted with `publication_policy: "publish_when_review_ready"` must
 
 The authority record binds the exact task, logical task, source delivery, rights basis, agreement status, internal approval, and any source-to-execution mappings. Its self-attestation hash covers the canonical JSON record. An authorized record must state `intended_catalog_member: true`, carry an applicable executed-agreement or first-party rights basis, and include an approval scoped to `gdpx_benchmark_qc_and_publication`.
 
+The uploaded declaration is necessary but not sufficient. Audit also requires its attestation hash to match the active immutable publication grant in Standard Data's operator-controlled registry. Submission credentials cannot create or advance that grant. Missing, blocked, superseded, or mismatched grants keep the task out of the catalog. This separation lets an owner later replace an authorization decision without changing task bytes while preserving the complete decision history.
+
 <Warning>
-  Upload permission is not publication authority. A valid API key, successful transport, complete rollout, partner delivery, or technical `review_ready` candidate cannot substitute for this task-bound authority record. Never reuse an authority file across revisions or deliveries.
+  Upload permission is not publication authority. A valid API key, successful transport, complete rollout, partner delivery, self-hash, or technical `review_ready` candidate cannot substitute for a task-bound declaration **and** matching server grant. Never reuse an authority file across revisions or deliveries.
 </Warning>
 
 Large trajectories and work products stay as hash-bound objects. Do not copy them into a metadata field or replace them with a summary.

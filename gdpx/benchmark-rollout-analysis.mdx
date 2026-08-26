@@ -10,7 +10,7 @@ keywords: ["GDPx", "rollout analysis", "failure analysis", "DeepSWE", "Luna", "Q
 <Warning>
   This endpoint returns judge-assisted QC evidence. It does not retain or publish the submitted rollout, advance a task through QC, create or update a canonical task or rollout, authorize workspace import, or issue a certificate. A reviewer must resolve `needs_human_review` results and apply the [QC stage rules](/qc-stages-for-benchmark).
 
-  Keep the analysis response, then include the underlying trajectory, reward, grading evidence, and produced artifacts in the canonical bundle described by the [rollout evidence contract](/gdpx/rollout-viewer-evidence).
+  It also does not create a managed runtime receipt or managed-execution approval. Keep the analysis response, then include the underlying trajectory, reward, grading evidence, and produced artifacts in the canonical bundle described by the [rollout evidence contract](/gdpx/rollout-viewer-evidence).
 </Warning>
 
 <Info>
@@ -62,14 +62,14 @@ curl --fail-with-body \
 
 | Field | Required | Description |
 | --- | --- | --- |
-| `schema_version` | Yes | Must be `1.0.0` |
+| `schema_version` | Yes | Must be `1.0.0` for this analysis endpoint |
 | `task` | Yes | Exact task identity, instruction, rubric, and optional known-good evidence |
 | `rollout` | Yes | One model identity and one ordered observable trajectory |
 | `verifier` | Yes | Outcome, reward data, summary, and optional per-test results |
 | `runtime` | Yes | Environment, provider, orchestration, Oracle, and optional action-space evidence |
 | `custom_evidence` | No | Additional bounded evidence with an explicit source and locator |
 
-The schema is strict: unknown fields and implicit type coercions are rejected. Nested fields use these contracts:
+This request schema is independent of `gdpx-review-bundle/1.1.0`. The analysis endpoint schema is strict: unknown fields and implicit type coercions are rejected. Nested fields use these contracts:
 
 | Object | Fields |
 | --- | --- |
@@ -427,4 +427,4 @@ The service charges the rate limit only after the JSON and evidence contract val
 | `503` | The pinned judge is unavailable | Retry after service recovery |
 | `504` | Analysis exceeded the bounded deadline | Confirm service state before retrying |
 
-The call is synchronous and does not create a retrievable canonical analysis record. Retain the response with its input, output, prompt, schema, and judge fingerprints in your review evidence.
+The call is synchronous and does not create a retrievable canonical analysis record. Retain the response with its input, output, prompt, schema, and judge fingerprints in your review evidence. To publish the underlying attempt, submit a one-task, one-run, one-rollout v1.1 bundle and complete the managed execution and approval workflow.

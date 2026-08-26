@@ -13,7 +13,9 @@ Submit the canonical task bundle above, or a batch archive that maps to it witho
 
 Run one smoke rollout on the exact task revision with GPT-5.6 Luna. QC1 checks that the environment builds and resets, tools and source files are available, and the verifier returns a valid score. It does not establish difficulty.
 
-Retain the complete prompt, observable trajectory, final answer or work product, six forensic evidence sections, criterion decisions, and score reconciliation described in [Rollout viewer evidence](/gdpx/rollout-viewer-evidence). Bind the canonical package to a valid `PUBLICATION_AUTHORITY.json`; technical QC evidence alone does not authorize catalog membership. Fix task, tool, source, verifier, evidence-capture, or authority defects and repeat the smoke test. A task stays in QC1 until one clean current-revision run shows that failures come from model behavior rather than broken construction.
+Retain the complete prompt, observable trajectory, final answer or work product, six forensic evidence sections, criterion decisions, and score reconciliation described in [Rollout viewer evidence](/gdpx/rollout-viewer-evidence). Bind the canonical package to a valid `PUBLICATION_AUTHORITY.json`; this is the uploaded publication declaration, not the operator rights grant. Technical QC evidence alone does not authorize catalog membership.
+
+Run the smoke through the approved managed execution path. Audit retains the runtime receipt and creates a separate operator-authenticated managed-execution approval only when it matches the exact task content, full workspace inventory, run, rollout, and canonical evidence bytes. An uploader-supplied receipt or validation claim remains archive-only. Fix task, tool, source, verifier, evidence-capture, authority, or execution defects and repeat the smoke test. A task stays in QC1 until one clean current-revision run shows that failures come from model behavior rather than broken construction.
 
 You may use [rollout analysis](/gdpx/benchmark-rollout-analysis) to separate a model failure from a task, verifier, environment, provider, or orchestration defect. Its recommendation supports review but does not move the task out of QC1.
 
@@ -41,7 +43,7 @@ The required artifacts must satisfy the [reviewer-visible rollout evidence contr
 
 `TASK.json` is the Standard Data intake manifest shipped with the Harbor task. Put it beside `task.toml` under `tasks/<task_name>/`. Its `rollouts` field indexes the result set. Full traces, rewards, and failure analyses stay under the root-level `trajectory/` directory.
 
-Fetch the authoritative publication contract from `GET /api/v3/gdpx/schemas/review-bundle` with your API key. The v3 capability response links to the same route. There is no supported `/api/v2/intake-schemas/task-json` endpoint.
+Fetch the authoritative publication contract from `GET /api/v3/gdpx/schemas/review-bundle` with your API key. The v3 capability response links to the same route and controls adapter availability. The current v1.1 contract accepts exactly one task, one run, and one rollout per ZIP. There is no supported `/api/v2/intake-schemas/task-json` endpoint.
 
 Add `rollouts` to the existing task-taxonomy manifest; do not remove the identity, construct, runtime, scoring, horizon, evidence, or provenance fields described above. The shortened example below shows the rollout extension.
 
@@ -100,7 +102,7 @@ Pin the prompt, tool configuration, sampling, context policy, budget, timeout, a
 
 Every artifact path must resolve to the exact uploaded bytes and match its declared hash, size, and media type. The trajectory must expose the observable execution, and generated work products must be included as inspectable native artifacts. IDs, scores, and aggregate statistics are indexes and summaries, not rollout evidence.
 
-Compute `task_content_sha256` over the canonical JSON inventory of every task-local file except `TASK.json`, sorted by path. The schema response gives the exact fields and digest expression. Audit rejects any path, size, media type, or hash that does not match the scanned ZIP.
+Use `gdpx-task/1.1.0` for canonical publication. Inventory every workspace file with its normalized path, SHA-256, byte size, media type, artifact kind, and visibility. Compute `environment.workspace_inventory_sha256` over that sorted inventory. Compute `task_content_sha256` over the complete canonical task graph as defined by the fetched schema. `RUN.json` must bind the same workspace inventory. Audit rejects an omitted file or any path, hash, size, media-type, kind, or visibility mismatch.
 
 ### Standardized Harbor runtime
 
@@ -123,9 +125,11 @@ If experts review rollouts during development, keep a simple log in `samples/`. 
 - Deterministic checks cover everything code can settle.
 - Every judge criterion is atomic and cites observable evidence.
 - Every rollout has a final answer or primary work product, all six forensic sections, and criterion-level score reconciliation.
-- The exact revision has a task-bound publication-authority record with the applicable rights basis and scoped approval.
+- The exact revision has a task-bound uploaded publication declaration with the applicable rights basis and owner intent.
+- Standard Data's current immutable rights grant and authority head match that exact declaration, task content, workspace inventory, and source delivery.
+- The qualifying run has an operator-authenticated managed-execution approval for the exact retained receipt and evidence.
 - Alternate valid methods are not penalized.
 - Agent-visible, grader-only, and gold files are isolated correctly.
 - Source, rights, sanitization, and overlap-risk metadata are complete.
 
-Use the [audit endpoint](/gdpx/audit-endpoint) for non-canonical document feedback while authoring. A clean document audit never authorizes a ZIP. When the GDPx capability endpoint reports `ready`, [upload the evaluation bundle](/gdpx/evaluation-bundle-upload); the exact archive must reach `review_ready` before it can enter Wilderness.
+Use the [audit endpoint](/gdpx/audit-endpoint) for non-canonical document feedback while authoring. A clean document audit never authorizes a ZIP. When the GDPx capability endpoint reports `ready`, [upload the evaluation bundle](/gdpx/evaluation-bundle-upload); the exact archive must complete managed execution, approval, and current-policy readiness before it can enter Wilderness.

@@ -8,7 +8,7 @@ keywords: ["GDPx", "Audit v2", "draft workspace", "resumable upload", "immutable
 The v2 workspace API accepts one ZIP, sanitizes and maps it, runs the pinned v15 static admission policy, and may create immutable **draft** task revisions in Audit. It is retained for compatibility with existing workspace clients.
 
 <Warning>
-  v2 does not publish a task into GDPx or Wilderness. Use [Upload an evaluation bundle](/gdpx/evaluation-bundle-upload) for the v3 task-and-evidence contract. Only a v3 submission that reaches `review_ready` can enter the active GDPx catalog.
+  v2 does not publish a task into GDPx or Wilderness. Use [Upload an evaluation bundle](/gdpx/evaluation-bundle-upload) for the v3 task-and-evidence contract. Only a v1.1 submission with current publication authority, an approved managed execution, and current-policy `review_ready` status can enter the active GDPx catalog.
 </Warning>
 
 A successful `/v1/evaluate` response—including `ready_to_submit: true`—does not authorize either workflow. v1 provides document feedback; v2 creates draft revisions; v3 enforces publication readiness.
@@ -50,7 +50,7 @@ The response state is:
 
 The response also returns `reason_code`, effective and missing scopes, ZIP limits, the pinned `protocolrev_dq_v15_15_0_0` policy, component readiness, and same-origin links. Create a submission only when `state` is `ready`.
 
-The v2 capability response may describe its legacy workspace contract. It is not the GDPx publication schema. Fetch the current publication contract from `GET /api/v3/gdpx/schemas/review-bundle`.
+The v2 capability response may describe its legacy workspace contract. It is not the GDPx publication schema. Fetch the current publication contract from `GET /api/v3/gdpx/schemas/review-bundle` and treat the v3 capability response as authoritative for admission and adapter availability.
 
 ## 2. Create one durable submission
 
@@ -106,7 +106,7 @@ awaiting_upload -> uploading -> sanitizing -> mapping -> preflighting -> importi
 
 `blocked`, `failed`, `expired`, and `cancelled` are terminal. The response progressively adds the sanitized source-bundle ID, adapter preview, public-safe v15 admission attestation, task import, blocking issues, and created task revision IDs.
 
-The workflow imports all mapped draft tasks or none. Warnings do not block. Missing required checks, degraded evaluation, ambiguous mappings, review-required results, or any task blocker produce `blocked` and create no task revisions. Results in the ZIP remain supplied, unvalidated evidence unless the v3 evidence workflow validates them.
+The workflow imports all mapped draft tasks or none. Warnings do not block. Missing required checks, degraded evaluation, ambiguous mappings, review-required results, or any task blocker produce `blocked` and create no task revisions. Results in the ZIP remain supplied, unvalidated evidence. V2 cannot issue a managed-execution approval. Only the v3 workflow can bind an approved managed run to current-policy readiness.
 
 ## Verify reviewer evidence after import
 
@@ -159,4 +159,4 @@ GET /api/v2/tasks/{task_revision_id}/workspace
 GET /api/v2/tasks/{task_revision_id}/files
 ```
 
-An import creates new immutable revisions; it never edits an existing revision in place. These records do not appear in the active GDPx catalog until a v3 submission supplies complete current-revision evidence and reaches `review_ready`.
+An import creates new immutable draft revisions; it never edits an existing revision in place. These records do not appear in the active GDPx catalog until a v3 submission supplies complete current-revision evidence, obtains matching rights and managed-execution approvals, and reaches current-policy `review_ready`.

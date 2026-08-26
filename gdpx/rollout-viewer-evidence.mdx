@@ -5,7 +5,7 @@ description: "Understand the complete evidence required for the Master rollout v
 keywords: ["Wilderness", "Master", "rollout viewer", "rubric decisions", "observable trajectory", "GDPx"]
 ---
 
-Every rollout published in Wilderness opens on **Master**. Master is a readable projection of retained evidence. It does not replace or fabricate the six forensic source sections.
+Every rollout published in Wilderness opens on **Master**. Master uses `gdpx-master-evidence/1.1.0` and is a readable projection of retained evidence. It does not replace or fabricate the six forensic source sections.
 
 <Info>
   A displayed score must be explainable criterion by criterion. If the source evidence cannot support that explanation, the rollout is incomplete and is not published in Wilderness Results.
@@ -23,6 +23,8 @@ Master presents the evidence in review order:
 6. Artifacts, provenance, transformations, and completeness.
 
 The statistics header may include score, threshold, tests, turns or steps, tool calls and errors, input and output tokens, peak context, duration, cost, model, harness, judge or verifier, timestamps, and stop condition. An unavailable optional metric is labeled `Not supplied`; it is never displayed as zero.
+
+The execution label comes from Audit, not from an uploader-provided claim. A qualifying QC1 run shows managed execution validation only when its exact task, workspace inventory, run, rollout, evidence files, and runtime receipt match an operator-authenticated managed-execution approval. Otherwise, the evidence remains `not_execution_validated` and archive-only.
 
 ### Prompt and answer
 
@@ -68,7 +70,7 @@ Each tab is either complete or explicitly `not_applicable` with a source-grounde
 
 ## Access and permanent omissions
 
-Every authenticated tenant user with `tasks:read` receives the same sanitized task and rollout evidence. Wilderness does not require a separate trace-review role and does not hide complete evidence behind a companion-specific client gate.
+Every authenticated tenant user with `tasks:read` receives the same complete sanitized Master projection and all six source sections. Wilderness does not require a separate trace-review role, companion entitlement, or client-side evidence gate. Do not display an “authorized viewer only” message to a tenant reader who already has `tasks:read`.
 
 These boundaries remain permanent:
 
@@ -82,10 +84,10 @@ Removing an unnecessary viewing gate does not weaken these tenant, secret, or be
 
 ## Completeness and provenance
 
-Master identifies whether a field was supplied canonically, normalized from a source bundle, or derived from retained legacy evidence. A derived field includes its source references, transformer version, hashes, and timestamp.
+Master identifies whether a field was supplied canonically, normalized from a source bundle, or derived from retained legacy evidence. A derived field includes its source references, transformer version, hashes, and timestamp. Master also binds the exact `task_content_sha256` and `workspace_inventory_sha256` used for execution.
 
 The projection may join or format existing facts. It may not invent a missing final answer, criterion decision, rationale, test result, score, or artifact. If one of those primary facts is unavailable, the task remains blocked from the active GDPx catalog.
 
-Use `GET /api/v3/tasks/{task_revision_id}/review-readiness` to inspect blockers. Use `GET /api/v3/tasks/{task_revision_id}/runs/{run_id}/rollouts/{rollout_id}` to retrieve the same sanitized evidence projection that Master renders.
+Use `GET /api/v3/tasks/{task_revision_id}/review-readiness` to inspect current-policy blockers, rights authority, and managed-execution approval. Use `GET /api/v3/tasks/{task_revision_id}/runs/{run_id}/rollouts/{rollout_id}` to retrieve the same sanitized evidence projection that Master renders. Historical evidence remains immutable, but only current-policy review-ready evidence appears in Wilderness Results.
 
 See [Upload an evaluation bundle](/gdpx/evaluation-bundle-upload) for the canonical source contract.

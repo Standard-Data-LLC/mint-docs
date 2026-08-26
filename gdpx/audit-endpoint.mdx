@@ -52,7 +52,13 @@ curl --fail-with-body \
 
 Treat `temporarily_unavailable` as a hard stop. It can mean GDPx admission, the pinned processor release, queue dispatch, object scanner, or tenant allowlist is not ready. Retry only after the advertised capability changes; a client must not route around that state through the legacy v2 importer.
 
+The v3 capability response and `GET /api/v3/gdpx/schemas/review-bundle` are authoritative for the active publication contract. The current regime is `gdpx-review-bundle/1.1.0`: exactly one task, one run, and one rollout per ZIP, with exact task-content and full workspace-inventory bindings. Do not infer accepted fields or adapter availability from this page, a cached schema, or a v2 response.
+
+The v2 workspace path creates draft Audit revisions only. It cannot approve an execution, reach `review_ready`, change the GDPx catalog, or route around a disabled v3 admission gate.
+
 Use [Analyze a benchmark rollout](/gdpx/benchmark-rollout-analysis) after a rollout completes. That endpoint accepts one strict JSON rollout projection and returns judge-assisted QC evidence. It does not retain or publish the rollout and does not replace the [evaluation bundle workflow](/gdpx/evaluation-bundle-upload).
+
+A complete v3 publication proceeds from an archive-only submission to a managed QC1 run and retained receipt. Audit then verifies the committed evidence generations and creates an immutable operator-authenticated managed-execution approval. Replay or resubmit the exact bundle when the capability response instructs you to do so; only then can it reach current-policy readiness, immutable benchmark membership, and the active catalog head. Partner-supplied validation claims remain archive-only until the managed approval exists.
 
 ## Submit a document
 

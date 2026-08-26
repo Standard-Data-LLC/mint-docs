@@ -8,7 +8,7 @@ keywords: ["GDPx", "document feedback", "preflight endpoint", "API", "task speci
 `POST /v1/evaluate` reviews one task specification or benchmark methodology paper and returns structured blockers, warnings, evidence, and suggested fixes. Use it while you are still revising task content.
 
 <Info>
-  Document feedback does not create or modify source bundles, task revisions, runs, or certificates. The authoritative import gate is the v15 preflight of the exact workspace ZIP submitted through `/api/v2/workspace-submissions`.
+  Document feedback does not create or modify source bundles, task revisions, runs, or certificates. The authoritative GDPx publication gate is the exact review bundle submitted through `/api/v3/gdpx-submissions`.
 </Info>
 
 <Warning>
@@ -36,6 +36,9 @@ export STANDARD_DATA_API_KEY="<your-standard-data-api-key>"
 | `GET` | `/v1/evaluations/{evaluation_id}` | Retrieve an evaluation |
 | `GET` | `/v1/healthz` | Check service health without authentication |
 | `GET` | `/api/v2/intake-capabilities` | Read server-authoritative workspace-intake readiness |
+| `GET` | `/api/v3/gdpx/capabilities` | Read the GDPx task-and-evidence publication contract |
+| `GET` | `/api/v3/gdpx/schemas/review-bundle` | Fetch the canonical review-bundle JSON Schema |
+| `POST` | `/api/v3/gdpx-submissions` | Upload complete task and rollout evidence for GDPx publication |
 
 Validate the key and discover the next step before presenting a submission action:
 
@@ -47,7 +50,7 @@ curl --fail-with-body \
 
 `canonical_submission.state` is `ready`, `missing_access`, `temporarily_unavailable`, or `incompatible`. Follow its same-origin links; do not construct an `/api/v2` URL from an old task-feedback hostname.
 
-Use [Analyze a benchmark rollout](/gdpx/benchmark-rollout-analysis) after a rollout completes. That endpoint accepts one strict JSON rollout projection and returns judge-assisted QC evidence. It does not replace this document review or the canonical workspace gate.
+Use [Analyze a benchmark rollout](/gdpx/benchmark-rollout-analysis) after a rollout completes. That endpoint accepts one strict JSON rollout projection and returns judge-assisted QC evidence. It does not retain or publish the rollout and does not replace the [evaluation bundle workflow](/gdpx/evaluation-bundle-upload).
 
 ## Submit a document
 
@@ -79,7 +82,7 @@ http --form POST "${STANDARD_DATA_API_BASE}/v1/evaluate" \
 To review a taxonomy-aligned task, include the delivery-package outline, required task metadata, rollout evidence bindings, failed-rollout analyses, and dataset-level failure taxonomy and distributions in the Markdown or JSON document. These are document contents, not separate v1 request fields.
 
 <Warning>
-  The v1 parser does not enforce the complete v15 workspace contract. Review `ungraded_sections` and `guidelines_version_applied`; an absence of v1 findings is not package acceptance.
+  The v1 parser does not enforce the complete GDPx review-bundle contract. Review `ungraded_sections` and `guidelines_version_applied`; an absence of v1 findings is not package acceptance.
 </Warning>
 
 ## JSON request

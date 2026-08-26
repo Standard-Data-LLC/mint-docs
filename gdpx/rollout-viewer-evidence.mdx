@@ -1,0 +1,91 @@
+---
+title: "Rollout viewer evidence"
+sidebarTitle: "Rollout viewer evidence"
+description: "Understand the complete evidence required for the Master rollout view in Wilderness."
+keywords: ["Wilderness", "Master", "rollout viewer", "rubric decisions", "observable trajectory", "GDPx"]
+---
+
+Every rollout published in Wilderness opens on **Master**. Master is a readable projection of retained evidence. It does not replace or fabricate the six forensic source sections.
+
+<Info>
+  A displayed score must be explainable criterion by criterion. If the source evidence cannot support that explanation, the rollout is incomplete and is not published in Wilderness Results.
+</Info>
+
+## What Master shows
+
+Master presents the evidence in review order:
+
+1. Run statistics and execution outcome.
+2. Exact task prompt and relevant agent-visible context.
+3. Final model answer and primary work product.
+4. Rubric scorecard and score reconciliation.
+5. Collapsed observable trajectory.
+6. Artifacts, provenance, transformations, and completeness.
+
+The statistics header may include score, threshold, tests, turns or steps, tool calls and errors, input and output tokens, peak context, duration, cost, model, harness, judge or verifier, timestamps, and stop condition. An unavailable optional metric is labeled `Not supplied`; it is never displayed as zero.
+
+### Prompt and answer
+
+Master renders the exact prompt before the model response. Plain text and Markdown are readable without opening raw JSON.
+
+The answer area shows the final response and the primary work product. Document, PDF, spreadsheet, image, and code artifacts use their native previewers when available and retain a download link to the hash-bound source artifact.
+
+### Rubric scorecard
+
+The scorecard appears immediately after the answer. Each criterion shows:
+
+- its exact wording and stable ID;
+- weight and awarded contribution when applicable;
+- `passed`, `failed`, `partial`, `blocked`, `not_applicable`, or `unscored` as text and an icon;
+- the grader rationale;
+- direct and dependency-cascaded results; and
+- links to the exact event, test, output, or artifact used as evidence.
+
+Color reinforces status but is never the only indicator. Failed and blocked criteria open by default. Passed criteria start collapsed. Reviewers can search criteria and filter by **All**, **Failed**, **Blocked**, or **Unscored**.
+
+The summary shows the reported and calculated totals, aggregation rule, threshold, hard gates, and reconciliation status. A non-reconciling score is a publication blocker, not a UI warning.
+
+### Observable trajectory
+
+The trajectory shows model-visible messages, assistant responses, tool calls, tool results, state transitions, produced artifacts, and errors in order. Long tool payloads use progressive disclosure and link to retained raw evidence.
+
+Do not call this view “chain of thought.” Hidden or private reasoning is not collected or displayed. A reviewer may see only observable messages and operational actions that were part of the retained run.
+
+## Source sections
+
+The forensic tabs remain available after Master:
+
+| Tab | Required contents |
+| --- | --- |
+| **Problem** | Exact task instruction, runtime kickoff, and agent-visible context |
+| **Setup Logs** | Environment build, initialization, reset, dependency, and orchestration evidence |
+| **Agent Logs** | Observable messages, tool calls, tool results, and agent-visible errors |
+| **Results** | Final response, produced artifacts, patches, and result metadata |
+| **Test Logs** | Per-test output, status, criterion bindings, and verifier runtime evidence |
+| **Grading** | Criterion decisions, rationale, judge/verifier fingerprints, and score reconciliation |
+
+Each tab is either complete or explicitly `not_applicable` with a source-grounded reason. A missing section cannot be converted to `not_applicable` merely to satisfy admission.
+
+## Access and permanent omissions
+
+Every authenticated tenant user with `tasks:read` receives the same sanitized task and rollout evidence. Wilderness does not require a separate trace-review role and does not hide complete evidence behind a companion-specific client gate.
+
+These boundaries remain permanent:
+
+- anonymous users cannot read tenant evidence;
+- one tenant cannot read another tenant’s evidence;
+- credentials, signed URLs, secret values, and provider-private state are omitted;
+- hidden or private reasoning is omitted; and
+- verifier-only gold material remains outside the rollout projection when disclosure would leak the benchmark answer.
+
+Removing an unnecessary viewing gate does not weaken these tenant, secret, or benchmark-integrity boundaries.
+
+## Completeness and provenance
+
+Master identifies whether a field was supplied canonically, normalized from a source bundle, or derived from retained legacy evidence. A derived field includes its source references, transformer version, hashes, and timestamp.
+
+The projection may join or format existing facts. It may not invent a missing final answer, criterion decision, rationale, test result, score, or artifact. If one of those primary facts is unavailable, the task remains blocked from the active GDPx catalog.
+
+Use `GET /api/v3/tasks/{task_revision_id}/review-readiness` to inspect blockers. Use `GET /api/v3/tasks/{task_revision_id}/runs/{run_id}/rollouts/{rollout_id}` to retrieve the same sanitized evidence projection that Master renders.
+
+See [Upload an evaluation bundle](/gdpx/evaluation-bundle-upload) for the canonical source contract.

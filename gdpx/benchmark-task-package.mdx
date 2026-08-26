@@ -71,7 +71,9 @@ Numeric examples in templates are illustrative. Set criterion count, verifier mi
 
 ## Package a delivery batch for upload
 
-The single-task bundle above is the canonical normalized unit. A multi-task delivery uses an upstream batch envelope so the runnable task, complete rollout corpus, and QA documentation remain isolated from one another. Audit first stores the ZIP as a source bundle; an adapter preview must map its contents into canonical task units before import.
+The single-task bundle above is the canonical normalized task unit. A publishable delivery wraps those tasks and their evaluation evidence in the `gdpx-review-bundle/1.0.0` layout documented in [Upload an evaluation bundle](/gdpx/evaluation-bundle-upload). `GDPX_BUNDLE.json` must inventory every file and bind each run and rollout to the exact task revision.
+
+The older batch envelope below remains useful as an authoring and partner-handoff format. Submit it with `adapter_mode: "terra_compatibility"` only when you cannot emit the canonical v3 layout. Adaptation may map and cite existing facts, but it may not invent missing evidence or change the task or rubric.
 
 Do not copy the whole authoring bundle into the runtime directory. Export the approved task and its intake-only `TASK.json` under `tasks/`. Keep trajectories under `trajectory/` and supporting material under `docs/`.
 
@@ -175,7 +177,7 @@ Omit hidden or private reasoning, credentials, signed URLs, and raw provider-pri
 4. Put exactly one batch root in the archive. Do not upload several unrelated roots or a directory-only ZIP.
 5. Record the final filename, byte size, media type `application/zip`, and SHA-256 of the exact bytes you will upload.
 6. Open at least one packaged attempt for every task and model pairing. Confirm that the prompt, observable transcript, tool I/O, output artifacts, tests, and grading evidence are present and readable from the archive alone.
-7. Test the methodology document with the [audit endpoint](/gdpx/audit-endpoint). When intake capability reports `ready`, [submit the workspace ZIP](/gdpx/import-approved-tasks); the exact archive must pass v15 admission before automatic import.
+7. Test the methodology document with the [audit endpoint](/gdpx/audit-endpoint). Then build the canonical review bundle and [submit it through v3](/gdpx/evaluation-bundle-upload). The exact archive must reach `review_ready` before publication.
 
 <Warning>
   The document preflight endpoint accepts one PDF, DOCX, Markdown, or JSON document. It does not accept this ZIP. The canonical flow performs the resumable upload, quarantine, scanning, and adapter preview. A successful byte upload is not task acceptance: stop if the preview is blocked, incomplete, or does not map every task and visibility boundary exactly.

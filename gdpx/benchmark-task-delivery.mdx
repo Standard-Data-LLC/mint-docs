@@ -13,7 +13,7 @@ Submit the canonical task bundle above, or a batch archive that maps to it witho
 
 Run one smoke rollout on the exact task revision with GPT-5.6 Luna. QC1 checks that the environment builds and resets, tools and source files are available, and the verifier returns a valid score. It does not establish difficulty.
 
-Fix task, tool, source, or verifier defects and repeat the smoke test. A task stays in QC1 until one clean current-revision run shows that failures come from model behavior rather than broken construction.
+Retain the complete prompt, observable trajectory, final answer or work product, six forensic evidence sections, criterion decisions, and score reconciliation described in [Rollout viewer evidence](/gdpx/rollout-viewer-evidence). Fix task, tool, source, verifier, or evidence-capture defects and repeat the smoke test. A task stays in QC1 until one clean current-revision run shows that failures come from model behavior rather than broken construction.
 
 You may use [rollout analysis](/gdpx/benchmark-rollout-analysis) to separate a model failure from a task, verifier, environment, provider, or orchestration defect. Its recommendation supports review but does not move the task out of QC1.
 
@@ -41,7 +41,7 @@ The required artifacts must satisfy the [reviewer-visible rollout evidence contr
 
 `TASK.json` is the Standard Data intake manifest shipped with the Harbor task. Put it beside `task.toml` under `tasks/<task_name>/`. Its `rollouts` field indexes the result set. Full traces, rewards, and failure analyses stay under the root-level `trajectory/` directory.
 
-Fetch the authoritative contract from `GET /api/v2/intake-schemas/task-json` with your API key. The intake-capability response links to the same route.
+Fetch the authoritative publication contract from `GET /api/v3/gdpx/schemas/review-bundle` with your API key. The v3 capability response links to the same route. There is no supported `/api/v2/intake-schemas/task-json` endpoint.
 
 Add `rollouts` to the existing task-taxonomy manifest; do not remove the identity, construct, runtime, scoring, horizon, evidence, or provenance fields described above. The shortened example below shows the rollout extension.
 
@@ -96,7 +96,7 @@ Add `rollouts` to the existing task-taxonomy manifest; do not remove the identit
 
 Include every model key in the current evaluation matrix and put exactly 16 completed `subject` attempts in each one, with ordinals `1` through `16`. Use one pass threshold across the task. Reference, hinted, and infrastructure attempts must use a different `kind` and do not count toward the subject set.
 
-Pin the prompt, tool configuration, sampling, context policy, budget, timeout, and retry policy in `run_config`. Every digest uses the `sha256:<64-lowercase-hex>` form, and every artifact path is relative to the batch root. A failed attempt needs `failure_analysis`; a passing attempt does not. Never include private reasoning, credentials, or raw provider events.
+Pin the prompt, tool configuration, sampling, context policy, budget, timeout, and retry policy in `run_config`. Every digest uses the `sha256:<64-lowercase-hex>` form, and every artifact path is relative to the batch root. A failed attempt needs `failure_analysis`; a passing attempt does not. Every attempt needs the complete v3 rollout evidence and criterion ledger. Never include private reasoning, credentials, or raw provider events.
 
 Every artifact path must resolve to the exact uploaded bytes and match its declared hash, size, and media type. The trajectory must expose the observable execution, and generated work products must be included as inspectable native artifacts. IDs, scores, and aggregate statistics are indexes and summaries, not rollout evidence.
 
@@ -122,8 +122,9 @@ If experts review rollouts during development, keep a simple log in `samples/`. 
 - The reference output passes; known-bad outputs fail for the intended reason.
 - Deterministic checks cover everything code can settle.
 - Every judge criterion is atomic and cites observable evidence.
+- Every rollout has a final answer or primary work product, all six forensic sections, and criterion-level score reconciliation.
 - Alternate valid methods are not penalized.
 - Agent-visible, grader-only, and gold files are isolated correctly.
 - Source, rights, sanitization, and overlap-risk metadata are complete.
 
-Use the [audit endpoint](/gdpx/audit-endpoint) for non-canonical document feedback while authoring. A clean document audit is not a v15 workspace result, and its legacy `ready_to_submit` field never authorizes a ZIP. When the capability endpoint reports `ready`, [submit the workspace](/gdpx/import-approved-tasks); the exact archive must pass the pinned v15 preflight before automatic import.
+Use the [audit endpoint](/gdpx/audit-endpoint) for non-canonical document feedback while authoring. A clean document audit never authorizes a ZIP. When the GDPx capability endpoint reports `ready`, [upload the evaluation bundle](/gdpx/evaluation-bundle-upload); the exact archive must reach `review_ready` before it can enter Wilderness.

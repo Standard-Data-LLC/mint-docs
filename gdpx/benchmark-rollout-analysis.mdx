@@ -5,12 +5,12 @@ description: "Classify one observable rollout and determine whether a failure is
 keywords: ["GDPx", "rollout analysis", "failure analysis", "DeepSWE", "Luna", "QC"]
 ---
 
-`POST /v1/benchmark-rollout-analyses` sends one normalized, reviewer-observable rollout to a pinned internal model judge judge. It classifies the verifier result and separately determines whether a failed rollout is a legitimate model failure.
+`POST /v1/benchmark-rollout-analyses` sends one normalized, reviewer-observable rollout to a pinned internal model judge. It classifies the verifier result and separately determines whether a failed rollout is a legitimate model failure.
 
 <Warning>
-  This endpoint returns judge-assisted QC evidence. It does not advance a task through QC, create or update a canonical task or rollout, authorize workspace import, or issue a certificate. A reviewer must resolve `needs_human_review` results and apply the [QC stage rules](/qc-stages-for-benchmark).
+  This endpoint returns judge-assisted QC evidence. It does not retain or publish the submitted rollout, advance a task through QC, create or update a canonical task or rollout, authorize workspace import, or issue a certificate. A reviewer must resolve `needs_human_review` results and apply the [QC stage rules](/qc-stages-for-benchmark).
 
-  This call does not retain or import the rollout for Wilderness. Keep the analysis response, then include the underlying trajectory, reward, grading evidence, and produced artifacts in the workspace ZIP under the [reviewer-visible rollout evidence contract](/gdpx/benchmark-task-package#preserve-reviewer-visible-rollout-evidence).
+  Keep the analysis response, then include the underlying trajectory, reward, grading evidence, and produced artifacts in the canonical bundle described by the [rollout evidence contract](/gdpx/rollout-viewer-evidence).
 </Warning>
 
 <Info>

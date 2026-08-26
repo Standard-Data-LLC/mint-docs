@@ -1,17 +1,17 @@
 ---
-title: "Submit a workspace (WIP)"
-sidebarTitle: "Final Step - Submit Final Task"
-description: "Upload, preflight, and automatically import a complete task workspace."
-keywords: ["GDPx", "Audit v2", "workspace submission", "resumable upload", "immutable task revision"]
+title: "Import a draft workspace with v2"
+sidebarTitle: "Legacy draft import"
+description: "Upload and preflight a workspace as draft Audit revisions without publishing it to GDPx."
+keywords: ["GDPx", "Audit v2", "draft workspace", "resumable upload", "immutable task revision"]
 ---
 
-Wilderness collects runnable benchmark tasks for standardized rollouts and scaled evaluation. The canonical submission API accepts one workspace ZIP, sanitizes and maps it, runs the pinned v15 static admission policy against every mapped task, and creates immutable task revisions automatically when the complete workspace is eligible.
+The v2 workspace API accepts one ZIP, sanitizes and maps it, runs the pinned v15 static admission policy, and may create immutable **draft** task revisions in Audit. It is retained for compatibility with existing workspace clients.
 
 <Warning>
-  This is a durable workflow, not document feedback. A successful `/v1/evaluate` response—including `ready_to_submit: true`—never authorizes the ZIP. Only the v15 workspace preflight can make this submission eligible for automatic import.
+  v2 does not publish a task into GDPx or Wilderness. Use [Upload an evaluation bundle](/gdpx/evaluation-bundle-upload) for the v3 task-and-evidence contract. Only a v3 submission that reaches `review_ready` can enter the active GDPx catalog.
 </Warning>
 
-There is no hidden customer approval step. Availability is expressed by the authenticated capability endpoint and the global service mode.
+A successful `/v1/evaluate` response—including `ready_to_submit: true`—does not authorize either workflow. v1 provides document feedback; v2 creates draft revisions; v3 enforces publication readiness.
 
 For benchmark QC3, keep full traces, rewards, and failure analyses under `trajectory/`. Index those root-relative artifacts in `tasks/<task_name>/TASK.json.rollouts`. Audit reads this intake manifest but keeps it out of the agent runtime. Uploaded results are supplied evidence; Audit does not claim to have executed them.
 
@@ -50,7 +50,7 @@ The response state is:
 
 The response also returns `reason_code`, effective and missing scopes, ZIP limits, the pinned `protocolrev_dq_v15_15_0_0` policy, component readiness, and same-origin links. Create a submission only when `state` is `ready`.
 
-For benchmark QC3, follow `links.task_json_schema` to fetch the exact `TASK.json.rollouts` contract before building the ZIP.
+The v2 capability response may describe its legacy workspace contract. It is not the GDPx publication schema. Fetch the current publication contract from `GET /api/v3/gdpx/schemas/review-bundle`.
 
 ## 2. Create one durable submission
 
@@ -106,7 +106,7 @@ awaiting_upload -> uploading -> sanitizing -> mapping -> preflighting -> importi
 
 `blocked`, `failed`, `expired`, and `cancelled` are terminal. The response progressively adds the sanitized source-bundle ID, adapter preview, public-safe v15 admission attestation, task import, blocking issues, and created task revision IDs.
 
-The workflow imports all mapped tasks or none. Warnings do not block. Missing required checks, degraded evaluation, ambiguous mappings, review-required results, or any task blocker produce `blocked` and create no task revisions. Results in the ZIP remain supplied, unvalidated evidence unless a separate execution workflow validates them.
+The workflow imports all mapped draft tasks or none. Warnings do not block. Missing required checks, degraded evaluation, ambiguous mappings, review-required results, or any task blocker produce `blocked` and create no task revisions. Results in the ZIP remain supplied, unvalidated evidence unless the v3 evidence workflow validates them.
 
 ## Verify reviewer evidence after import
 
@@ -148,7 +148,7 @@ Canonical v2 errors use this safe envelope:
 
 Do not convert every error to “not found.” Preserve the HTTP status, `error.code`, `request_id`, `retryable`, details, workflow stage, and `Retry-After` when presenting remediation.
 
-## View imported revisions
+## View draft revisions
 
 After `state: "succeeded"`, use the tenant-scoped viewer endpoints:
 
@@ -159,4 +159,4 @@ GET /api/v2/tasks/{task_revision_id}/workspace
 GET /api/v2/tasks/{task_revision_id}/files
 ```
 
-An import creates new immutable revisions; it never edits an existing revision in place. Wilderness consumes these same records and presents the semantic Results, Solution, Environment, and All Files views.
+An import creates new immutable revisions; it never edits an existing revision in place. These records do not appear in the active GDPx catalog until a v3 submission supplies complete current-revision evidence and reaches `review_ready`.

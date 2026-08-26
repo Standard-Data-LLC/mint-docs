@@ -289,4 +289,4 @@ Start with the [audit endpoint](/gdpx/audit-endpoint). Submit one Markdown or JS
 
 The live one-document endpoint is a preflight surface, not proof that the complete ZIP satisfies every required package or v15 evaluation control. Review `ungraded_sections` and the applied guideline version in every response.
 
-After reviewing the document findings, check the authenticated intake capability and follow [Submit a workspace](/gdpx/import-approved-tasks). That `/api/v2` workflow uploads the ZIP, creates a sanitized source bundle, runs the authoritative v15 workspace preflight, and automatically commits immutable task revisions only when every mapped task is eligible.
+After reviewing the document findings, check `GET /api/v3/gdpx/capabilities` and follow [Upload an evaluation bundle](/gdpx/evaluation-bundle-upload). The v3 workflow validates the exact task and rollout evidence and publishes only revisions that reach `review_ready`. The legacy [v2 workspace flow](/gdpx/import-approved-tasks) creates draft Audit revisions and does not add tasks to Wilderness.

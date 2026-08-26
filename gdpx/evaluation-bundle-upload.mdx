@@ -1,0 +1,197 @@
+---
+title: "Upload an evaluation bundle"
+sidebarTitle: "Evaluation bundle upload"
+description: "Upload tasks and complete rollout evidence through the GDPx v3 publication workflow."
+keywords: ["GDPx", "v3", "evaluation bundle", "rollout evidence", "Wilderness", "resumable upload"]
+---
+
+`POST /api/v3/gdpx-submissions` is the only submission path that can publish a task into the GDPx/Wilderness catalog. It accepts a ZIP that binds runnable task bytes, rollout evidence, criterion decisions, and review artifacts into one immutable delivery.
+
+<Warning>
+  A successful byte upload is not publication. A task appears in Wilderness only after the workflow reaches `review_ready`. A task with missing or irreconcilable evidence remains in Audit as `blocked` and is not included in the active GDPx catalog.
+</Warning>
+
+The legacy `/api/v2/workspace-submissions` workflow may still create draft Audit revisions. It cannot add a task to the GDPx benchmark revision or Wilderness catalog.
+
+## Authenticate and discover the contract
+
+Use the shared Standard Data API origin and a tenant-scoped key:
+
+```bash
+export STANDARD_DATA_API_BASE="https://api.standarddata.io"
+export STANDARD_DATA_API_KEY="<your-standard-data-api-key>"
+```
+
+Read capabilities and the current JSON Schema before building a bundle:
+
+```bash
+curl --fail-with-body \
+  --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
+  "${STANDARD_DATA_API_BASE}/api/v3/gdpx/capabilities" \
+  --output gdpx-capabilities.json
+
+curl --fail-with-body \
+  --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
+  "${STANDARD_DATA_API_BASE}/api/v3/gdpx/schemas/review-bundle" \
+  --output gdpx-review-bundle.schema.json
+```
+
+Creating a submission requires `uploads:write` and `imports:write`. Capabilities, schema, catalog, readiness, submission-status, and rollout reads require `tasks:read`. Authentication is always tenant-bound.
+
+The schema identifier is `https://standard-data.dev/contracts/gdpx-review-bundle/1.0.0/schema.json`.
+
+The capability response is authoritative for the active contract version, maximum ZIP size, supported adapter modes, publication policy, and resumable-upload limits. Do not hard-code those values from an older response.
+
+## Canonical ZIP layout
+
+The canonical contract version is `gdpx-review-bundle/1.0.0`:
+
+```text
+GDPX_BUNDLE.json
+tasks/
+└── <task_id>/
+    ├── TASK.json
+    ├── task.toml
+    ├── instruction.md
+    ├── environment/
+    ├── tests/
+    └── solution/
+evaluations/
+└── <task_id>/
+    └── <run_id>/
+        ├── RUN.json
+        └── <rollout_id>/
+            ├── ROLLOUT.json
+            ├── trajectory.atif.json
+            ├── verifier.json
+            ├── criterion-decisions.json
+            └── artifacts/
+```
+
+`GDPX_BUNDLE.json` is a complete inventory. For every retained file, record its normalized relative path, byte size, media type, and SHA-256. It also binds every task, run, and rollout to the exact `task_revision_id`, `run_id`, and `rollout_id` represented by those files.
+
+Large trajectories and work products stay as hash-bound objects. Do not copy them into a metadata field or replace them with a summary.
+
+### Required rollout evidence
+
+Each rollout must retain:
+
+- the exact prompt and relevant agent-visible context;
+- an ordered observable trajectory with model messages, tool calls, tool results, environment events, and errors;
+- the final model answer or primary work product;
+- verifier output and all test results;
+- a decision for every scored rubric criterion;
+- score reconciliation, including aggregation, threshold, dependencies, and hard gates;
+- model, harness, environment, verifier, and judge versions;
+- duration, turns or steps, token usage, cost, stop condition, and execution outcome when supplied by the harness; and
+- immutable artifact hashes and object generations.
+
+The six forensic sections—Problem, Setup Logs, Agent Logs, Results, Test Logs, and Grading—must be present. A section with no applicable source data must use an explicit `not_applicable` status and a reason. Omitting a section is not equivalent to `not_applicable`.
+
+### Criterion decisions
+
+Each item in `criterion-decisions.json` must contain:
+
+| Field | Requirement |
+| --- | --- |
+| `criterion_id` | Stable ID that exactly matches one source-rubric criterion |
+| `criterion_text` | Exact source wording; do not paraphrase the grading contract |
+| `status` | `passed`, `failed`, `partial`, `blocked`, `not_applicable`, or `unscored` |
+| `weight` | Source weight or scoring contribution when one exists |
+| `awarded` / `maximum` | Awarded and possible contribution when applicable |
+| `direct_result` | Result before dependency or hard-gate effects |
+| `cascaded_result` | Result after dependency or hard-gate effects |
+| `grader` | Verifier or judge identity and pinned version |
+| `rationale` | Human-readable explanation grounded in observable evidence |
+| `evidence_refs` | Typed references to retained events, tests, outputs, or artifacts |
+
+The score-reconciliation object records the aggregation rule, reported score, calculated score, pass threshold, hard-gate results, and whether the values reconcile. A duplicate criterion ID, unknown criterion, dangling evidence reference, or unexplained score mismatch blocks publication.
+
+## Create a submission
+
+Hash the exact ZIP and send one idempotent request:
+
+```bash
+curl --fail-with-body \
+  --request POST "${STANDARD_DATA_API_BASE}/api/v3/gdpx-submissions" \
+  --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
+  --header "Content-Type: application/json" \
+  --header "Idempotency-Key: gdpx-<stable-client-operation-id>" \
+  --data '{
+    "filename": "delivery.zip",
+    "content_type": "application/zip",
+    "size_bytes": 123456,
+    "sha256": "<64-lowercase-hex>",
+    "contract_version": "gdpx-review-bundle/1.0.0",
+    "mode": "task_and_evidence",
+    "target_task_revision_id": null,
+    "adapter_mode": "canonical",
+    "publication_policy": "publish_when_review_ready"
+  }' \
+  --output gdpx-submission.json
+```
+
+Request fields:
+
+| Field | Accepted value |
+| --- | --- |
+| `content_type` | `application/zip` |
+| `contract_version` | `gdpx-review-bundle/1.0.0` |
+| `mode` | `task_and_evidence` or `evidence_only` |
+| `target_task_revision_id` | Required for `evidence_only`; otherwise `null` |
+| `adapter_mode` | `canonical` or `terra_compatibility` |
+| `publication_policy` | `publish_when_review_ready` |
+
+The response returns `gdpx_submission_id` plus same-origin relations for upload authorization, completion, polling, and cancellation. Upload signing and finalization reuse the v2 upload-session transport linked by the response. Follow those links. Do not construct storage URLs, persist resumable-session credentials, or send the Standard Data API key to object storage.
+
+## Follow the workflow
+
+```text
+awaiting_upload → sanitizing → normalizing → validating → importing → review_ready
+                                                                  └→ blocked
+```
+
+Poll `GET /api/v3/gdpx-submissions/{gdpx_submission_id}` or the returned `self` link. `blocked` is terminal for that immutable submission. Cancellation also ends in `blocked` with reason code `SUBMISSION_CANCELLED`; it does not introduce a separate workflow state. Correct a blocked source package and create a new submission. The result includes stable issue codes and JSON pointers to missing, mismatched, or unsafe fields.
+
+Validation is all-or-nothing for publication. It verifies identity bindings, hashes, artifact availability, rubric completeness, criterion evidence, score reconciliation, runtime status, secret scanning, and omission of private reasoning.
+
+After import, verify the exact task revision:
+
+```text
+GET /api/v3/tasks/{task_revision_id}/review-readiness
+GET /api/v3/tasks/{task_revision_id}/runs/{run_id}/rollouts/{rollout_id}
+GET /api/v3/gdpx/catalog/current
+```
+
+The active catalog is an immutable benchmark revision. It is not inferred from creator labels, publication flags, run counts, or a mutable `is_current` field.
+
+## Terra compatibility mode
+
+Choose `terra_compatibility` only for a legacy or partner-specific package that cannot be emitted canonically. GPT-5.6 Terra may identify source files, map heterogeneous fields, assign source-derived stable IDs, and create citation-bound presentation summaries.
+
+Terra must not:
+
+- rewrite task instructions or rubric meaning;
+- change weights, thresholds, dependencies, or hard gates;
+- invent a prompt, output, test, grading decision, or evidence;
+- infer missing facts from domain knowledge; or
+- authoritatively rescore the rollout.
+
+Every generated field records source locations, input and output hashes, model revision, adapter prompt version, and timestamp. An ambiguous or uncited mapping blocks publication.
+
+If an exact rubric and final output exist but the criterion ledger is absent, rerun the original verifier or judge against the retained output. A policy-approved stronger compatible judge may be used under the judge-dominance rule, but the result must be labeled as regrading. Preserve both scores and block publication for adjudication if they disagree.
+
+## Legacy migration and reruns
+
+For existing tasks, recover evidence in this order:
+
+1. canonical retained Audit evidence;
+2. reviewer-evidence companions;
+3. immutable release artifacts; and
+4. the original partner delivery.
+
+A derived Master projection must cite those retained sources and record the transformer version. It may improve presentation, but it may not invent missing primary evidence.
+
+Regrade a retained final output when the source rubric and verifier are available. Run a fresh GPT-5.6 Luna QC1 rollout only when primary evidence cannot be recovered or the task revision changed. Bind a rerun to the exact immutable revision and native harness; do not use a new run to overwrite historical evidence.
+
+See [Rollout viewer evidence](/gdpx/rollout-viewer-evidence) for the display contract and [Partner delivery and review](/gdpx/benchmark-task-delivery) for QC requirements.

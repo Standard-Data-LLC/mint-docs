@@ -38,7 +38,7 @@ Use a reproducible baseline reasoning profile and a pinned frontier profile. Hig
 
 If both tiers resolve a task zero times, do not infer difficulty from failure alone. Classify it as unsolved at current capability, then use a known-good artifact, qualified-practitioner check, or the optional calibrated-hint procedure below to investigate non-brokenness. Recompute every pass rate after excluding confirmed reward-hacked runs.
 
-Do not invent a top-level rollout section in `task.toml`. Index the attempts in `TASK.json` and keep the underlying `reward.json` files. Audit derives `rollout_n`, reward statistics, `pass_rate`, mean steps, cost, and token totals from that evidence.
+Do not invent a top-level rollout section in `task.toml`. Index the attempts in `TASK.json`, keep the underlying `reward.json` files, and include the canonical evaluation records required by the [v3 review bundle](/gdpx/evaluation-bundle-upload). Audit derives `rollout_n`, reward statistics, `pass_rate`, mean steps, cost, and token totals from retained primary evidence.
 
 ## Recommended: use hints as causal probes
 
@@ -138,6 +138,7 @@ Required:
 - Every verifier writes `/logs/verifier/reward.json` at runtime.
 - Every countable rollout satisfies the [reviewer-visible evidence contract](/gdpx/benchmark-task-package#preserve-reviewer-visible-rollout-evidence), including inspectable native work products.
 - Model, harness, version, prompt, tool, sampling, budget, timeout, context, judge, and retry settings are pinned for every supplied rollout.
+- Every rollout retains a final answer or primary work product, all six forensic sections, criterion decisions, and a reconciling score ledger.
 - Every failed rollout has evidence-backed root-cause analysis, a taxonomy label, solvability status, and confidence or ambiguity status.
 - Dataset-level failure taxonomy, per-model and cross-task distributions, and the task-count histogram are complete.
 - Agent-visible, verifier-only, solution, and gold boundaries are enforced by the runtime, not merely described in prose.

@@ -43,7 +43,7 @@ The schema identifier is `https://standard-data.dev/contracts/gdpx-review-bundle
 The capability response is authoritative for the active contract version, maximum ZIP size, supported adapter modes, publication policy, and resumable-upload limits. Do not hard-code those values from an older response.
 
 <Warning>
-  Submission is fail-closed. Do not offer an upload action unless `canonical_submission.available` is `true`. During a controlled rollout, admission may be disabled or tenant-allowlisted even though the schema and read APIs are reachable.
+  Submission is fail-closed. Offer an upload action only when `/v1/whoami` reports `canonical_submission.state` as `ready` **and** `/api/v3/gdpx/capabilities` reports `access.can_submit` as `true`. Inspect `admission.blockers` when it is false. During a controlled rollout, admission may be disabled or tenant-allowlisted even though the schema and read APIs are reachable.
 </Warning>
 
 ## Canonical ZIP layout

@@ -73,6 +73,8 @@ Numeric examples in templates are illustrative. Set criterion count, verifier mi
 
 The single-task bundle above is the canonical normalized task unit. A publishable delivery wraps those tasks and their evaluation evidence in the `gdpx-review-bundle/1.0.0` layout documented in [Upload an evaluation bundle](/gdpx/evaluation-bundle-upload). `GDPX_BUNDLE.json` must inventory every file and bind each run and rollout to the exact task revision.
 
+The canonical task directory also contains `PUBLICATION_AUTHORITY.json`. This is a Standard Data publication control, not an agent-visible task material or a partner-authored rubric field. It binds the exact task revision to its source-delivery hash, rights basis, agreement state, scoped approval, and source mappings. Do not place it in the runtime workspace, copy it between task revisions, or infer it from a successful upload.
+
 The older batch envelope below remains useful as an authoring and partner-handoff format. Submit it with `adapter_mode: "terra_compatibility"` only when you cannot emit the canonical v3 layout. Adaptation may map and cite existing facts, but it may not invent missing evidence or change the task or rubric.
 
 Do not copy the whole authoring bundle into the runtime directory. Export the approved task and its intake-only `TASK.json` under `tasks/`. Keep trajectories under `trajectory/` and supporting material under `docs/`.
@@ -171,7 +173,7 @@ Omit hidden or private reasoning, credentials, signed URLs, and raw provider-pri
 
 ### Prepare the ZIP
 
-1. Verify that every task has matching entries under `tasks/`, `trajectory/`, and `docs/`.
+1. Verify that every task has matching entries under `tasks/`, `trajectory/`, and `docs/`, and that its canonical publication bundle contains an exact, task-bound `PUBLICATION_AUTHORITY.json`.
 2. Remove `.git/`, `.DS_Store`, `__MACOSX/`, symbolic links, secrets, temporary files, and unrelated build output.
 3. Confirm that each environment builds from the delivered files alone. Pin or include every base image, dependency, workspace asset, tool definition, and skill document.
 4. Put exactly one batch root in the archive. Do not upload several unrelated roots or a directory-only ZIP.

@@ -13,7 +13,7 @@ Submit the canonical task bundle above, or a batch archive that maps to it witho
 
 Run one smoke rollout on the exact task revision with GPT-5.6 Luna. QC1 checks that the environment builds and resets, tools and source files are available, and the verifier returns a valid score. It does not establish difficulty.
 
-Retain the complete prompt, observable trajectory, final answer or work product, six forensic evidence sections, criterion decisions, and score reconciliation described in [Rollout viewer evidence](/gdpx/rollout-viewer-evidence). Fix task, tool, source, verifier, or evidence-capture defects and repeat the smoke test. A task stays in QC1 until one clean current-revision run shows that failures come from model behavior rather than broken construction.
+Retain the complete prompt, observable trajectory, final answer or work product, six forensic evidence sections, criterion decisions, and score reconciliation described in [Rollout viewer evidence](/gdpx/rollout-viewer-evidence). Bind the canonical package to a valid `PUBLICATION_AUTHORITY.json`; technical QC evidence alone does not authorize catalog membership. Fix task, tool, source, verifier, evidence-capture, or authority defects and repeat the smoke test. A task stays in QC1 until one clean current-revision run shows that failures come from model behavior rather than broken construction.
 
 You may use [rollout analysis](/gdpx/benchmark-rollout-analysis) to separate a model failure from a task, verifier, environment, provider, or orchestration defect. Its recommendation supports review but does not move the task out of QC1.
 
@@ -123,6 +123,7 @@ If experts review rollouts during development, keep a simple log in `samples/`. 
 - Deterministic checks cover everything code can settle.
 - Every judge criterion is atomic and cites observable evidence.
 - Every rollout has a final answer or primary work product, all six forensic sections, and criterion-level score reconciliation.
+- The exact revision has a task-bound publication-authority record with the applicable rights basis and scoped approval.
 - Alternate valid methods are not penalized.
 - Agent-visible, grader-only, and gold files are isolated correctly.
 - Source, rights, sanitization, and overlap-risk metadata are complete.

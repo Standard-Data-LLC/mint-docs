@@ -55,6 +55,7 @@ GDPX_BUNDLE.json
 tasks/
 └── <task_id>/
     ├── TASK.json
+    ├── PUBLICATION_AUTHORITY.json
     ├── task.toml
     ├── instruction.md
     ├── environment/
@@ -73,6 +74,16 @@ evaluations/
 ```
 
 `GDPX_BUNDLE.json` is a complete inventory. For every retained file, record its normalized relative path, byte size, media type, and SHA-256. It also binds every task, run, and rollout to the exact `task_revision_id`, `run_id`, and `rollout_id` represented by those files.
+
+### Publication authority
+
+Every task submitted with `publication_policy: "publish_when_review_ready"` must include `tasks/<task_id>/PUBLICATION_AUTHORITY.json`. The bundle manifest records that file with role `publication_authority` and binds its path and SHA-256 from the task descriptor. Missing, blocked, mismatched, or tampered authority evidence is a publication blocker even when every technical evaluation check passes.
+
+The authority record binds the exact task, logical task, source delivery, rights basis, agreement status, internal approval, and any source-to-execution mappings. Its self-attestation hash covers the canonical JSON record. An authorized record must state `intended_catalog_member: true`, carry an applicable executed-agreement or first-party rights basis, and include an approval scoped to `gdpx_benchmark_qc_and_publication`.
+
+<Warning>
+  Upload permission is not publication authority. A valid API key, successful transport, complete rollout, partner delivery, or technical `review_ready` candidate cannot substitute for this task-bound authority record. Never reuse an authority file across revisions or deliveries.
+</Warning>
 
 Large trajectories and work products stay as hash-bound objects. Do not copy them into a metadata field or replace them with a summary.
 
@@ -158,7 +169,7 @@ awaiting_upload → sanitizing → normalizing → validating → importing → 
 
 Poll `GET /api/v3/gdpx-submissions/{gdpx_submission_id}` or the returned `self` link. `blocked` is terminal for that immutable submission. Cancellation also ends in `blocked` with reason code `SUBMISSION_CANCELLED`; it does not introduce a separate workflow state. Correct a blocked source package and create a new submission. The result includes stable issue codes and JSON pointers to missing, mismatched, or unsafe fields.
 
-Validation is all-or-nothing for publication. It verifies identity bindings, hashes, artifact availability, rubric completeness, criterion evidence, score reconciliation, runtime status, secret scanning, and omission of private reasoning.
+Validation is all-or-nothing for publication. It verifies identity bindings, hashes, publication authority, artifact availability, rubric completeness, criterion evidence, score reconciliation, runtime status, secret scanning, and omission of private reasoning.
 
 After import, verify the exact task revision:
 

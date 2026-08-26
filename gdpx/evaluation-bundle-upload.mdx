@@ -170,6 +170,10 @@ GET /api/v3/gdpx/catalog/current
 
 The active catalog is an immutable benchmark revision. It is not inferred from creator labels, publication flags, run counts, or a mutable `is_current` field.
 
+<Warning>
+  GDPx publication is not a temporary preview. Submit only task revisions intended to remain in the tenant's benchmark history. Corrections create a new immutable revision for the same logical task; the public v3 API does not delete evidence or unpublish an accidental catalog member.
+</Warning>
+
 ## Terra compatibility mode
 
 Choose `terra_compatibility` only for a legacy or partner-specific package that cannot be emitted canonically **and** only when the current capabilities response lists `terra_compatibility` in `adapter_modes`. If the server does not advertise that adapter, submit a canonical bundle or wait for the trusted adapter to become available; never emulate the adapter client-side.

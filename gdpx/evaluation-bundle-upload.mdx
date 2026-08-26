@@ -42,6 +42,10 @@ The schema identifier is `https://standard-data.dev/contracts/gdpx-review-bundle
 
 The capability response is authoritative for the active contract version, maximum ZIP size, supported adapter modes, publication policy, and resumable-upload limits. Do not hard-code those values from an older response.
 
+<Warning>
+  Submission is fail-closed. Do not offer an upload action unless `canonical_submission.available` is `true`. During a controlled rollout, admission may be disabled or tenant-allowlisted even though the schema and read APIs are reachable.
+</Warning>
+
 ## Canonical ZIP layout
 
 The canonical contract version is `gdpx-review-bundle/1.0.0`:
@@ -168,7 +172,9 @@ The active catalog is an immutable benchmark revision. It is not inferred from c
 
 ## Terra compatibility mode
 
-Choose `terra_compatibility` only for a legacy or partner-specific package that cannot be emitted canonically. GPT-5.6 Terra may identify source files, map heterogeneous fields, assign source-derived stable IDs, and create citation-bound presentation summaries.
+Choose `terra_compatibility` only for a legacy or partner-specific package that cannot be emitted canonically **and** only when the current capabilities response lists `terra_compatibility` in `adapter_modes`. If the server does not advertise that adapter, submit a canonical bundle or wait for the trusted adapter to become available; never emulate the adapter client-side.
+
+When advertised, the pinned compatibility model may identify source files, map heterogeneous fields, assign source-derived stable IDs, and create citation-bound presentation summaries. Its exact model revision, adapter prompt version, and release are recorded in the normalized evidence. The public contract does not permit callers to select or substitute a model.
 
 Terra must not:
 

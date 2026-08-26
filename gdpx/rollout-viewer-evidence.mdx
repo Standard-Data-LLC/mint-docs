@@ -28,7 +28,7 @@ The statistics header may include score, threshold, tests, turns or steps, tool 
 
 Master renders the exact prompt before the model response. Plain text and Markdown are readable without opening raw JSON.
 
-The answer area shows the final response and the primary work product. Document, PDF, spreadsheet, image, and code artifacts use their native previewers when available and retain a download link to the hash-bound source artifact.
+The answer area shows the final response and the primary work product. Document, PDF, spreadsheet, image, and code artifacts use their native previewers when available and retain a download link to the hash-bound source artifact. A server-supplied, hash-attested presentation is preferred. For verified Office files without one, Wilderness may build a bounded local preview from the downloaded bytes after checking the declared generation, size, and SHA-256; the immutable source download remains authoritative.
 
 ### Rubric scorecard
 

@@ -95,12 +95,13 @@ Each item in `criterion-decisions.json` must contain:
 | Field | Requirement |
 | --- | --- |
 | `criterion_id` | Stable ID that exactly matches one source-rubric criterion |
-| `criterion_text` | Exact source wording; do not paraphrase the grading contract |
+| `source_text` | Exact source wording; do not paraphrase the grading contract |
 | `status` | `passed`, `failed`, `partial`, `blocked`, `not_applicable`, or `unscored` |
 | `weight` | Source weight or scoring contribution when one exists |
-| `awarded` / `maximum` | Awarded and possible contribution when applicable |
+| `awarded_contribution` / `maximum_contribution` | Awarded and possible contribution when applicable |
 | `direct_result` | Result before dependency or hard-gate effects |
 | `cascaded_result` | Result after dependency or hard-gate effects |
+| `dependency_criterion_ids` | Exact IDs of criteria that can cascade into this result |
 | `grader` | Verifier or judge identity and pinned version |
 | `rationale` | Human-readable explanation grounded in observable evidence |
 | `evidence_refs` | Typed references to retained events, tests, outputs, or artifacts |

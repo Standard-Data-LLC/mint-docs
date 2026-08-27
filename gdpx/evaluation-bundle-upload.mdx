@@ -52,6 +52,7 @@ The canonical contract version is `gdpx-review-bundle/1.1.0`. Each ZIP contains 
 
 ```text
 GDPX_BUNDLE.json
+INTERNAL_QA_CREDENTIAL_ATTESTATION.json   # internal-QA deliveries only
 tasks/
 └── <task_id>/
     ├── TASK.json
@@ -85,7 +86,7 @@ evaluations/
 
 Every task submitted with `publication_policy: "publish_when_review_ready"` must include `tasks/<task_id>/PUBLICATION_AUTHORITY.json` using `gdpx-publication-authority/1.1.0`. The bundle manifest records that file with role `publication_authority` and binds its path and SHA-256 from the task descriptor. Missing, blocked, mismatched, or tampered declaration evidence is a publication blocker even when every technical evaluation check passes.
 
-The partner-uploaded declaration binds the exact task, task-content hash, workspace-inventory hash, logical task, source delivery, rights basis, agreement status, owner intent, and source mappings. Its self-attestation hash covers the canonical JSON record. An authorized declaration must state `intended_catalog_member: true`, carry an applicable executed-agreement or first-party rights basis, and include approval scoped to `gdpx_benchmark_qc_and_publication`.
+The partner-uploaded declaration binds the exact task, task-content hash, workspace-inventory hash, logical task, source delivery, rights basis, agreement status, owner intent, and source mappings. Its self-attestation hash covers the canonical JSON record. An external-catalog declaration must state `publication_target: "external_catalog"`, set `intended_catalog_member: true`, carry an applicable executed-agreement or first-party rights basis, and include approval scoped to `gdpx_benchmark_qc_and_publication`.
 
 The uploaded declaration is necessary but not sufficient. Audit separately requires an immutable publication-rights grant in Standard Data's operator-controlled registry and an active authority head that resolves to that grant. The grant and head bind the exact declaration, source delivery, task-content hash, and workspace-inventory hash. Submission credentials cannot create, replace, or advance either record.
 
@@ -95,6 +96,24 @@ If the active policy changes or an owner revokes publication, Audit first publis
   Upload permission is not publication authority. A valid API key, successful transport, complete rollout, partner declaration, self-hash, or technical candidate cannot substitute for a task-bound declaration, matching immutable operator grant, and current authority head. Never reuse an authority file across revisions or deliveries.
 </Warning>
 
+### Internal-QA exact-byte fixture retention
+
+Use the internal-QA path only when an isolated benchmark world intentionally contains credential-like fixture literals that reviewers must inspect byte for byte. It is not a general secret-scanner exception.
+
+The declaration must state `publication_target: "internal_qa"`, set `intended_catalog_member: false`, use a first-party rights basis, and include approval scoped to `gdpx_internal_qa_synthetic_fixture_retention`. Standard Data separately retains an operator-controlled `INTERNAL_QA_CREDENTIAL_STATEMENT.json` using `gdpx-internal-qa-credential-statement/1.0.0`. Its semantic statement hash, exact file hash, immutable control object, active grant, and authority-head generation are distinct bindings; an uploader cannot create or advance them.
+
+The review bundle includes `INTERNAL_QA_CREDENTIAL_ATTESTATION.json` and inventories it in `GDPX_BUNDLE.json` with role `internal_qa_credential_attestation`. The attestation must include:
+
+- a complete, sorted, hash-bound corpus covering every retained and projected credential-like occurrence;
+- exactly one source-bound classification for every detector match;
+- `synthetic_fixture_literal` records with exact source, fixture, and Master pointers and hashes, offline-world provenance, isolated execution, disabled network egress, and no environment, secret-manager, or provider origin;
+- `non_value_syntax` records with parser proof for identifiers, expressions, and empty literals; and
+- clean high-confidence, provider-format, and grouped-token entropy scans plus a `network_origin` verdict of `offline_only` over the same corpus hash.
+
+Source and Master bytes must match the attested fixture bytes exactly. Placeholders, rewritten values, an incomplete corpus, an uncited match, or a blanket `internal` or `sanitized` flag blocks admission. Any byte, corpus, authority, or grant change requires a new statement, attestation, operator grant, and exact replay.
+
+Internal-QA evidence may run through managed execution and remains readable to authenticated tenant reviewers with `tasks:read` while its exact active grant is valid. It never satisfies external-catalog readiness or membership. Revoking or replacing the grant closes every internal-QA review path without deleting immutable audit history.
+
 ### Managed execution and approval
 
 An uploaded `RUN.json`, provider result, Harbor identifier, runtime receipt, or field that claims execution validation is evidence supplied by the uploader. It cannot authenticate its own execution.
@@ -102,6 +121,8 @@ An uploaded `RUN.json`, provider result, Harbor identifier, runtime receipt, or 
 A rollout qualifies for QC1 publication only after Standard Data runs or verifies it through the approved managed execution path. The retained runtime receipt binds the exact task and workspace, run and rollout manifests, trajectory, verifier output, criterion ledger, work products, forensic sections, runtime configuration, harness result, logs, and immutable artifact hashes. After the evidence generations, Master, criterion chunks, and artifacts commit, Audit verifies their exact hashes and creates a separate operator-authenticated managed-execution approval for those canonical bytes.
 
 The approval is not part of the uploaded authority declaration and cannot be created by submission credentials. Until the exact approval exists and verifies, the run remains `not_execution_validated`. Audit keeps the first import as archive evidence, but it cannot satisfy QC1, become `review_ready`, enter Wilderness Results, or support catalog membership. After approval, replay or resubmit the exact hash-bound bundle when the capability response instructs you to do so; any byte change requires new verification and approval.
+
+If trusted-runtime attestation is rejected before model launch, retain only bounded structural diagnostics: `missing_marker`, `duplicate_marker`, `marker_not_first`, or `malformed_marker`; marker count; whether the first line was the marker; capped stderr line and byte counts; and truncation flags. Never retain raw stderr in this diagnostic. A pre-launch rejection produces no subject rollout, no score, and no QC1 credit. Display it as an execution rejection, never as score `0`.
 
 Large trajectories and work products stay as hash-bound objects. Do not copy them into a metadata field or replace them with a summary.
 

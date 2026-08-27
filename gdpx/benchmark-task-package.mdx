@@ -75,6 +75,8 @@ The single-task bundle above is the canonical normalized task unit. A publishabl
 
 The canonical task directory also contains `PUBLICATION_AUTHORITY.json`. This is the uploaded publication declaration, not agent-visible task material and not an operator grant. It binds the exact task revision, task-content hash, full workspace-inventory hash, source delivery, rights basis, agreement state, owner intent, and source mappings. Audit publishes only when that declaration also matches an immutable grant and active head in Standard Data's operator-controlled registry. Do not place it in the runtime workspace, copy it between task revisions, or infer it from a successful upload.
 
+An internal-QA review bundle may also include root-level `INTERNAL_QA_CREDENTIAL_ATTESTATION.json`, inventoried by `GDPX_BUNDLE.json` with role `internal_qa_credential_attestation`. Use it only for exact synthetic fixture literals in an isolated offline world. Every detected occurrence needs exactly one source-bound classification, and every projected Master occurrence must bind the identical bytes. A blanket internal, trusted, or sanitized flag is invalid. This review-only authority can never authorize external-catalog membership; see [Internal-QA exact-byte fixture retention](/gdpx/evaluation-bundle-upload#internal-qa-exact-byte-fixture-retention).
+
 `TASK.json` must inventory every workspace file by normalized path, SHA-256, byte size, media type, artifact kind, and visibility. The sorted inventory determines `environment.workspace_inventory_sha256`. `task_content_sha256` binds the complete canonical task graph. `RUN.json` and Master must repeat the exact workspace-inventory binding. Audit rejects an omitted path or any hash, size, media-type, kind, or visibility mismatch.
 
 Execution evidence cannot approve itself. Partner-uploaded run records and receipts remain `not_execution_validated` until Audit verifies the exact managed run and creates a separate operator-authenticated managed-execution approval. Unapproved evidence stays archive-only and does not appear in Wilderness.
@@ -169,9 +171,9 @@ Also retain run-level model, provider, harness, harness version, compute, infras
 
 Keep generated work products beside the attempt under `trajectory/<task_name>/<model_name>/rollout_<harness@version>_<n>/artifacts/`. Reference them from the trajectory or its attempt manifest. Preserve native formats so reviewers can inspect formulas, cell values, document content, and other task-specific details directly.
 
-Omit hidden or private reasoning, credentials, signed URLs, and raw provider-private payloads. Record each omission explicitly. Do not replace observable content with the word `restricted`, an empty event list, or a provider identifier.
+Omit hidden or private reasoning, actual or live credentials, signed URLs, secret values, and raw provider-private payloads. Record each omission explicitly. Do not replace observable content with the word `restricted`, an empty event list, or a provider identifier.
 
-Sanitize those excluded fields before upload, then preserve and display every remaining observable byte. A sanitized prompt, model message, tool input or output, test log, grading rationale, or final result must not be replaced by a blanket redaction marker. Structural event metadata without the corresponding retained observable body is incomplete evidence.
+Sanitize those excluded fields before upload, then preserve and display every remaining observable byte. An approved internal-QA synthetic fixture literal is retained verbatim under its exact corpus, source, fixture, Master, scanner, runtime, grant, and authority-head bindings. A sanitized prompt, model message, tool input or output, test log, grading rationale, or final result must not be replaced by a blanket redaction marker. Structural event metadata without the corresponding retained observable body is incomplete evidence.
 
 <Warning>
   `TASK.json` indexes rollout evidence; it does not replace the evidence. Audit does not reconstruct missing bodies from Harbor, Prime Intellect, or another provider. A metadata-only rollout is diagnostic evidence only. It cannot count toward QC1, QC2, QC3, reviewer acceptance, or a published difficulty claim. Reviewer permissions cannot recover evidence that was never uploaded.
@@ -180,7 +182,7 @@ Sanitize those excluded fields before upload, then preserve and display every re
 ### Prepare the ZIP
 
 1. Verify that every task has matching entries under `tasks/`, `trajectory/`, and `docs/`, and that each one-task canonical publication bundle contains an exact, task-bound `PUBLICATION_AUTHORITY.json`.
-2. Remove `.git/`, `.DS_Store`, `__MACOSX/`, symbolic links, secrets, temporary files, and unrelated build output.
+2. Remove `.git/`, `.DS_Store`, `__MACOSX/`, symbolic links, actual secrets, temporary files, and unrelated build output. Do not rewrite an attested internal-QA fixture value; byte changes require a new attestation and operator grant.
 3. Confirm that each environment builds from the delivered files alone. Pin or include every base image, dependency, workspace asset, tool definition, and skill document.
 4. Put exactly one batch root in the archive. Do not upload several unrelated roots or a directory-only ZIP.
 5. Record the final filename, byte size, media type `application/zip`, and SHA-256 of the exact bytes you will upload.

@@ -98,7 +98,7 @@ Add `rollouts` to the existing task-taxonomy manifest; do not remove the identit
 
 Include every model key in the current evaluation matrix and put exactly 16 completed `subject` attempts in each one, with ordinals `1` through `16`. Use one pass threshold across the task. Reference, hinted, and infrastructure attempts must use a different `kind` and do not count toward the subject set.
 
-Pin the prompt, tool configuration, sampling, context policy, budget, timeout, and retry policy in `run_config`. Every digest uses the `sha256:<64-lowercase-hex>` form, and every artifact path is relative to the batch root. A failed attempt needs `failure_analysis`; a passing attempt does not. Every attempt needs the complete v3 rollout evidence and criterion ledger. Never include private reasoning, credentials, or raw provider events.
+Pin the prompt, tool configuration, sampling, context policy, budget, timeout, and retry policy in `run_config`. Every digest uses the `sha256:<64-lowercase-hex>` form, and every artifact path is relative to the batch root. A failed attempt needs `failure_analysis`; a passing attempt does not. Every attempt needs the complete v3 rollout evidence and criterion ledger. Never include private reasoning, actual or live credentials, secret values, or raw provider events. An isolated synthetic fixture is retained only through the [internal-QA exact-byte attestation path](/gdpx/evaluation-bundle-upload#internal-qa-exact-byte-fixture-retention).
 
 Every artifact path must resolve to the exact uploaded bytes and match its declared hash, size, and media type. The trajectory must expose the observable execution, and generated work products must be included as inspectable native artifacts. IDs, scores, and aggregate statistics are indexes and summaries, not rollout evidence.
 
@@ -109,6 +109,8 @@ Use `gdpx-task/1.1.0` for canonical publication. Inventory every workspace file 
 Run QC3 on the standardized Harbor runtime. Bind every result to the exact task bytes, environment digest, Harbor release, harness release, and run configuration. Custom reward or environment-interaction extensions are fine when they run inside Harbor and are fully declared. They do not replace a required model harness. Replace custom agents or runtimes with the standard runnable agent before QC3; results from an incompatible runtime do not count.
 
 `TASK.json` is task-local intake metadata, not an agent file. Never mount it, `trajectory/`, `docs/`, tests, solutions, or hidden grading material into the agent runtime.
+
+A trusted-runtime attestation rejection before launch is an infrastructure attempt, not a failed subject rollout. Retain its stable reason (`missing_marker`, `duplicate_marker`, `marker_not_first`, or `malformed_marker`) and bounded counts and truncation flags, but no raw stderr. It produces no score and receives no QC credit.
 
 ### QC4: Analysis and normalization
 

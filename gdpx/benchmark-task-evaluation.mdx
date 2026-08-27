@@ -42,6 +42,10 @@ Do not invent a top-level rollout section in `task.toml`. Index the attempts in 
 
 For publication, package each countable QC1 attempt as its own `gdpx-review-bundle/1.1.0` ZIP with exactly one task, one run, and one rollout. Bind the complete workspace inventory and task content to the run. An uploaded score or receipt remains archive-only until Audit records a matching operator-authenticated managed-execution approval.
 
+A trusted-runtime attestation rejection before model launch is an infrastructure failure, not a subject rollout. It must not enter rollout totals, pass rates, or score distributions. Retain bounded diagnostics sufficient to distinguish `missing_marker`, `duplicate_marker`, `marker_not_first`, and `malformed_marker`, including marker count, first-line status, capped stderr line and byte counts, and truncation flags. Do not retain raw stderr in that diagnostic and do not convert the rejection to reward `0`.
+
+For isolated evaluations that intentionally use credential-like synthetic fixtures, follow the [internal-QA exact-byte policy](/gdpx/evaluation-bundle-upload#internal-qa-exact-byte-fixture-retention). Managed execution may produce review evidence under that authority, but it does not make the run externally catalog-eligible.
+
 ## Recommended: use hints as causal probes
 
 A hint is an optional diagnostic, not a required taxonomy field. It has two purposes: investigate whether a zero-resolve task is solvable in principle and test whether a proposed failure mode caused the observed failure. Keep hinted and unhinted runs in separate, pinned evaluation conditions.

@@ -11,6 +11,8 @@ The v2 workspace API accepts one ZIP, sanitizes and maps it, runs the pinned v15
   v2 does not publish a task into GDPx or Wilderness. Use [Upload an evaluation bundle](/gdpx/evaluation-bundle-upload) for the v3 task-and-evidence contract. Only a v1.1 submission with current publication authority, an approved managed execution, and current-policy `review_ready` status can enter the active GDPx catalog.
 </Warning>
 
+V2 also has no internal-QA exact-byte attestation path. It cannot authorize retention of credential-like fixture literals or substitute for the v3 attestation, operator statement, grant, and active-head checks.
+
 A successful `/v1/evaluate` response—including `ready_to_submit: true`—does not authorize either workflow. v1 provides document feedback; v2 creates draft revisions; v3 enforces publication readiness.
 
 For benchmark QC3, keep full traces, rewards, and failure analyses under `trajectory/`. Index those root-relative artifacts in `tasks/<task_name>/TASK.json.rollouts`. Audit reads this intake manifest but keeps it out of the agent runtime. Uploaded results are supplied evidence; Audit does not claim to have executed them.
@@ -110,7 +112,7 @@ The workflow imports all mapped draft tasks or none. Warnings do not block. Miss
 
 ## Verify reviewer evidence after import
 
-After a submission succeeds, open at least one rollout for every task and model pairing in Wilderness. Confirm that the exact prompt and task context, observable transcript, tool inputs and outputs, final response, tests, criterion-level grading, and native work-product artifacts are present.
+After a submission succeeds, inspect each created revision in Audit’s draft viewer. Confirm that the task bytes and any supplied evidence are mapped as expected. A v2 draft does not appear in Wilderness. Inspecting a rollout in Wilderness is possible only after a qualifying v3 submission, managed execution approval, current-policy readiness, and active catalog membership.
 
 A visible score with unavailable rollout detail is a source-evidence gap, not a reviewer-permission issue. Do not count that attempt toward QC or difficulty assessment. Recover the exact original execution evidence, rebuild the archive, and submit it as a new immutable revision. Do not substitute a different model run or attach evidence from another task revision.
 

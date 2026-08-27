@@ -53,6 +53,10 @@ The trajectory shows model-visible messages, assistant responses, tool calls, to
 
 Do not call this view “chain of thought.” Hidden or private reasoning is not collected or displayed. A reviewer may see only observable messages and operational actions that were part of the retained run.
 
+### Pre-launch execution rejection
+
+A trusted-runtime attestation rejection is infrastructure evidence, not a model score. Master labels the attempt **Execution rejected before scoring** and may show only the bounded reason (`missing_marker`, `duplicate_marker`, `marker_not_first`, or `malformed_marker`), marker count, first-line check, capped stderr line and byte counts, and truncation flags. It never displays raw stderr from that diagnostic. No rollout, score, or QC credit is created.
+
 ## Source sections
 
 The forensic tabs remain available after Master:
@@ -72,13 +76,15 @@ Each tab is either complete or explicitly `not_applicable` with a source-grounde
 
 Every authenticated tenant user with `tasks:read` receives the same complete sanitized Master projection and all six source sections. Wilderness does not require a separate trace-review role, companion entitlement, or client-side evidence gate. Do not display an “authorized viewer only” message to a tenant reader who already has `tasks:read`.
 
-Sanitization is a narrow ingestion boundary, not a presentation mode. After credentials, private reasoning, and provider-private fields have been removed, render the remaining prompt, messages, tool inputs and outputs, tests, grading, and work-product content verbatim. Never replace retained sanitized content with `Content redacted`, `[OMITTED SENSITIVE SUPPLIED CONTENT]`, a structural-event-only table, or another blanket placeholder. If the source bundle did not retain a body, label it `Not retained`; do not imply that a viewer permission can reveal it.
+Sanitization is a narrow ingestion boundary, not a presentation mode. After actual or live credentials, private reasoning, and provider-private fields have been removed, render the remaining prompt, messages, tool inputs and outputs, tests, grading, and work-product content verbatim. Never replace retained sanitized content with `Content redacted`, `[OMITTED SENSITIVE SUPPLIED CONTENT]`, a structural-event-only table, or another blanket placeholder. If the source bundle did not retain a body, label it `Not retained`; do not imply that a viewer permission can reveal it.
+
+An approved internal-QA attestation is the narrow exception for credential-like literals that are proven synthetic, fixture-bound, offline, and unreachable. Those source and Master bytes render verbatim. Master shows the attestation status, corpus hash, classification provenance, and active authority generation without adding another permission gate. Revoked, mismatched, incomplete, or external-origin evidence fails closed.
 
 These boundaries remain permanent:
 
 - anonymous users cannot read tenant evidence;
 - one tenant cannot read another tenant’s evidence;
-- credentials, signed URLs, secret values, and provider-private state are omitted;
+- actual or live credentials, signed URLs, secret values, and provider-private state are omitted;
 - hidden or private reasoning is omitted; and
 - verifier-only gold material remains outside the rollout projection when disclosure would leak the benchmark answer.
 

@@ -1,32 +1,33 @@
 ---
 title: "QC stages for benchmarks"
-hidden: true
 sidebarTitle: "QC stages"
 description: "Run benchmark QC and integrate rollout analysis without automating stage decisions."
 ---
 
 Before a task enters QC, it must use the [benchmark task package](/gdpx/benchmark-task-package). 
 
-Partner Task Iteration (Until August 25th):
+## Partner task iteration
 
 <Accordion title="QC1: Integrity in construction">
-  Run one GPT-5.6 Luna smoke rollout through the approved managed execution path on the exact task and workspace inventory. Confirm that the environment, tools, source files, and verifier work. Retain the complete prompt, observable trajectory, final output, six forensic sections, criterion decisions, score reconciliation, native work products, and managed runtime receipt. The run counts only after Audit creates a matching operator-authenticated managed-execution approval. Fix construction or evidence-capture defects and repeat until one current-revision smoke is clean. Use [rollout analysis](/gdpx/benchmark-rollout-analysis) as judge-assisted evidence when the failure origin is unclear; it does not retain the rollout or advance the task.
+  Run one GPT-5.6 Luna smoke rollout through the approved managed execution path on the exact task and workspace inventory. Confirm that the environment, tools, source files, and verifier work. Retain the complete prompt, observable trajectory, final output, six forensic sections, criterion decisions, score reconciliation, native work products, and managed runtime receipt. The run counts only after Audit creates a matching operator-authenticated managed-execution approval. A trusted-runtime attestation rejection before model launch creates no subject rollout, no score, and no QC1 credit; retain only its bounded structural diagnostic. Fix construction or evidence-capture defects and repeat until one current-revision smoke is clean. Use [rollout analysis](/gdpx/benchmark-rollout-analysis) as judge-assisted evidence when the failure origin is unclear; it does not retain the rollout or advance the task.
 </Accordion>
 
 <Accordion title="QC2: Difficulty and reward integrity">
   Run repeated native frontier-harness rollouts. Confirm that rewards are stable, interpretable, and resistant to reward hacking. Review false positives and false negatives. If Luna is already saturated, keep the task in QC1, harden or drop it, and rerun. Saturated smoke results do not count as QC2.
 </Accordion>
 
-Final Evals for Benchmark Results (and iteration):
+## Final benchmark evaluation
 
 <Accordion title="QC3: Benchmark evaluation">
   Run 16 completed subject rollouts for each pairing in the current evaluation matrix. Analyze model failures, reward variance, unintended behavior, and verifier issues. Infrastructure retries, Oracle runs, and hinted runs do not count toward the 16 subjects.
 </Accordion>
 
-Research Paper Writeout Co-Development:
+## Analysis and normalization
 
 <Accordion title="QC4: Analysis and normalization">
   Review false positives and false negatives, cluster failure modes, run useful cross-harness checks, and decide final inclusion. Normalize accepted task and evidence revisions after that decision. Only a v3 submission with current rights authority, an approved managed QC1 execution, and current-policy `review_ready` status may join the active GDPx catalog.
 </Accordion>
+
+Internal-QA exact-byte evidence may support construction debugging and authenticated tenant review under its active grant. It cannot graduate into external GDPx membership. A catalog candidate needs the external publication authority and every normal QC admission requirement.
 
 See [Partner delivery and review](/gdpx/benchmark-task-delivery) for the full evidence contract.

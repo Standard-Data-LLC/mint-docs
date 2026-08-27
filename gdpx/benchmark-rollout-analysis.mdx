@@ -33,6 +33,8 @@ Set `rollout.private_reasoning_omitted` to `true`. The endpoint rejects any othe
 
 The service scans every request string, including mapping keys and values inside action input and output schemas. It rejects raw `gs://`, `s3://`, `az://`, `abfs://`, `abfss://`, `wasb://`, and `wasbs://` references; GCS, AWS, and generic signed-storage query credentials; and common Anthropic, generic secret-key, AWS, bearer, Google, GitHub, and Slack credential signatures.
 
+This v1 analysis endpoint has no internal-QA fixture exception and does not preserve an exact-byte attestation. Submit attested synthetic fixture evidence only through the v3 [evaluation bundle workflow](/gdpx/evaluation-bundle-upload#internal-qa-exact-byte-fixture-retention). Do not rewrite fixture values merely to make a v1 analysis request pass; use other non-sensitive evidence for the optional analysis or omit the v1 call.
+
 ## Authenticate
 
 Use the shared Standard Data API origin and a key with `evaluations:write`:

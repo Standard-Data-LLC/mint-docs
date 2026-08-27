@@ -205,7 +205,9 @@ The response returns `gdpx_submission_id` plus same-origin relations for upload 
 
 Use `mode: "evidence_only"` only to attach one run and one rollout to a task revision that Audit already retains. Set `target_task_revision_id` to that exact revision. The submitted `TASK.json`, task-content hash, full workspace inventory, rubric, verifier, and environment bindings must exactly match the retained canonical task.
 
-An evidence-only submission never changes the task head, replaces task bytes, or creates a new task revision. Any mismatch blocks the submission. If the task changed, submit a new `task_and_evidence` bundle for the new immutable revision.
+An evidence-only submission never changes the task head, replaces task bytes, creates a new task revision, or directly mutates the active catalog. Any mismatch blocks the submission. If the task changed, submit a new `task_and_evidence` bundle for the new immutable revision.
+
+For an externally supplied evidence-only bundle, Audit first retains and verifies the exact source ZIP generation, signed compatibility authorization, signed completion, Master, criterion ledger, execution approval, and current task authority. It then freezes an immutable append candidate and stops before readiness, membership, catalog, or compatibility activation. An operator must explicitly admit that exact candidate hash against the expected catalog revision and generation. Admission creates a new immutable benchmark revision, preserves every existing rollout and the single qualifying QC1 anchor, appends the new rollout as non-qualifying evidence, compare-and-swap advances the catalog head, and only then activates its compatibility projection. There is no public force or bypass parameter.
 
 ## Follow the workflow
 
@@ -234,6 +236,8 @@ v3 submission and archive-only import
 ### Catalog admission and reader activation
 
 `review_ready` is an immutable attestation for one exact task revision, qualifying rollout, Master projection, and policy version. It does not make a task visible by itself. Audit copies that exact readiness binding into an immutable benchmark-revision membership, then advances the active GDPx catalog head to the complete benchmark revision.
+
+A catalog task may retain several complete QC1 rollouts, but exactly one admission is the qualifying QC1 anchor bound by membership and readiness. Additional admitted rollouts must independently satisfy the complete evidence, execution-approval, compatibility-completion, task, workspace, source-archive, and artifact checks. They never replace or silently promote themselves over the anchor.
 
 Any compatibility projection used by older readers is prepared and hash-verified before publication, but remains hidden. Audit activates it only after the active v3 catalog admits the same task revision, run, rollout, Master hash, and evidence hash. A partial write therefore cannot expose a score without its Master evidence. Retrying an interrupted activation reuses the retained immutable authorization and completion bindings; it does not mint a different rollout or mutate the historical membership.
 
@@ -269,7 +273,7 @@ Terra must not:
 - infer missing facts from domain knowledge; or
 - authoritatively rescore the rollout.
 
-Every generated field records source locations, input and output hashes, model revision, adapter prompt version, and timestamp. An ambiguous or uncited mapping blocks publication.
+Every generated field records its exact source path and file SHA-256, RFC 6901 pointer or retained byte span, input and output hashes, model revision, adapter prompt version, and timestamp. Stable derived IDs bind those source locators; identical values in different locations must not alias. An ambiguous, uncited, colliding, or source-unbound mapping blocks publication. Legacy adapter records remain readable under their frozen contract but cannot be used to create a new transformation.
 
 If an exact rubric and final output exist but the criterion ledger is absent, rerun the original verifier or judge against the retained output. A policy-approved stronger compatible judge may be used under the judge-dominance rule, but the result must be labeled as regrading. Preserve both scores and block publication for adjudication if they disagree.
 
@@ -292,9 +296,11 @@ There is no public batch-migration endpoint. A migration inventory or report doe
 
 Recovery, verifier regrading, and managed GPT-5.6 Luna execution are separate operations. A retained output may be regraded only with its exact rubric and verifier or a policy-approved judge-dominant replacement. A missing primary output requires a fresh managed Modal/Harbor QC1 rollout on the exact revision and native harness. If approved tooling cannot produce the canonical bundle and managed-execution approval, the task remains blocked; an operator may not edit the migration report or database to make it review-ready.
 
-Before switching the active catalog, operators must review immutable JSON, CSV, and human-readable migration reports; validate finance, LuminAI healthcare, Engram biology, legal, hardware, and code canaries; and prove that every candidate has complete Master evidence, all six forensic sections, a reconciled criterion ledger, verified artifacts, and current publication and execution authority. The catalog switch is one compare-and-swap to a new immutable benchmark revision. Any stale authority, missing field, unresolved task, or unavailable rollback procedure blocks cutover.
+Before switching the active catalog, operators must review immutable JSON, CSV, and human-readable migration reports; validate exactly one canonical finance, LuminAI healthcare, Engram biology, legal, hardware, and code canary; and prove that every candidate has complete Master evidence, all six forensic sections, a reconciled criterion ledger, verified artifacts, its exact retained canonical source ZIP generation, and current publication and execution authority. The catalog switch is one compare-and-swap to a new immutable benchmark revision. Any stale authority, missing field, unresolved task, failed domain canary, or unavailable rollback procedure blocks cutover.
 
-The internal `gdpx:verify-current-release` command performs the final read-only data check against the exact active V3 catalog. It revalidates the committed membership root and current readiness records, reads every admitted rollout, and re-reads each artifact at its bound generation to verify its size and SHA-256. A release requires a passing JSON/CSV/Markdown report with zero missing fields. This command does not repair data, publish a catalog, or replace authenticated same-tenant, anonymous, and cross-tenant HTTP authorization tests.
+The internal `gdpx:orchestrate-migration` command builds a hash-bound dry-run plan and immutable JSON, CSV, and Markdown reports. Apply mode accepts only that exact plan hash and submits complete candidate bundles through the normal v3 path; it never switches the catalog. `gdpx:verify-migration-canaries` validates the six named canonical domain bundles. `gdpx:verify-current-release` performs the final read-only data check against the exact active V3 catalog: it revalidates the committed membership and rollout-admission roots and current readiness records, reads every admitted rollout, and re-reads each artifact at its bound generation to verify its size and SHA-256. A release requires passing reports with zero missing fields. None of these commands repairs evidence or replaces authenticated same-tenant, anonymous, and cross-tenant HTTP authorization tests.
+
+Before cutover, generate and retain a `gdpx:rollback-catalog` plan for the exact current and previous head. Applying it requires the exact plan SHA-256 plus the unchanged expected current revision and generation. Rollback revalidates the target revision under current policy and performs a compare-and-swap; it has no force mode and does not erase the rejected revision.
 
 <Warning>
   The legacy v39 backfill command is inventory-only and cannot publish evidence or switch the GDPx catalog. The current internal migration reporter can publish only a cohort that is already current-policy `review_ready`; it does not reconstruct evidence, rerun a verifier, or schedule Modal/Harbor work.

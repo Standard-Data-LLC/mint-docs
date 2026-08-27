@@ -112,7 +112,9 @@ The review bundle includes `INTERNAL_QA_CREDENTIAL_ATTESTATION.json` and invento
 
 Source and Master bytes must match the attested fixture bytes exactly. Placeholders, rewritten values, an incomplete corpus, an uncited match, or a blanket `internal` or `sanitized` flag blocks admission. Any byte, corpus, authority, or grant change requires a new statement, attestation, operator grant, and exact replay.
 
-Internal-QA evidence may run through managed execution and remains readable to authenticated tenant reviewers with `tasks:read` while its exact active grant is valid. It never satisfies external-catalog readiness or membership. Revoking or replacing the grant closes every internal-QA review path without deleting immutable audit history.
+Internal-QA evidence may run through managed execution and remains readable to every authenticated tenant user with `tasks:read` while its exact active grant is valid. It never satisfies external-catalog readiness or membership. Revoking or replacing the grant closes every internal-QA review path without deleting immutable audit history.
+
+An internal-QA admission writes only the immutable V3 review binding, admission terminal, exact access reservation, Master evidence, criterion chunks, and artifact bindings. It must not create a V2 task projection, workspace, supplied run, readiness attestation, family, data sheet, or catalog record. Legacy V2 records found for a review-only revision are stale migration artifacts and must remain excluded from every reader until an operator reviews the dry-run inventory.
 
 ### Managed execution and approval
 
@@ -122,7 +124,7 @@ A rollout qualifies for QC1 publication only after Standard Data runs or verifie
 
 The approval is not part of the uploaded authority declaration and cannot be created by submission credentials. Until the exact approval exists and verifies, the run remains `not_execution_validated`. Audit keeps the first import as archive evidence, but it cannot satisfy QC1, become `review_ready`, enter Wilderness Results, or support catalog membership. After approval, replay or resubmit the exact hash-bound bundle when the capability response instructs you to do so; any byte change requires new verification and approval.
 
-If trusted-runtime attestation is rejected before model launch, retain only bounded structural diagnostics: `missing_marker`, `duplicate_marker`, `marker_not_first`, or `malformed_marker`; marker count; whether the first line was the marker; capped stderr line and byte counts; and truncation flags. Never retain raw stderr in this diagnostic. A pre-launch rejection produces no subject rollout, no score, and no QC1 credit. Display it as an execution rejection, never as score `0`.
+If trusted-runtime attestation is rejected before model launch, retain only bounded structural diagnostics: `missing_marker`, `duplicate_marker`, `marker_not_first`, `malformed_marker`, `missing_sidecar`, `malformed_sidecar`, `mismatched_sidecar_a`, `controller_timeout`, or `controller_terminated`; marker count and first-line status; capped stdout and stderr line and byte counts with truncation flags; whether a chunk was observed; return code when available; elapsed time; and sidecar presence and validity. Never retain raw stdout, stderr, marker values, or sidecar bytes in this diagnostic. A pre-launch rejection produces no subject rollout, no score, and no QC1 credit. Display it as an execution rejection, never as score `0`.
 
 Large trajectories and work products stay as hash-bound objects. Do not copy them into a metadata field or replace them with a summary.
 
@@ -229,7 +231,15 @@ v3 submission and archive-only import
   → active GDPx catalog head
 ```
 
-`review_ready` always means ready under the current publication policy. A historical readiness attestation remains immutable, but a changed rights head, revoked authorization, mismatched execution approval, or newer policy makes it non-current and removes publication eligibility until Audit issues new matching records.
+### Catalog admission and reader activation
+
+`review_ready` is an immutable attestation for one exact task revision, qualifying rollout, Master projection, and policy version. It does not make a task visible by itself. Audit copies that exact readiness binding into an immutable benchmark-revision membership, then advances the active GDPx catalog head to the complete benchmark revision.
+
+Any compatibility projection used by older readers is prepared and hash-verified before publication, but remains hidden. Audit activates it only after the active v3 catalog admits the same task revision, run, rollout, Master hash, and evidence hash. A partial write therefore cannot expose a score without its Master evidence. Retrying an interrupted activation reuses the retained immutable authorization and completion bindings; it does not mint a different rollout or mutate the historical membership.
+
+The GDPx tab reads `GET /api/v3/gdpx/catalog/current`. It does not infer membership from publication flags, creator labels, run counts, legacy stage labels, or a mutable `is_current` field.
+
+`review_ready` always means ready under the policy recorded by that attestation. A historical readiness attestation remains immutable, but a changed rights head, revoked authorization, mismatched execution approval, or newer policy makes it non-current and removes publication eligibility until Audit issues new matching records and a new benchmark revision becomes active.
 
 After import, verify the exact task revision:
 
@@ -239,7 +249,7 @@ GET /api/v3/tasks/{task_revision_id}/runs/{run_id}/rollouts/{rollout_id}
 GET /api/v3/gdpx/catalog/current
 ```
 
-The active catalog is an immutable benchmark revision selected by a durable catalog head. It is not inferred from creator labels, publication flags, run counts, or a mutable `is_current` field.
+The active catalog is the immutable benchmark revision selected by that durable catalog head.
 
 <Warning>
   GDPx publication is not a temporary preview. Submit only task revisions intended to remain in the tenant's benchmark history. Corrections create a new immutable revision for the same logical task. The public v3 API does not delete evidence or change publication authority; an operator-controlled revocation excludes a task through a new head and catalog revision without erasing history.

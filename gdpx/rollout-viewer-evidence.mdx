@@ -55,7 +55,7 @@ Do not call this view “chain of thought.” Hidden or private reasoning is not
 
 ### Pre-launch execution rejection
 
-A trusted-runtime attestation rejection is infrastructure evidence, not a model score. Master labels the attempt **Execution rejected before scoring** and may show only the bounded reason (`missing_marker`, `duplicate_marker`, `marker_not_first`, or `malformed_marker`), marker count, first-line check, capped stderr line and byte counts, and truncation flags. It never displays raw stderr from that diagnostic. No rollout, score, or QC credit is created.
+A trusted-runtime attestation rejection is infrastructure evidence, not a model score. Master labels the attempt **Execution rejected before scoring** and may show only the bounded reason (`missing_marker`, `duplicate_marker`, `marker_not_first`, `malformed_marker`, `missing_sidecar`, `malformed_sidecar`, `mismatched_sidecar_a`, `controller_timeout`, or `controller_terminated`); marker count and first-line check; capped stdout and stderr line and byte counts with truncation flags; return code when available; elapsed time; and sidecar presence and validity. It never displays raw stdout, stderr, marker values, or sidecar bytes from that diagnostic. No rollout, score, or QC credit is created.
 
 ## Source sections
 
@@ -80,6 +80,10 @@ Sanitization is a narrow ingestion boundary, not a presentation mode. After actu
 
 An approved internal-QA attestation is the narrow exception for credential-like literals that are proven synthetic, fixture-bound, offline, and unreachable. Those source and Master bytes render verbatim. Master shows the attestation status, corpus hash, classification provenance, and active authority generation without adding another permission gate. Revoked, mismatched, incomplete, or external-origin evidence fails closed.
 
+For this exact path, the rollout response declares `review_access.access_class: "internal_qa"`, `review_access.classified_synthetic_fixture_values_present: true`, `redaction_policy.credentials_omitted: true`, `redaction_policy.actual_credentials_omitted: true`, and `redaction_policy.credentials_omitted_semantics: "actual_credentials_only"`. It also declares that hidden reasoning and provider-private state remain omitted. A viewer must preserve the attested fixture bytes under that complete server-authorized boundary; it must not apply a second credential-pattern filter in the browser. The semantics do not authorize actual credentials or private reasoning.
+
+Internal-QA evidence exists only in the V3 review-evidence store and exact V3 task/run/rollout routes. It does not create a V2 task, workspace, run, readiness record, family, data sheet, or catalog member. This separation prevents a review-only fixture from leaking into external task discovery through a stale legacy index.
+
 These boundaries remain permanent:
 
 - anonymous users cannot read tenant evidence;
@@ -97,5 +101,7 @@ Master identifies whether a field was supplied canonically, normalized from a so
 The projection may join or format existing facts. It may not invent a missing final answer, criterion decision, rationale, test result, score, or artifact. If one of those primary facts is unavailable, the task remains blocked from the active GDPx catalog.
 
 Use `GET /api/v3/tasks/{task_revision_id}/review-readiness` to inspect current-policy blockers, rights authority, and managed-execution approval. Use `GET /api/v3/tasks/{task_revision_id}/runs/{run_id}/rollouts/{rollout_id}` to retrieve the same complete retained evidence projection that Master renders. Historical evidence remains immutable, but only current-policy review-ready evidence appears in Wilderness Results.
+
+Reader visibility follows the active v3 catalog, not a legacy task or run row. A staged compatibility projection remains invisible until the catalog admits the exact task revision, run, rollout, Master hash, and evidence hash. Wilderness must not show a rollout row unless the corresponding Master route is admitted and retrievable.
 
 See [Upload an evaluation bundle](/gdpx/evaluation-bundle-upload) for the canonical source contract.

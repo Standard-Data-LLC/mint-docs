@@ -55,7 +55,7 @@ Do not call this view “chain of thought.” Hidden or private reasoning is not
 
 ### Pre-launch execution rejection
 
-A trusted-runtime attestation rejection is infrastructure evidence, not a model score. Master labels the attempt **Execution rejected before scoring** and may show only the bounded reason (`missing_marker`, `duplicate_marker`, `marker_not_first`, `malformed_marker`, `missing_sidecar`, `malformed_sidecar`, `mismatched_sidecar_a`, `controller_timeout`, or `controller_terminated`); marker count and first-line check; capped stdout and stderr line and byte counts with truncation flags; return code when available; elapsed time; and sidecar presence and validity. It never displays raw stdout, stderr, marker values, or sidecar bytes from that diagnostic. No rollout, score, or QC credit is created.
+A trusted-runtime attestation rejection is infrastructure evidence, not a model score. Master labels the attempt **Execution rejected before scoring** and may show only the bounded reason (`missing_marker`, `duplicate_marker`, `marker_not_first`, `malformed_marker`, `missing_sidecar`, `malformed_sidecar`, `mismatched_sidecar_a`, `controller_timeout`, or `controller_terminated`); marker count and first-line check; capped stdout and stderr line and byte counts with truncation flags; return code when available; elapsed time; and sidecar presence and validity. It never displays raw stdout, stderr, marker values, or sidecar bytes from that diagnostic. Zero-byte stdout and stderr are not a successful attestation by themselves: the canonical sidecar and frame A must still validate and match before launch. An empty stderr stream may omit the marker only under that verified sidecar/frame-A condition. No rollout, score, or QC credit is created. This display contract does not imply that any runtime build passed a live canary.
 
 ## Source sections
 
@@ -71,6 +71,10 @@ The forensic tabs remain available after Master:
 | **Grading** | Criterion decisions, rationale, judge/verifier fingerprints, and score reconciliation |
 
 Each tab is either complete or explicitly `not_applicable` with a source-grounded reason. A missing section cannot be converted to `not_applicable` merely to satisfy admission.
+
+Master is the default tab for new navigation, but every existing deep link to **Problem**, **Setup Logs**, **Agent Logs**, **Results**, **Test Logs**, or **Grading** remains valid and opens the requested source section. Migration must not rewrite or invalidate stored reviewer URLs.
+
+The viewer uses the page's normal vertical flow. It must not place Master, a forensic section, a long trajectory, or a large rubric inside a fixed-height nested scrolling region. Use progressive disclosure, in-page anchors, and artifact previews or downloads while keeping the browser's main scroll position authoritative.
 
 ## Access and permanent omissions
 

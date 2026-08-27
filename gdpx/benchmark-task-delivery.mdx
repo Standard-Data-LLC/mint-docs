@@ -110,7 +110,9 @@ Run QC3 on the standardized Harbor runtime. Bind every result to the exact task 
 
 `TASK.json` is task-local intake metadata, not an agent file. Never mount it, `trajectory/`, `docs/`, tests, solutions, or hidden grading material into the agent runtime.
 
-A trusted-runtime attestation rejection before launch is an infrastructure attempt, not a failed subject rollout. Retain its stable reason (`missing_marker`, `duplicate_marker`, `marker_not_first`, or `malformed_marker`) and bounded counts and truncation flags, but no raw stderr. It produces no score and receives no QC credit.
+A trusted-runtime attestation rejection before launch is an infrastructure attempt, not a failed subject rollout. Runtime success requires a completed one-shot privilege attestation and an independently validated canonical sidecar that matches frame A before the launch gate opens. Empty stdout and stderr alone do not prove success. Empty stderr may omit the marker only when that sidecar/frame-A check passes; non-empty stderr requires one well-formed, first, byte-identical marker.
+
+Retain only its stable reason (`missing_marker`, `duplicate_marker`, `marker_not_first`, `malformed_marker`, `missing_sidecar`, `malformed_sidecar`, `mismatched_sidecar_a`, `controller_timeout`, or `controller_terminated`) and bounded marker, stream, timing, return-code, and sidecar validity metadata. Do not retain raw stdout, stderr, marker values, or sidecar bytes. It produces no score and receives no QC credit. These rules do not claim that a particular runtime build has passed a live canary.
 
 ### QC4: Analysis and normalization
 

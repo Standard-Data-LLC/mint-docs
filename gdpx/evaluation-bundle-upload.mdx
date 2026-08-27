@@ -36,7 +36,7 @@ curl --fail-with-body \
   --output gdpx-review-bundle.schema.json
 ```
 
-Creating a submission requires `uploads:write` and `imports:write`. Capabilities, schema, catalog, readiness, submission-status, and rollout reads require `tasks:read`. Authentication is always tenant-bound.
+Creating a submission requires `uploads:write` and `imports:write`. Polling `GET /api/v3/gdpx-submissions/{gdpx_submission_id}` requires `imports:write`, including when you follow the returned `self` link. Capabilities, schema, catalog, readiness, and rollout reads require `tasks:read`. Authentication is always tenant-bound.
 
 The current schema identifier is `https://standard-data.dev/contracts/gdpx-review-bundle/1.1.0/schema.json`.
 
@@ -124,7 +124,9 @@ A rollout qualifies for QC1 publication only after Standard Data runs or verifie
 
 The approval is not part of the uploaded authority declaration and cannot be created by submission credentials. Until the exact approval exists and verifies, the run remains `not_execution_validated`. Audit keeps the first import as archive evidence, but it cannot satisfy QC1, become `review_ready`, enter Wilderness Results, or support catalog membership. After approval, replay or resubmit the exact hash-bound bundle when the capability response instructs you to do so; any byte change requires new verification and approval.
 
-If trusted-runtime attestation is rejected before model launch, retain only bounded structural diagnostics: `missing_marker`, `duplicate_marker`, `marker_not_first`, `malformed_marker`, `missing_sidecar`, `malformed_sidecar`, `mismatched_sidecar_a`, `controller_timeout`, or `controller_terminated`; marker count and first-line status; capped stdout and stderr line and byte counts with truncation flags; whether a chunk was observed; return code when available; elapsed time; and sidecar presence and validity. Never retain raw stdout, stderr, marker values, or sidecar bytes in this diagnostic. A pre-launch rejection produces no subject rollout, no score, and no QC1 credit. Display it as an execution rejection, never as score `0`.
+Trusted-runtime success requires the controller to finish the one-shot privilege attestation, independently validate the canonical create-only sidecar, bind that sidecar byte for byte to frame A, and only then open the model launch gate. Empty captured stdout and stderr do not establish success. An entirely empty stderr stream may omit the marker only when the sidecar and frame A both validate. If stderr contains any bytes, the marker must be unique, first, well formed, and byte-identical to the verified sidecar and frame A.
+
+If trusted-runtime attestation is rejected before model launch, retain only bounded structural diagnostics: `missing_marker`, `duplicate_marker`, `marker_not_first`, `malformed_marker`, `missing_sidecar`, `malformed_sidecar`, `mismatched_sidecar_a`, `controller_timeout`, or `controller_terminated`; marker count and first-line status; capped stdout and stderr line and byte counts with truncation flags; whether a chunk was observed; return code when available; elapsed time; and sidecar presence and validity. `missing_marker` applies only when a non-empty stderr stream requires a marker. Never retain raw stdout, stderr, marker values, or sidecar bytes in this diagnostic. A pre-launch rejection produces no subject rollout, no score, and no QC1 credit. Display it as an execution rejection, never as score `0`. These are admission semantics, not a claim that a particular runtime build has passed a live canary.
 
 Large trajectories and work products stay as hash-bound objects. Do not copy them into a metadata field or replace them with a summary.
 
@@ -216,7 +218,12 @@ awaiting_upload → sanitizing → normalizing → validating → importing → 
                                                                   └→ blocked
 ```
 
-Poll `GET /api/v3/gdpx-submissions/{gdpx_submission_id}` or the returned `self` link. `blocked` is terminal for that immutable submission. Cancellation also ends in `blocked` with reason code `SUBMISSION_CANCELLED`; it does not introduce a separate workflow state. Correct a blocked source package and create a new submission. The result includes stable issue codes and JSON pointers to missing, mismatched, or unsafe fields.
+Poll `GET /api/v3/gdpx-submissions/{gdpx_submission_id}` or the returned `self` link with an `imports:write` credential. `blocked` is terminal for that immutable submission. Cancellation also ends in `blocked` with reason code `SUBMISSION_CANCELLED`; it does not introduce a separate workflow state. The result includes stable issue codes and JSON pointers to missing, mismatched, or unsafe fields.
+
+Handle `blocked` according to its issue code:
+
+- `GDPX_EVIDENCE_ONLY_OPERATOR_ADMISSION_REQUIRED` means Audit already verified the external evidence-only delivery and froze an exact append candidate. Do not edit or resubmit it. Give the retained candidate ID, candidate SHA-256, and expected catalog revision and generation to the operator admission workflow. The operator either admits those exact bytes or rejects the stale candidate; the public submission remains terminal.
+- A malformed, incomplete, mismatched, or otherwise unfrozen source package has no admissible append candidate. Correct the reported source fields and create a new submission. Do not reuse the old submission ID or claim that its terminal record changed.
 
 Validation is all-or-nothing for publication. It verifies identity bindings, task and workspace hashes, publication declaration, active rights grant and head, managed-execution approval, artifact availability, rubric completeness, criterion evidence, score reconciliation, runtime status, secret scanning, and omission of private reasoning.
 
@@ -263,13 +270,14 @@ The active catalog is the immutable benchmark revision selected by that durable 
 
 Choose `terra_compatibility` only for a legacy or partner-specific package that cannot be emitted canonically **and** only when the current capabilities response lists `terra_compatibility` in `adapter_modes`. If the server does not advertise that adapter, submit a canonical bundle or wait for the trusted adapter to become available; never emulate the adapter client-side. The capabilities response and fetched schema—not this page or a cached client copy—are authoritative for availability and accepted fields.
 
-When advertised, the pinned compatibility model may identify source files, map heterogeneous fields, assign source-derived stable IDs, and create citation-bound presentation summaries. Its exact model revision, adapter prompt version, and release are recorded in the normalized evidence. The public contract does not permit callers to select or substitute a model.
+When advertised, the pinned compatibility model may identify source files, map heterogeneous fields, and assign source-derived stable IDs. It does not summarize or paraphrase source evidence. Any presentation field it emits must reproduce a source-bound value under the exact locator rules below. Its exact model revision, adapter prompt version, and release are recorded in the normalized evidence. The public contract does not permit callers to select or substitute a model.
 
 Terra must not:
 
 - rewrite task instructions or rubric meaning;
 - change weights, thresholds, dependencies, or hard gates;
 - invent a prompt, output, test, grading decision, or evidence;
+- summarize or paraphrase retained source evidence;
 - infer missing facts from domain knowledge; or
 - authoritatively rescore the rollout.
 

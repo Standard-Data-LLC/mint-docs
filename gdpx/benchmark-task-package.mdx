@@ -171,6 +171,8 @@ Keep generated work products beside the attempt under `trajectory/<task_name>/<m
 
 Omit hidden or private reasoning, credentials, signed URLs, and raw provider-private payloads. Record each omission explicitly. Do not replace observable content with the word `restricted`, an empty event list, or a provider identifier.
 
+Sanitize those excluded fields before upload, then preserve and display every remaining observable byte. A sanitized prompt, model message, tool input or output, test log, grading rationale, or final result must not be replaced by a blanket redaction marker. Structural event metadata without the corresponding retained observable body is incomplete evidence.
+
 <Warning>
   `TASK.json` indexes rollout evidence; it does not replace the evidence. Audit does not reconstruct missing bodies from Harbor, Prime Intellect, or another provider. A metadata-only rollout is diagnostic evidence only. It cannot count toward QC1, QC2, QC3, reviewer acceptance, or a published difficulty claim. Reviewer permissions cannot recover evidence that was never uploaded.
 </Warning>

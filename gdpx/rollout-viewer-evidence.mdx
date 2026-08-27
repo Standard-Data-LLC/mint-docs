@@ -72,6 +72,8 @@ Each tab is either complete or explicitly `not_applicable` with a source-grounde
 
 Every authenticated tenant user with `tasks:read` receives the same complete sanitized Master projection and all six source sections. Wilderness does not require a separate trace-review role, companion entitlement, or client-side evidence gate. Do not display an “authorized viewer only” message to a tenant reader who already has `tasks:read`.
 
+Sanitization is a narrow ingestion boundary, not a presentation mode. After credentials, private reasoning, and provider-private fields have been removed, render the remaining prompt, messages, tool inputs and outputs, tests, grading, and work-product content verbatim. Never replace retained sanitized content with `Content redacted`, `[OMITTED SENSITIVE SUPPLIED CONTENT]`, a structural-event-only table, or another blanket placeholder. If the source bundle did not retain a body, label it `Not retained`; do not imply that a viewer permission can reveal it.
+
 These boundaries remain permanent:
 
 - anonymous users cannot read tenant evidence;
@@ -88,6 +90,6 @@ Master identifies whether a field was supplied canonically, normalized from a so
 
 The projection may join or format existing facts. It may not invent a missing final answer, criterion decision, rationale, test result, score, or artifact. If one of those primary facts is unavailable, the task remains blocked from the active GDPx catalog.
 
-Use `GET /api/v3/tasks/{task_revision_id}/review-readiness` to inspect current-policy blockers, rights authority, and managed-execution approval. Use `GET /api/v3/tasks/{task_revision_id}/runs/{run_id}/rollouts/{rollout_id}` to retrieve the same sanitized evidence projection that Master renders. Historical evidence remains immutable, but only current-policy review-ready evidence appears in Wilderness Results.
+Use `GET /api/v3/tasks/{task_revision_id}/review-readiness` to inspect current-policy blockers, rights authority, and managed-execution approval. Use `GET /api/v3/tasks/{task_revision_id}/runs/{run_id}/rollouts/{rollout_id}` to retrieve the same complete retained evidence projection that Master renders. Historical evidence remains immutable, but only current-policy review-ready evidence appears in Wilderness Results.
 
 See [Upload an evaluation bundle](/gdpx/evaluation-bundle-upload) for the canonical source contract.

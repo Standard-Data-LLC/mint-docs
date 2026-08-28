@@ -37,11 +37,11 @@ export STANDARD_DATA_API_KEY="<your-standard-data-api-key>"
 | `GET` | `/v1/healthz` | Check service health without authentication |
 | `GET` | `/api/v2/intake-capabilities` | Read server-authoritative workspace-intake readiness |
 | `GET` | `/api/v3/gdpx/capabilities` | Read the GDPx task-and-evidence publication contract |
-| `GET` | `/api/v3/gdpx/openapi.json` | Fetch the authenticated GDPx OpenAPI 3.1 document |
+| `GET` | `/api/v3/gdpx/openapi.json` | Fetch the authenticated GDPx OpenAPI 3.1 document when capabilities advertise it |
 | `GET` | `/api/v3/gdpx/schemas/review-bundle` | Fetch the canonical review-bundle JSON Schema |
 | `POST` | `/api/v3/gdpx-submissions` | Upload complete task and rollout evidence for GDPx publication |
 | `GET` | `/api/v3/gdpx-submissions/{gdpx_submission_id}` | Read one immutable submission workflow |
-| `GET` | `/api/v3/tasks/{task_revision_id}/review-readiness` | Read current-policy readiness and blockers for one exact revision |
+| `GET` | `/api/v3/tasks/{task_revision_id}/review-readiness` | Read catalog-selected current-policy readiness for one published revision |
 | `GET` | `/api/v3/tasks/{task_revision_id}/runs/{run_id}/rollouts/{rollout_id}` | Read the complete sanitized Master and criterion evidence |
 | `GET` | `/api/v3/gdpx/catalog/current` | Read the immutable benchmark revision selected by the active catalog head |
 
@@ -57,7 +57,7 @@ curl --fail-with-body \
 
 Treat `temporarily_unavailable` as a hard stop. It can mean GDPx admission, the pinned processor release, queue dispatch, object scanner, or tenant allowlist is not ready. Retry only after the advertised capability changes; a client must not route around that state through the legacy v2 importer.
 
-Fetch the API description with the same tenant-scoped bearer credential. This route requires `tasks:read`; it is not a public discovery document:
+Fetch the API description with the same tenant-scoped bearer credential only when the capability response includes `openapi_endpoint`. This route requires `tasks:read`; it is not a public discovery document:
 
 ```bash
 curl --fail-with-body \
@@ -66,7 +66,7 @@ curl --fail-with-body \
   --output gdpx-openapi.json
 ```
 
-The v3 capability response and `GET /api/v3/gdpx/schemas/review-bundle` are authoritative for the active publication contract. When the server advertises `gdpx-review-bundle/1.1.0`, a `task_and_evidence` ZIP contains 1–100 unique tasks, with exactly one evaluation and one QC1 rollout for each task. The whole set is imported atomically, with exact task-content and full workspace-inventory bindings. An `evidence_only` ZIP remains a single-target append. Managed native normalization may derive typed rollout and Master `1.2.1` records after capture; that does not change the public submission version. Do not infer accepted fields, deployment availability, or adapter availability from this page, a cached schema, or a v2 response.
+The v3 capability response and `GET /api/v3/gdpx/schemas/review-bundle` are authoritative for the active publication contract. If `openapi_endpoint` is absent, do not call or advertise the OpenAPI route on that release. When the server advertises `gdpx-review-bundle/1.1.0`, a `task_and_evidence` ZIP contains 1–100 unique tasks, with exactly one evaluation and one QC1 rollout for each task. The whole set is imported atomically, with exact task-content and full workspace-inventory bindings. An `evidence_only` ZIP remains a single-target append. Managed native normalization may derive typed rollout and Master `1.2.1` records after capture; that does not change the public submission version. Do not infer accepted fields, deployment availability, or adapter availability from this page, a cached schema, or a v2 response.
 
 The v2 workspace path creates draft Audit revisions only. It cannot approve an execution, reach `review_ready`, change the GDPx catalog, or route around a disabled v3 admission gate.
 
@@ -75,6 +75,8 @@ Internal-QA exact-byte fixture retention also uses v3, with a source-bound attes
 Use [Analyze a benchmark rollout](/gdpx/benchmark-rollout-analysis) after a rollout completes. That endpoint accepts one strict JSON rollout projection and returns judge-assisted QC evidence. It does not retain or publish the rollout and does not replace the [evaluation bundle workflow](/gdpx/evaluation-bundle-upload).
 
 A complete v3 publication proceeds from an archive-only submission to a managed QC1 run and retained receipt. Audit then verifies the committed evidence generations and creates an immutable operator-authenticated managed-execution approval. Replay or resubmit the exact bundle when the capability response instructs you to do so; only then can it reach current-policy readiness, immutable benchmark membership, and the active catalog head. Partner-supplied validation claims remain archive-only until the managed approval exists. A compatibility-reader projection stays hidden until that catalog head admits the same task, rollout, Master hash, and evidence hash.
+
+Until a revision is selected by the active catalog, inspect its submission resource and `blocking_issues`. `GET /api/v3/tasks/{task_revision_id}/review-readiness` is a publication-verification read: it returns the catalog-selected immutable attestation and returns `404` for unpublished or internal-QA-only revisions.
 
 ## Submit a document
 

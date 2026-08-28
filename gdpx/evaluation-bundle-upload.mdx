@@ -50,18 +50,18 @@ curl --fail-with-body \
   "${STANDARD_DATA_API_BASE}/api/v3/gdpx/schemas/review-bundle" \
   --output gdpx-review-bundle.schema.json
 
-if jq -e '.contract_version == "gdpx-review-bundle/1.1.0"' \
-  gdpx-capabilities.json >/dev/null; then
+OPENAPI_PATH="$(jq -r '.openapi_endpoint // ""' gdpx-capabilities.json)"
+if [ -n "${OPENAPI_PATH}" ]; then
   curl --fail-with-body \
     --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
-    "${STANDARD_DATA_API_BASE}/api/v3/gdpx/openapi.json" \
+    "${STANDARD_DATA_API_BASE}${OPENAPI_PATH}" \
     --output gdpx-openapi.json
 fi
 ```
 
 Creating a submission requires `uploads:write` and `imports:write`. Polling `GET /api/v3/gdpx-submissions/{gdpx_submission_id}` requires `imports:write`, including when you follow the returned `self` link. Capabilities, schema, catalog, readiness, and rollout reads require `tasks:read`. Authentication is always tenant-bound.
 
-When v1.1 is advertised, `GET /api/v3/gdpx/openapi.json` returns the authenticated OpenAPI 3.1 document. It requires `tasks:read`, rejects anonymous and upload-only credentials, and returns a private, non-cacheable response. This page documents the v1.1 submission schema, `https://standard-data.dev/contracts/gdpx-review-bundle/1.1.0/schema.json`. Use it only when the capability response advertises v1.1.
+Call the authenticated OpenAPI 3.1 route only when capabilities include `openapi_endpoint`. It requires `tasks:read`, rejects anonymous and upload-only credentials, and returns a private, non-cacheable response. Absence of that field means the route is not deployed on that API release. This page documents the v1.1 submission schema, `https://standard-data.dev/contracts/gdpx-review-bundle/1.1.0/schema.json`. Use it only when the capability response advertises v1.1.
 
 The capability response is authoritative for the active contract version, maximum ZIP size, supported adapter modes, publication policy, and resumable-upload limits. Do not hard-code those values from an older response.
 
@@ -119,7 +119,7 @@ For a current rollout with `provenance.source_type: "regraded"`, `provenance.sou
 
 ### Strict JSON and canonical hashing
 
-Every retained or authenticated JSON boundary uses strict UTF-8 before schema validation, projection, hashing, or signing. Audit rejects duplicate object keys, integral numbers outside JavaScript's safe integer range, unpaired Unicode surrogates, non-finite numbers, trailing content, and values outside the JSON data model. This is the interoperable I-JSON boundary. Valid values are hashed as RFC 8785/JCS canonical JSON; source-object SHA-256 fields still bind the exact retained bytes.
+Every JSON document whose exact retained bytes become evidence, authority, scan or transformation input, or a signed/hash-bound managed-runtime record uses strict UTF-8 before schema validation, projection, hashing, or signing. At those exact-evidence boundaries, Audit rejects duplicate object keys, integral numbers outside JavaScript's safe integer range, unpaired Unicode surrogates, non-finite numbers, trailing content, and values outside the JSON data model. Valid values are hashed as RFC 8785/JCS canonical JSON; source-object SHA-256 fields still bind the exact retained bytes. Ordinary API request envelopes continue to use their documented request-schema validation and are not evidence merely because they are authenticated.
 
 Do not rely on a parser's last-key-wins behavior, float coercion, Unicode replacement, or property order. A document that would decode differently across implementations is invalid rather than normalized into evidence.
 
@@ -329,11 +329,11 @@ Any compatibility projection used by older readers is prepared and hash-verified
 
 The GDPx tab reads `GET /api/v3/gdpx/catalog/current`. It does not infer membership from publication flags, creator labels, run counts, legacy stage labels, or a mutable `is_current` field.
 
-The catalog returns lightweight admitted-rollout identities and evidence hashes. Retrieve the complete execution approval, compatibility binding, Master evidence, criterion ledger, and artifacts from the task rollout endpoint.
+The catalog returns lightweight admitted-rollout identities and evidence hashes. Retrieve the catalog-selected readiness attestation, including its execution approval and compatibility binding, from the review-readiness endpoint. Retrieve Master evidence, criterion chunks, transformation history, and artifact links from the task rollout endpoint.
 
 `review_ready` always means ready under the policy recorded by that attestation. A historical readiness attestation remains immutable. A changed rights head, revoked authorization, mismatched execution approval, or newer policy requires new matching records and a new benchmark revision before the catalog can change; staging or changing a draft/latest readiness pointer alone never changes what Wilderness serves.
 
-After import, verify the exact task revision:
+Before publication, inspect the submission resource and its `blocking_issues`; the catalog-selected review-readiness route returns `404` for an unpublished or internal-QA-only revision. After publication, verify the exact task revision:
 
 ```text
 GET /api/v3/tasks/{task_revision_id}/review-readiness

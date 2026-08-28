@@ -13,7 +13,9 @@ keywords:
   ]
 ---
 
-Every rollout published in Wilderness opens on **Master**. Master uses `gdpx-master-evidence/1.1.0` and is a readable projection of retained evidence. It does not replace or fabricate the six forensic source sections.
+Every rollout published in Wilderness opens on **Master**. The canonical submission baseline derives `gdpx-master-evidence/1.1.0`. A managed native run derives typed `gdpx-rollout/1.2.1` and `gdpx-master-evidence/1.2.1`, preserving typed content and native provenance as a readable projection of retained evidence. Neither Master version replaces or fabricates the six forensic source sections.
+
+Typed `gdpx-rollout/1.2.0` and `gdpx-master-evidence/1.2.0` remain readable only for immutable legacy compatibility. New managed captures emit `1.2.1`. A legacy typed record cannot become current publishable evidence because it lacks the required native criterion-chunk inventory and one-to-one canonical mapping.
 
 <Info>
   A displayed score must be explainable criterion by criterion. If the source
@@ -62,6 +64,8 @@ The summary shows the reported and calculated totals, aggregation rule, threshol
 The trajectory shows model-visible messages, assistant responses, tool calls, tool results, state transitions, produced artifacts, and errors in order. Long tool payloads use progressive disclosure and link to retained raw evidence.
 
 Do not call this view “chain of thought.” Hidden or private reasoning is not collected or displayed. A reviewer may see only observable messages and operational actions that were part of the retained run.
+
+Typed managed evidence retains model-visible system and user context, assistant messages, tool calls, tool results, failures, the final answer, and non-text content such as images. Each successful tool call must have exactly one content-bearing result. Private reasoning fields and events are removed at ingestion; the remaining typed content is retained rather than flattened into a lossy text summary.
 
 ### Pre-launch execution rejection
 
@@ -116,11 +120,15 @@ Master identifies whether a field was supplied canonically, normalized from a so
 
 A retained `gdpx-rollout/1.0.0` source marked `regraded` remains a readable draft because that schema cannot bind the exact pre-regrade Master. It does not produce current Master evidence or appear in Wilderness Results. Only a `gdpx-rollout/1.1.0` regrade with that original-Master binding and a completed signed-intent and processor-finalization path can become publishable evidence.
 
+For managed `1.2.1` evidence, provenance distinguishes the canonical GDPx workspace inventory from the native materialized Harbor task-root inventory. A hash-bound `workspace_file_mappings` list covers every file exactly once and maps each native relative path to `tasks/<task_id>/source/<native-path>` with byte-identical size and SHA-256. The canonical descriptor additionally binds media type, artifact kind, and visibility. Master retains both inventory hashes and the mapping hash; none is an alias for another.
+
+Master also retains the native verifier chunk inventory. Each native chunk's exact ID, sequence, and content SHA-256 maps one-to-one to a separate canonical criterion-chunk ID, ordinal, and semantic content SHA-256. The viewer may present canonical criterion sections, but provenance must keep the native identity and retained bytes available for verification. Retained work products and logs remain path-, size-, hash-, media-type-, and generation-bound artifacts rather than metadata summaries.
+
 A Terra-derived field includes its exact source path and file hash plus an RFC 6901 pointer or retained byte span. The viewer does not infer absent provenance. If only the older coarse Master provenance exists, it labels that retained projection explicitly rather than inventing field-level citations. Master also binds the exact `task_content_sha256` and `workspace_inventory_sha256` used for execution.
 
 The projection may join or format existing facts. It may not invent a missing final answer, criterion decision, rationale, test result, score, or artifact. If one of those primary facts is unavailable, the task remains blocked from the active GDPx catalog.
 
-Use `GET /api/v3/tasks/{task_revision_id}/review-readiness` to inspect the exact immutable readiness attestation selected by the active catalog membership, including its rights authority and managed-execution approval. A staged or newer draft/latest readiness pointer is not returned as catalog authority. Use `GET /api/v3/tasks/{task_revision_id}/runs/{run_id}/rollouts/{rollout_id}` to retrieve the same complete retained evidence projection that Master renders. Historical evidence remains immutable, but only catalog-selected, current-policy review-ready evidence appears in Wilderness Results.
+Use `GET /api/v3/tasks/{task_revision_id}/review-readiness` to inspect the exact immutable readiness attestation selected by the active catalog membership, including its rights authority and managed-execution approval. A staged or newer draft/latest readiness pointer is not returned as catalog authority. Use `GET /api/v3/tasks/{task_revision_id}/runs/{run_id}/rollouts/{rollout_id}` to retrieve the same complete retained evidence projection that Master renders. Historical evidence remains immutable, but every rollout shown as current publishable evidence in Wilderness Results must satisfy the current readiness policy. Passing readiness for the qualifying anchor does not make another rollout current.
 
 Reader visibility follows the active v3 catalog, not a legacy task or run row. A staged compatibility projection remains invisible until the catalog admits the exact task revision, run, rollout, Master hash, and evidence hash. Wilderness must not show a rollout row unless the corresponding Master route is admitted and retrievable.
 

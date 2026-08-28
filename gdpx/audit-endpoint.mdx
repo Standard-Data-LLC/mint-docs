@@ -37,6 +37,7 @@ export STANDARD_DATA_API_KEY="<your-standard-data-api-key>"
 | `GET` | `/v1/healthz` | Check service health without authentication |
 | `GET` | `/api/v2/intake-capabilities` | Read server-authoritative workspace-intake readiness |
 | `GET` | `/api/v3/gdpx/capabilities` | Read the GDPx task-and-evidence publication contract |
+| `GET` | `/api/v3/gdpx/openapi.json` | Fetch the authenticated GDPx OpenAPI 3.1 document |
 | `GET` | `/api/v3/gdpx/schemas/review-bundle` | Fetch the canonical review-bundle JSON Schema |
 | `POST` | `/api/v3/gdpx-submissions` | Upload complete task and rollout evidence for GDPx publication |
 | `GET` | `/api/v3/gdpx-submissions/{gdpx_submission_id}` | Read one immutable submission workflow |
@@ -56,7 +57,16 @@ curl --fail-with-body \
 
 Treat `temporarily_unavailable` as a hard stop. It can mean GDPx admission, the pinned processor release, queue dispatch, object scanner, or tenant allowlist is not ready. Retry only after the advertised capability changes; a client must not route around that state through the legacy v2 importer.
 
-The v3 capability response and `GET /api/v3/gdpx/schemas/review-bundle` are authoritative for the active publication contract. The current regime is `gdpx-review-bundle/1.1.0`: a `task_and_evidence` ZIP contains 1–100 unique tasks, with exactly one evaluation and one QC1 rollout for each task. The whole set is imported atomically, with exact task-content and full workspace-inventory bindings. An `evidence_only` ZIP remains a single-target append. Do not infer accepted fields or adapter availability from this page, a cached schema, or a v2 response.
+Fetch the API description with the same tenant-scoped bearer credential. This route requires `tasks:read`; it is not a public discovery document:
+
+```bash
+curl --fail-with-body \
+  --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
+  "${STANDARD_DATA_API_BASE}/api/v3/gdpx/openapi.json" \
+  --output gdpx-openapi.json
+```
+
+The v3 capability response and `GET /api/v3/gdpx/schemas/review-bundle` are authoritative for the active publication contract. When the server advertises `gdpx-review-bundle/1.1.0`, a `task_and_evidence` ZIP contains 1–100 unique tasks, with exactly one evaluation and one QC1 rollout for each task. The whole set is imported atomically, with exact task-content and full workspace-inventory bindings. An `evidence_only` ZIP remains a single-target append. Managed native normalization may derive typed rollout and Master `1.2.1` records after capture; that does not change the public submission version. Do not infer accepted fields, deployment availability, or adapter availability from this page, a cached schema, or a v2 response.
 
 The v2 workspace path creates draft Audit revisions only. It cannot approve an execution, reach `review_ready`, change the GDPx catalog, or route around a disabled v3 admission gate.
 

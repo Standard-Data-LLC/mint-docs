@@ -15,6 +15,9 @@ keywords:
 
 `POST /api/v3/gdpx-submissions` is the only submission path that can publish a task into the GDPx/Wilderness catalog. It accepts a ZIP that binds runnable task bytes, rollout evidence, criterion decisions, and review artifacts into one immutable delivery.
 
+Start with [GDPx workflow](/gdpx/workflow) for the end-to-end sequence and the
+boundary between partner, operator, and Wilderness responsibilities.
+
 <Warning>
   A successful byte upload is not publication. A task appears in Wilderness only
   after managed execution approval, current-policy `review_ready` status, and
@@ -46,11 +49,19 @@ curl --fail-with-body \
   --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
   "${STANDARD_DATA_API_BASE}/api/v3/gdpx/schemas/review-bundle" \
   --output gdpx-review-bundle.schema.json
+
+if jq -e '.contract_version == "gdpx-review-bundle/1.1.0"' \
+  gdpx-capabilities.json >/dev/null; then
+  curl --fail-with-body \
+    --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
+    "${STANDARD_DATA_API_BASE}/api/v3/gdpx/openapi.json" \
+    --output gdpx-openapi.json
+fi
 ```
 
 Creating a submission requires `uploads:write` and `imports:write`. Polling `GET /api/v3/gdpx-submissions/{gdpx_submission_id}` requires `imports:write`, including when you follow the returned `self` link. Capabilities, schema, catalog, readiness, and rollout reads require `tasks:read`. Authentication is always tenant-bound.
 
-The current schema identifier is `https://standard-data.dev/contracts/gdpx-review-bundle/1.1.0/schema.json`.
+When v1.1 is advertised, `GET /api/v3/gdpx/openapi.json` returns the authenticated OpenAPI 3.1 document. It requires `tasks:read`, rejects anonymous and upload-only credentials, and returns a private, non-cacheable response. This page documents the v1.1 submission schema, `https://standard-data.dev/contracts/gdpx-review-bundle/1.1.0/schema.json`. Use it only when the capability response advertises v1.1.
 
 The capability response is authoritative for the active contract version, maximum ZIP size, supported adapter modes, publication policy, and resumable-upload limits. Do not hard-code those values from an older response.
 
@@ -65,7 +76,7 @@ The capability response is authoritative for the active contract version, maximu
 
 ## Canonical ZIP layout
 
-The canonical contract version is `gdpx-review-bundle/1.1.0`. A `task_and_evidence` ZIP contains 1–100 unique tasks. Each task has exactly one evaluation and one QC1 rollout, and the entire set imports atomically:
+Under `gdpx-review-bundle/1.1.0`, a `task_and_evidence` ZIP contains 1–100 unique tasks. Each task has exactly one evaluation and one QC1 rollout, and the entire set imports atomically:
 
 ```text
 GDPX_BUNDLE.json
@@ -93,7 +104,9 @@ evaluations/
 
 `GDPX_BUNDLE.json` is a complete inventory of every other retained file in the ZIP. Do not add `GDPX_BUNDLE.json` to its own inventory. For each archive file except the manifest itself—including any other root-level control file—record its normalized relative path, byte size, media type, and SHA-256. The manifest binds every task, run, and rollout to the exact `task_id`, `task_revision_id`, `logical_task_id`, `run_id`, and `rollout_id`. Task, revision, logical-task, run, and rollout identities must be unique across the ZIP. Multiple rollouts for one task remain invalid; create another immutable submission for another attempt. `evidence_only` remains a one-task append to its declared `target_task_revision_id`.
 
-`TASK.json` uses `gdpx-task/1.1.0`. It binds the exact prompt, rubric, verifier, `task_content_sha256`, and a complete `workspace_files` inventory. Each workspace entry declares its normalized path, SHA-256, byte size, media type, artifact kind, and visibility. `environment.workspace_inventory_sha256` covers the sorted inventory, including every one of those fields. `RUN.json` uses `gdpx-run/1.1.0` and must repeat the same workspace-inventory binding. `ROLLOUT.json` uses `gdpx-rollout/1.1.0`. The derived Master projection uses `gdpx-master-evidence/1.1.0` and binds that inventory again.
+`TASK.json` uses `gdpx-task/1.1.0`. It binds the exact prompt, rubric, verifier, `task_content_sha256`, and a complete `workspace_files` inventory. Each workspace entry declares its normalized path, SHA-256, byte size, media type, artifact kind, and visibility. `environment.workspace_inventory_sha256` covers the sorted inventory, including every one of those fields. `RUN.json` uses `gdpx-run/1.1.0` and must repeat the same workspace-inventory binding. The canonical submission baseline remains `gdpx-rollout/1.1.0`; its ordinary derived Master baseline is `gdpx-master-evidence/1.1.0`.
+
+A successful managed native normalization produces a separate typed `gdpx-rollout/1.2.1` and materializes `gdpx-master-evidence/1.2.1`. These are derived managed evidence records, not a new public review-bundle version and not values to substitute into a `gdpx-review-bundle/1.1.0` upload. Existing typed `gdpx-rollout/1.2.0` and `gdpx-master-evidence/1.2.0` records remain readable as immutable compatibility evidence. They cannot be emitted by a new managed capture or become newly publishable because they do not bind native criterion-chunk provenance.
 
 For a current rollout with `provenance.source_type: "regraded"`, `provenance.source_sha256` is required and must bind the exact retained pre-regrade Master. A current non-regraded rollout must omit that field. Retained `gdpx-rollout/1.0.0` sources remain readable under their frozen schema, which did not define `provenance.source_sha256`. A legacy 1.0 rollout marked `regraded` therefore remains a read-only draft and cannot materialize current Master evidence or a publication candidate. Do not add a 1.1 field to historical bytes; create new 1.1 regraded evidence through the signed-intent and processor-finalization path below.
 
@@ -103,6 +116,12 @@ For a current rollout with `provenance.source_type: "regraded"`, `provenance.sou
   verifier-only, and publication-only task file must appear with its exact path,
   hash, size, media type, kind, and visibility.
 </Warning>
+
+### Strict JSON and canonical hashing
+
+Every retained or authenticated JSON boundary uses strict UTF-8 before schema validation, projection, hashing, or signing. Audit rejects duplicate object keys, integral numbers outside JavaScript's safe integer range, unpaired Unicode surrogates, non-finite numbers, trailing content, and values outside the JSON data model. This is the interoperable I-JSON boundary. Valid values are hashed as RFC 8785/JCS canonical JSON; source-object SHA-256 fields still bind the exact retained bytes.
+
+Do not rely on a parser's last-key-wins behavior, float coercion, Unicode replacement, or property order. A document that would decode differently across implementations is invalid rather than normalized into evidence.
 
 ### Uploaded publication declaration
 
@@ -148,7 +167,37 @@ An internal-QA admission writes only the immutable V3 review binding, admission 
 
 An uploaded `RUN.json`, provider result, Harbor identifier, runtime receipt, or field that claims execution validation is evidence supplied by the uploader. It cannot authenticate its own execution.
 
+There is no public managed-rollout launch endpoint. Submission credentials
+cannot start a managed run or issue its approval. Give the Standard Data
+operator the submission ID, exact task/run/rollout identities, task-content
+hash, workspace-inventory hash, and required model/harness envelope. The
+operator owns the managed launch and independent approval.
+
 A rollout qualifies for QC1 publication only after Standard Data runs or verifies it through the approved managed execution path. The retained runtime receipt binds the exact task and workspace, run and rollout manifests, trajectory, verifier output, criterion ledger, work products, forensic sections, runtime configuration, harness result, logs, and immutable artifact hashes. After the evidence generations, Master, criterion chunks, and artifacts commit, Audit verifies their exact hashes and creates a separate operator-authenticated managed-execution approval for those canonical bytes.
+
+The canonical and materialized workspace hashes are different authorities:
+
+| Binding | Exact contents |
+| --- | --- |
+| `workspace_inventory_sha256` | Canonical descriptors under `tasks/<task_id>/source/...`, including path, size, SHA-256, media type, artifact kind, and visibility |
+| `materialized_workspace_inventory_sha256` | Native files in the Harbor task root before canonical projection, including each native path, size, and SHA-256 |
+| `workspace_file_mappings_sha256` | The complete one-to-one bridge between those two inventories |
+
+For every native file, the mapping must use the exact native relative path and the exact canonical path `tasks/<task_id>/source/<native-path>`. Both sides repeat the same byte size and SHA-256. The canonical side also records media type, artifact kind, and visibility. Native paths and canonical paths are each unique, the mappings are ordered by canonical path, and the mapping digest binds the domain `standard-data/gdpx-workspace-file-mappings/v1` plus the complete mapping array. Missing, extra, rewritten, or byte-mismatched files fail closed. Never place the materialized hash in the canonical field or derive one hash from the other.
+
+Managed capture retains the exact bytes for `result.json`, `config.json`, `lock.json`, `provider-readback.json`, `runtime-attestation.json`, `execution-binding.json`, `agent/trajectory.json`, `verifier/reward.json`, `verifier/criterion-report.json`, and every configured `artifacts/<output-path>`. The worker produces retained native result and observable-log objects, a task-materialization receipt, a worker receipt, sanitized logs, and work products. Receipts and approvals bind each object's path, role, byte size, SHA-256, and storage generation. A summary, provider ID, or reconstructed log cannot replace those bytes.
+
+Managed `1.2.1` evidence also preserves the verifier's native chunk inventory. Each entry binds the exact unnormalized `native_chunk_id`, contiguous `sequence`, and SHA-256 of the complete native chunk. A second hash-bound inventory maps it one-to-one to the distinct canonical `criterionchunk_...` ID, canonical ordinal, and semantic content SHA-256. The semantic digest excludes storage generations from evidence references, because materialization can change a generation without changing canonical evidence bytes. Dropping a native chunk, reusing an identity, changing its order, or substituting a canonical ID for a native ID invalidates the rollout.
+
+<Warning>
+  The checked-in native capture, control-port, and canonicalization protocols do
+  not establish deployment availability. The provider-native control service
+  and independent canonicalizer remain external dependencies. Managed execution
+  stays fail-closed until their exact deployments, service accounts, audiences,
+  release hashes, IAM bindings, and provider observation adapters are pinned and
+  advertised by capabilities. This documentation does not claim that a workload
+  can currently be launched.
+</Warning>
 
 The approval is not part of the uploaded authority declaration and cannot be created by submission credentials. Until the exact approval exists and verifies, the run remains `not_execution_validated`. Audit keeps the first import as archive evidence, but it cannot satisfy QC1, become `review_ready`, enter Wilderness Results, or support catalog membership. After approval, replay or resubmit the exact hash-bound bundle when the capability response instructs you to do so; any byte change requires new verification and approval.
 
@@ -274,7 +323,7 @@ v3 submission and archive-only import
 
 `review_ready` is an immutable attestation for one exact task revision, qualifying rollout, Master projection, and policy version. It does not make a task visible by itself. Audit copies that attestation ID and SHA-256 into an immutable benchmark-revision membership, then advances the active GDPx catalog head to the complete benchmark revision. The membership-bound attestation—not a mutable latest-readiness pointer—is the catalog authority.
 
-A catalog task may retain several complete QC1 rollouts, but exactly one admission is the qualifying QC1 anchor bound by membership and readiness. Additional admitted rollouts must independently satisfy the complete evidence, execution-approval, compatibility-completion, task, workspace, source-archive, and artifact checks. They never replace or silently promote themselves over the anchor.
+A catalog task may retain several complete QC1 rollouts, but exactly one admission is the qualifying QC1 anchor bound by membership and readiness. Every rollout exposed as current, publishable evidence must independently satisfy the current readiness policy, including complete evidence, execution approval, compatibility completion, task and workspace identity, source-archive retention, and artifact checks. Historical or compatibility-readable evidence may remain retained without being current or publishable. Additional current rollouts never replace or silently promote themselves over the anchor.
 
 Any compatibility projection used by older readers is prepared and hash-verified before publication, but remains hidden. Audit activates it only after the active v3 catalog admits the same task revision, run, rollout, Master hash, and evidence hash. A partial write therefore cannot expose a score without its Master evidence. Retrying an interrupted activation reuses the retained immutable authorization and completion bindings; it does not mint a different rollout or mutate the historical membership.
 

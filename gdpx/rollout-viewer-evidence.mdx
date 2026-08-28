@@ -120,7 +120,7 @@ A Terra-derived field includes its exact source path and file hash plus an RFC 6
 
 The projection may join or format existing facts. It may not invent a missing final answer, criterion decision, rationale, test result, score, or artifact. If one of those primary facts is unavailable, the task remains blocked from the active GDPx catalog.
 
-Use `GET /api/v3/tasks/{task_revision_id}/review-readiness` to inspect current-policy blockers, rights authority, and managed-execution approval. Use `GET /api/v3/tasks/{task_revision_id}/runs/{run_id}/rollouts/{rollout_id}` to retrieve the same complete retained evidence projection that Master renders. Historical evidence remains immutable, but only current-policy review-ready evidence appears in Wilderness Results.
+Use `GET /api/v3/tasks/{task_revision_id}/review-readiness` to inspect the exact immutable readiness attestation selected by the active catalog membership, including its rights authority and managed-execution approval. A staged or newer draft/latest readiness pointer is not returned as catalog authority. Use `GET /api/v3/tasks/{task_revision_id}/runs/{run_id}/rollouts/{rollout_id}` to retrieve the same complete retained evidence projection that Master renders. Historical evidence remains immutable, but only catalog-selected, current-policy review-ready evidence appears in Wilderness Results.
 
 Reader visibility follows the active v3 catalog, not a legacy task or run row. A staged compatibility projection remains invisible until the catalog admits the exact task revision, run, rollout, Master hash, and evidence hash. Wilderness must not show a rollout row unless the corresponding Master route is admitted and retrievable.
 

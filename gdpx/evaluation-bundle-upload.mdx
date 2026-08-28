@@ -91,7 +91,7 @@ evaluations/
             └── artifacts/
 ```
 
-`GDPX_BUNDLE.json` is a complete inventory. For every retained file, record its normalized relative path, byte size, media type, and SHA-256. It binds every task, run, and rollout to the exact `task_id`, `task_revision_id`, `logical_task_id`, `run_id`, and `rollout_id`. Task, revision, logical-task, run, and rollout identities must be unique across the ZIP. Multiple rollouts for one task remain invalid; create another immutable submission for another attempt. `evidence_only` remains a one-task append to its declared `target_task_revision_id`.
+`GDPX_BUNDLE.json` is a complete inventory of every other retained file in the ZIP. Do not add `GDPX_BUNDLE.json` to its own inventory. For each archive file except the manifest itself—including any other root-level control file—record its normalized relative path, byte size, media type, and SHA-256. The manifest binds every task, run, and rollout to the exact `task_id`, `task_revision_id`, `logical_task_id`, `run_id`, and `rollout_id`. Task, revision, logical-task, run, and rollout identities must be unique across the ZIP. Multiple rollouts for one task remain invalid; create another immutable submission for another attempt. `evidence_only` remains a one-task append to its declared `target_task_revision_id`.
 
 `TASK.json` uses `gdpx-task/1.1.0`. It binds the exact prompt, rubric, verifier, `task_content_sha256`, and a complete `workspace_files` inventory. Each workspace entry declares its normalized path, SHA-256, byte size, media type, artifact kind, and visibility. `environment.workspace_inventory_sha256` covers the sorted inventory, including every one of those fields. `RUN.json` uses `gdpx-run/1.1.0` and must repeat the same workspace-inventory binding. `ROLLOUT.json` uses `gdpx-rollout/1.1.0`. The derived Master projection uses `gdpx-master-evidence/1.1.0` and binds that inventory again.
 
@@ -125,6 +125,8 @@ If the active policy changes or an owner revokes publication, Audit first publis
 ### Internal-QA exact-byte fixture retention
 
 Use the internal-QA path only when an isolated benchmark world intentionally contains credential-like fixture literals that reviewers must inspect byte for byte. It is not a general secret-scanner exception.
+
+An internal-QA bundle that includes `INTERNAL_QA_CREDENTIAL_ATTESTATION.json` is singleton-only: it must contain exactly one task, one run, and one rollout. Do not combine an attested internal-QA task with any other task or evaluation in the same ZIP.
 
 The declaration must state `publication_target: "internal_qa"`, set `intended_catalog_member: false`, use a first-party rights basis, and include approval scoped to `gdpx_internal_qa_synthetic_fixture_retention`. Standard Data separately retains an operator-controlled `INTERNAL_QA_CREDENTIAL_STATEMENT.json` using `gdpx-internal-qa-credential-statement/1.0.0`. Its semantic statement hash, exact file hash, immutable control object, active grant, and authority-head generation are distinct bindings; an uploader cannot create or advance them.
 
@@ -164,7 +166,7 @@ Each rollout must retain:
 - an ordered observable trajectory with model messages, tool calls, tool results, environment events, and errors;
 - the final model answer or primary work product;
 - verifier output and all test results;
-- a decision for every scored rubric criterion;
+- exactly one decision for every declared rubric criterion, including blocked, not-applicable, and unscored criteria;
 - score reconciliation, including aggregation, threshold, dependencies, and hard gates;
 - model, harness, environment, verifier, and judge versions;
 - duration, turns or steps, token usage, cost, stop condition, and execution outcome when supplied by the harness; and
@@ -188,9 +190,9 @@ Each item in `criterion-decisions.json` must contain:
 | `dependency_criterion_ids`                      | Exact IDs of criteria that can cascade into this result                   |
 | `grader`                                        | Verifier or judge identity and pinned version                             |
 | `rationale`                                     | Human-readable explanation grounded in observable evidence                |
-| `evidence_refs`                                 | Typed references to retained events, tests, outputs, or artifacts         |
+| `evidence_refs`                                 | Typed references to retained events, tests, outputs, or artifacts; at least one is required for `passed`, `failed`, or `partial` |
 
-The score-reconciliation object records the aggregation rule, reported score, calculated score, pass threshold, hard-gate results, and whether the values reconcile. A duplicate criterion ID, unknown criterion, dangling evidence reference, or unexplained score mismatch blocks publication.
+The criterion ledger must contain exactly one decision for every criterion declared by the source rubric. This includes criteria marked `blocked`, `not_applicable`, or `unscored`; do not omit them. The score-reconciliation object records the aggregation rule, reported score, calculated score, pass threshold, hard-gate results, and whether the values reconcile. A duplicate criterion ID, missing or unknown criterion, dangling evidence reference, or unexplained score mismatch blocks publication.
 
 ## Create a submission
 
@@ -227,6 +229,8 @@ Request fields:
 | `adapter_mode`            | `canonical` or `terra_compatibility`           |
 | `publication_policy`      | `publish_when_review_ready`                    |
 
+Migration staging is not a public submission policy. A governed operator may retain complete candidate evidence through a separate authenticated workflow. A partner upload cannot select staging, advance a readiness head, or alter the active catalog's eligibility generation.
+
 The response returns `gdpx_submission_id` plus same-origin relations for upload authorization, completion, polling, and cancellation. Upload signing and finalization reuse the v2 upload-session transport linked by the response. Follow those links. Do not construct storage URLs, persist resumable-session credentials, or send the Standard Data API key to object storage.
 
 ### Evidence-only submissions
@@ -235,7 +239,7 @@ Use `mode: "evidence_only"` only to attach one run and one rollout to a task rev
 
 An evidence-only submission never changes the task head, replaces task bytes, creates a new task revision, or directly mutates the active catalog. Any mismatch blocks the submission. If the task changed, submit a new `task_and_evidence` bundle for the new immutable revision.
 
-For an externally supplied evidence-only bundle, Audit first retains and verifies the exact source ZIP generation, signed compatibility authorization, signed completion, Master, criterion ledger, execution approval, and current task authority. It then freezes an immutable append candidate and stops before readiness, membership, catalog, or compatibility activation. An operator must explicitly admit that exact candidate hash against the expected catalog revision and generation. Admission creates a new immutable benchmark revision, preserves every existing rollout and the single qualifying QC1 anchor, appends the new rollout as non-qualifying evidence, compare-and-swap advances the catalog head, and only then activates its compatibility projection. There is no public force or bypass parameter.
+For an externally supplied evidence-only bundle, Audit first retains and verifies the exact source ZIP generation, signed compatibility authorization, signed completion, Master, criterion ledger, execution approval, and current task authority. It then freezes an immutable append candidate and stops before readiness, membership, catalog, or compatibility activation. An operator must explicitly admit that exact candidate hash against the expected catalog revision and generation. Admission creates a new immutable benchmark revision, preserves every existing rollout and the single qualifying QC1 anchor, appends the new rollout as non-qualifying evidence, prepares a hash-bound compatibility projection, and makes that projection eligible for selection only when the single compare-and-swap advances the matching v3 catalog head. A preparation or catalog conflict leaves the old cohort fully current. There is no public force or bypass parameter.
 
 ## Follow the workflow
 
@@ -268,7 +272,7 @@ v3 submission and archive-only import
 
 ### Catalog admission and reader activation
 
-`review_ready` is an immutable attestation for one exact task revision, qualifying rollout, Master projection, and policy version. It does not make a task visible by itself. Audit copies that exact readiness binding into an immutable benchmark-revision membership, then advances the active GDPx catalog head to the complete benchmark revision.
+`review_ready` is an immutable attestation for one exact task revision, qualifying rollout, Master projection, and policy version. It does not make a task visible by itself. Audit copies that attestation ID and SHA-256 into an immutable benchmark-revision membership, then advances the active GDPx catalog head to the complete benchmark revision. The membership-bound attestation—not a mutable latest-readiness pointer—is the catalog authority.
 
 A catalog task may retain several complete QC1 rollouts, but exactly one admission is the qualifying QC1 anchor bound by membership and readiness. Additional admitted rollouts must independently satisfy the complete evidence, execution-approval, compatibility-completion, task, workspace, source-archive, and artifact checks. They never replace or silently promote themselves over the anchor.
 
@@ -276,7 +280,9 @@ Any compatibility projection used by older readers is prepared and hash-verified
 
 The GDPx tab reads `GET /api/v3/gdpx/catalog/current`. It does not infer membership from publication flags, creator labels, run counts, legacy stage labels, or a mutable `is_current` field.
 
-`review_ready` always means ready under the policy recorded by that attestation. A historical readiness attestation remains immutable, but a changed rights head, revoked authorization, mismatched execution approval, or newer policy makes it non-current and removes publication eligibility until Audit issues new matching records and a new benchmark revision becomes active.
+The catalog returns lightweight admitted-rollout identities and evidence hashes. Retrieve the complete execution approval, compatibility binding, Master evidence, criterion ledger, and artifacts from the task rollout endpoint.
+
+`review_ready` always means ready under the policy recorded by that attestation. A historical readiness attestation remains immutable. A changed rights head, revoked authorization, mismatched execution approval, or newer policy requires new matching records and a new benchmark revision before the catalog can change; staging or changing a draft/latest readiness pointer alone never changes what Wilderness serves.
 
 After import, verify the exact task revision:
 
@@ -312,11 +318,15 @@ Terra must not:
 - infer missing facts from domain knowledge; or
 - authoritatively rescore the rollout.
 
-Every generated field records its exact source path and file SHA-256, RFC 6901 pointer or retained byte span, input and output hashes, model revision, adapter prompt version, and timestamp. Stable derived IDs bind those source locators; identical values in different locations must not alias. An ambiguous, uncited, colliding, or source-unbound mapping blocks publication. Legacy adapter records remain readable under their frozen contract but cannot be used to create a new transformation.
+Every generated field records its exact source path and file SHA-256, RFC 6901 pointer or retained byte span, input and output hashes, model revision, adapter prompt version, and timestamp. Stable derived IDs bind those source locators; identical values in different locations must not alias. An ambiguous, uncited, colliding, or source-unbound mapping blocks publication. Legacy adapter records remain readable under their frozen contract but cannot create a new transformation.
+
+Source transport bytes remain inside the recovery-source boundary. Audit copies normalized bundles, transformation records, and certification provenance create-only into the canonical certification store. Before admission, it verifies the exact bucket, object, generation, size, media type, and SHA-256.
 
 If an exact rubric and final output exist but the criterion ledger is absent, rerun the original verifier or judge against the retained output. A policy-approved stronger compatible judge may be used under the judge-dominance rule, but the result must be labeled as regrading. Preserve both scores and block publication for adjudication if they disagree.
 
-Regrading uses a two-stage integrity boundary. Before import, a KMS-signed, one-time intent must bind the exact original evidence, unchanged subject attempt, replay inputs, grader, and policy approval. After import, Audit—not the model or uploader—derives the regenerated Master, evidence-commit, criterion-ledger, complete subject-evidence, and final-output-manifest hashes and writes the immutable dual-ledger record. A pre-import service cannot declare those final hashes. Until the signed-intent and processor-finalization capability is advertised, migration regrade rows stop with `GDPX_RECOVERY_REGRADE_INTENT_AUTHORITY_REQUIRED`, produce no candidate, and never call the regrader.
+Regrading uses a two-stage integrity boundary. Before import, a KMS-signed, one-time intent binds the exact original evidence, unchanged subject attempt, replay inputs, grader, and policy approval. Audit retains and verifies the original bundle before it accepts the regenerated bundle.
+
+After import, Audit—not the model or uploader—derives the regenerated Master, evidence-commit, criterion-ledger, complete subject-evidence, and final-output-manifest hashes. It then writes the immutable dual-ledger record. The intent progresses from `reserved` to `produced` to `completed`; Audit consumes it only after the dual ledger is durable. A pre-import service cannot declare final hashes. A crash between phases must resume the same immutable intent instead of minting another attempt.
 
 Judge dominance is an explicit approval, not a model-name comparison made by the uploader. The approval binds the tenant, exact task revision, rubric SHA-256, declared judge identity and digest, replacement judge identity and digest, compatibility finding, dominance finding, policy hash, approver, rationale, and timestamp. The replacement must be a different judge, must evaluate the unchanged retained output under the same scoring contract, and must be approved as both compatible with and stronger than the declared judge. An exact replay with the original judge does not require dominance approval. A missing approval, a changed rubric or output, or a score disagreement blocks publication pending adjudication.
 
@@ -335,7 +345,22 @@ Regrade a retained final output when the source rubric and verifier are availabl
 
 ### Operator migration boundary
 
-There is no public batch-migration endpoint. A migration inventory or report does not import evidence, approve execution, establish current readiness, or publish a catalog. Operators recover each exact task/run/rollout from canonical Audit evidence, reviewer companions, immutable release artifacts, and the original partner delivery—in that order—then submit complete canonical v3 bundles through the same admission path described above.
+There is no public batch-migration endpoint. A migration inventory or report does not import evidence, approve execution, establish current readiness, or publish a catalog. Operators recover each exact task/run/rollout from canonical Audit evidence, reviewer companions, immutable release artifacts, and the original partner delivery—in that order. Complete candidates then enter a separate, disabled-by-default internal staging service; partners cannot select this mode through `/api/v3/gdpx-submissions`.
+
+The staging service accepts only the dedicated Google OIDC service account and an exact source object locator: bucket, object, generation, byte size, media type, and SHA-256. It copies the ZIP create-only into the private canonical upload boundary. It binds the copy to a deterministic submission and staging intent, completes the normal scanner and processor path, and waits for a durable `retained_inactive` receipt.
+
+The receipt binds the reviewed migration report and plan, task revision, stage role, requested and retained object locators, canonical task and workspace hashes, compatibility completion, and immutable readiness-attestation ID and digest. Staging retains complete evidence. It never advances a readiness head, eligibility epoch, compatibility reader, benchmark membership, or catalog head.
+
+Every phase is idempotent. A retry after source copy, intent retention, upload finalization, queue dispatch, or processor completion must resume and verify the same objects and records. It must not create a different submission, replace bytes, or treat a missing receipt as success.
+
+<Warning>
+  The checked-in migration deployment remains disabled. Activation is blocked
+  until Standard Data provisions and verifies a narrow persistence broker or
+  dedicated staging database, plus a production orchestration runner with
+  exact service, identity, revision, image, route, audience, IAM, and readback
+  bindings. The staging identity must not receive database-wide Firestore
+  access.
+</Warning>
 
 Local recovery sources may enter the operator boundary only through the create-only source-promotion command. It writes content-addressed objects and accepts an existing object only after tenant metadata, exact generation, size, media type, SHA-256, and byte readback reconcile. Promotion produces a distinct immutable cloud-bound source manifest. It does not authorize a model call, QC1 launch, submission, membership change, or catalog switch.
 
@@ -343,13 +368,17 @@ Source promotion must run as the dedicated migration source-promoter identity wi
 
 Migration recovery has two coherent phases for its active path. In the closed phase, the operator runtime, normalizer authority, managed-QC1 authority, and managed execution are all disabled. In the executable phase, all four are enabled. Mixed phases are rejected. The executable phase requires new deployment hashes plus exact read-only infrastructure and IAM readback before any recovery call.
 
-The migration regrader is excluded from both phases. It remains undeployed and dormant, with no operator invoker or storage authority, until the signed regrade-intent and processor-finalization boundary is implemented and reviewed. Do not configure, deploy, or invoke it as part of either phase.
+The migration regrader is excluded from both normalization/QC1 phases and has its own disabled-by-default authority boundary. The signed regrade-intent and processor-finalization contracts do not make that runtime available by themselves. Enable it only when capabilities advertise the separately pinned authority, grader, storage, KMS, and finalization releases; do not route regrading through the normalization or managed-QC1 identities.
 
-Normalization and managed GPT-5.6 Luna execution are separate active-path operations. Regrading is a dormant operation and remains unavailable until the signed-intent boundary above is active. A retained output may then be regraded only with its exact rubric and verifier or a policy-approved judge-dominant replacement. A missing primary output requires a fresh managed Modal/Harbor QC1 rollout on the exact revision and native harness. Managed execution is asynchronous: an idempotent ensure operation is observed through bounded status reads and may return a canonical bundle only after a terminal success. If approved tooling cannot produce the canonical bundle and managed-execution approval, the task remains blocked; an operator may not edit the migration report or database to make it review-ready.
+Normalization and managed GPT-5.6 Luna execution are separate active-path operations. Regrading remains unavailable unless its distinct signed-intent, grader, and processor-finalization capabilities are all advertised. A retained output may then be regraded only with its exact rubric and verifier or a policy-approved judge-dominant replacement. A missing primary output requires a fresh managed Modal/Harbor QC1 rollout on the exact revision and native harness. Managed execution is asynchronous: an idempotent ensure operation is observed through bounded status reads and may return a canonical bundle only after a terminal success. If approved tooling cannot produce the canonical bundle and managed-execution approval, the task remains blocked; an operator may not edit the migration report or database to make it review-ready.
 
-Before switching the active catalog, operators must review immutable JSON, CSV, and human-readable migration reports; validate exactly one canonical finance, LuminAI healthcare, Engram biology, legal, hardware, and code canary; and prove that every candidate has complete Master evidence, all six forensic sections, a reconciled criterion ledger, verified artifacts, its exact retained canonical source ZIP generation, and current publication and execution authority. The catalog switch is one compare-and-swap to a new immutable benchmark revision. Any stale authority, missing field, unresolved task, failed domain canary, or unavailable rollback procedure blocks cutover.
+Before switching the active catalog, operators must review immutable JSON, CSV, and human-readable migration reports. They must validate exactly one canonical finance, LuminAI healthcare, Engram biology, legal, hardware, and code canary. Every candidate must have complete Master evidence, all six forensic sections, a reconciled criterion ledger, verified artifacts, an exact retained canonical source ZIP generation, and current publication and execution authority.
 
-The internal `gdpx:orchestrate-migration` command builds a hash-bound dry-run plan and immutable JSON, CSV, and Markdown reports. Apply mode accepts only that exact plan hash and submits complete candidate bundles through the normal v3 path; it never switches the catalog. `gdpx:verify-migration-canaries` validates the six named canonical domain bundles. `gdpx:verify-current-release` performs the final read-only data check against the exact active V3 catalog: it revalidates the committed membership and rollout-admission roots and current readiness records, reads every admitted rollout, and re-reads each artifact at its bound generation to verify its size and SHA-256. A release requires passing reports with zero missing fields. None of these commands repairs evidence or replaces authenticated same-tenant, anonymous, and cross-tenant HTTP authorization tests.
+A receipt manifest must resolve every staging receipt by ID and hash. A first-time regrade requires both its original and regenerated receipts. Before cutover, Audit materializes and verifies the exact proposed revision, memberships, rollout admissions, compatibility candidates, and catalog head. The catalog switch is one compare-and-swap to that immutable benchmark revision. After the switch, Audit re-reads the selected head, revision, membership and admission roots, compatibility projections, and artifacts. Any stale authority, missing field, unresolved task, failed domain canary, or unavailable rollback procedure blocks cutover.
+
+The internal `gdpx:orchestrate-migration` command builds a hash-bound dry-run plan and immutable JSON, CSV, and Markdown reports. Apply mode accepts only the exact plan and migration-report hash. It invokes the internal staging service for each generation-bound candidate and emits a hash-bound receipt manifest. It never switches the catalog.
+
+Use the receipt manifest to build a fresh live snapshot and final migration report. `gdpx:verify-migration-candidate` materializes the exact proposed release through capture-only write ports and proves it before the catalog compare-and-swap. `gdpx:verify-migration-canaries` validates the six named canonical domain bundles. `gdpx:verify-current-release` performs the final read-only check against the exact active v3 catalog. It revalidates the committed membership and rollout-admission roots, membership-bound readiness attestations, every admitted rollout, and each artifact's bound generation, size, and SHA-256. A release requires passing reports with zero missing fields. These commands do not repair evidence or replace same-tenant, anonymous, and cross-tenant HTTP authorization tests.
 
 Before cutover, generate and retain a `gdpx:rollback-catalog` plan for the exact current and previous head. Applying it requires the exact plan SHA-256 plus the unchanged expected current revision and generation. Rollback revalidates the target revision under current policy and performs a compare-and-swap; it has no force mode and does not erase the rejected revision.
 

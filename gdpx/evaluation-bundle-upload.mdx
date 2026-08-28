@@ -2,13 +2,25 @@
 title: "Upload an evaluation bundle"
 sidebarTitle: "Evaluation bundle upload"
 description: "Upload tasks and complete rollout evidence through the GDPx v3 publication workflow."
-keywords: ["GDPx", "v3", "evaluation bundle", "rollout evidence", "Wilderness", "resumable upload"]
+keywords:
+  [
+    "GDPx",
+    "v3",
+    "evaluation bundle",
+    "rollout evidence",
+    "Wilderness",
+    "resumable upload",
+  ]
 ---
 
 `POST /api/v3/gdpx-submissions` is the only submission path that can publish a task into the GDPx/Wilderness catalog. It accepts a ZIP that binds runnable task bytes, rollout evidence, criterion decisions, and review artifacts into one immutable delivery.
 
 <Warning>
-  A successful byte upload is not publication. A task appears in Wilderness only after managed execution approval, current-policy `review_ready` status, and inclusion in the active catalog revision. A task with missing or irreconcilable evidence remains in Audit as `blocked` and is not included in the active GDPx catalog.
+  A successful byte upload is not publication. A task appears in Wilderness only
+  after managed execution approval, current-policy `review_ready` status, and
+  inclusion in the active catalog revision. A task with missing or
+  irreconcilable evidence remains in Audit as `blocked` and is not included in
+  the active GDPx catalog.
 </Warning>
 
 The legacy `/api/v2/workspace-submissions` workflow may still create draft Audit revisions. It cannot add a task to the GDPx benchmark revision or Wilderness catalog.
@@ -43,7 +55,12 @@ The current schema identifier is `https://standard-data.dev/contracts/gdpx-revie
 The capability response is authoritative for the active contract version, maximum ZIP size, supported adapter modes, publication policy, and resumable-upload limits. Do not hard-code those values from an older response.
 
 <Warning>
-  Submission is fail-closed. Offer an upload action only when `/v1/whoami` reports `canonical_submission.state` as `ready` **and** `/api/v3/gdpx/capabilities` reports `access.can_submit` as `true`. Inspect `admission.blockers` when it is false. During a controlled rollout, admission may be disabled or tenant-allowlisted even though the schema and read APIs are reachable.
+  Submission is fail-closed. Offer an upload action only when `/v1/whoami`
+  reports `canonical_submission.state` as `ready` **and**
+  `/api/v3/gdpx/capabilities` reports `access.can_submit` as `true`. Inspect
+  `admission.blockers` when it is false. During a controlled rollout, admission
+  may be disabled or tenant-allowlisted even though the schema and read APIs are
+  reachable.
 </Warning>
 
 ## Canonical ZIP layout
@@ -76,10 +93,15 @@ evaluations/
 
 `GDPX_BUNDLE.json` is a complete inventory. For every retained file, record its normalized relative path, byte size, media type, and SHA-256. It binds the one task, one run, and one rollout to their exact `task_revision_id`, `run_id`, and `rollout_id`. A multi-task or multi-rollout ZIP is invalid; create one immutable submission per task attempt.
 
-`TASK.json` uses `gdpx-task/1.1.0`. It binds the exact prompt, rubric, verifier, `task_content_sha256`, and a complete `workspace_files` inventory. Each workspace entry declares its normalized path, SHA-256, byte size, media type, artifact kind, and visibility. `environment.workspace_inventory_sha256` covers the sorted inventory, including every one of those fields. `RUN.json` uses `gdpx-run/1.1.0` and must repeat the same workspace-inventory binding. The derived Master projection uses `gdpx-master-evidence/1.1.0` and binds that inventory again.
+`TASK.json` uses `gdpx-task/1.1.0`. It binds the exact prompt, rubric, verifier, `task_content_sha256`, and a complete `workspace_files` inventory. Each workspace entry declares its normalized path, SHA-256, byte size, media type, artifact kind, and visibility. `environment.workspace_inventory_sha256` covers the sorted inventory, including every one of those fields. `RUN.json` uses `gdpx-run/1.1.0` and must repeat the same workspace-inventory binding. `ROLLOUT.json` uses `gdpx-rollout/1.1.0`. The derived Master projection uses `gdpx-master-evidence/1.1.0` and binds that inventory again.
+
+For a current rollout with `provenance.source_type: "regraded"`, `provenance.source_sha256` is required and must bind the exact retained pre-regrade Master. A current non-regraded rollout must omit that field. Retained `gdpx-rollout/1.0.0` sources remain readable under their frozen schema, which did not define `provenance.source_sha256`. A legacy 1.0 rollout marked `regraded` therefore remains a read-only draft and cannot materialize current Master evidence or a publication candidate. Do not add a 1.1 field to historical bytes; create new 1.1 regraded evidence through the signed-intent and processor-finalization path below.
 
 <Warning>
-  Do not treat an environment directory hash, image digest, file count, or list of paths as a workspace inventory. Every agent-visible, tool-mediated, verifier-only, and publication-only task file must appear with its exact path, hash, size, media type, kind, and visibility.
+  Do not treat an environment directory hash, image digest, file count, or list
+  of paths as a workspace inventory. Every agent-visible, tool-mediated,
+  verifier-only, and publication-only task file must appear with its exact path,
+  hash, size, media type, kind, and visibility.
 </Warning>
 
 ### Uploaded publication declaration
@@ -93,7 +115,11 @@ The uploaded declaration is necessary but not sufficient. Audit separately requi
 If the active policy changes or an owner revokes publication, Audit first publishes a replacement catalog revision that excludes the task, then advances the authority head to the new immutable decision. The old grant, head revision, benchmark membership, task, and evidence remain in history. The current readiness projection becomes blocked. Audit never silently rewrites the old benchmark membership or makes the active catalog unavailable during revocation.
 
 <Warning>
-  Upload permission is not publication authority. A valid API key, successful transport, complete rollout, partner declaration, self-hash, or technical candidate cannot substitute for a task-bound declaration, matching immutable operator grant, and current authority head. Never reuse an authority file across revisions or deliveries.
+  Upload permission is not publication authority. A valid API key, successful
+  transport, complete rollout, partner declaration, self-hash, or technical
+  candidate cannot substitute for a task-bound declaration, matching immutable
+  operator grant, and current authority head. Never reuse an authority file
+  across revisions or deliveries.
 </Warning>
 
 ### Internal-QA exact-byte fixture retention
@@ -150,19 +176,19 @@ The six forensic sections—Problem, Setup Logs, Agent Logs, Results, Test Logs,
 
 Each item in `criterion-decisions.json` must contain:
 
-| Field | Requirement |
-| --- | --- |
-| `criterion_id` | Stable ID that exactly matches one source-rubric criterion |
-| `source_text` | Exact source wording; do not paraphrase the grading contract |
-| `status` | `passed`, `failed`, `partial`, `blocked`, `not_applicable`, or `unscored` |
-| `weight` | Source weight or scoring contribution when one exists |
-| `awarded_contribution` / `maximum_contribution` | Awarded and possible contribution when applicable |
-| `direct_result` | Result before dependency or hard-gate effects |
-| `cascaded_result` | Result after dependency or hard-gate effects |
-| `dependency_criterion_ids` | Exact IDs of criteria that can cascade into this result |
-| `grader` | Verifier or judge identity and pinned version |
-| `rationale` | Human-readable explanation grounded in observable evidence |
-| `evidence_refs` | Typed references to retained events, tests, outputs, or artifacts |
+| Field                                           | Requirement                                                               |
+| ----------------------------------------------- | ------------------------------------------------------------------------- |
+| `criterion_id`                                  | Stable ID that exactly matches one source-rubric criterion                |
+| `source_text`                                   | Exact source wording; do not paraphrase the grading contract              |
+| `status`                                        | `passed`, `failed`, `partial`, `blocked`, `not_applicable`, or `unscored` |
+| `weight`                                        | Source weight or scoring contribution when one exists                     |
+| `awarded_contribution` / `maximum_contribution` | Awarded and possible contribution when applicable                         |
+| `direct_result`                                 | Result before dependency or hard-gate effects                             |
+| `cascaded_result`                               | Result after dependency or hard-gate effects                              |
+| `dependency_criterion_ids`                      | Exact IDs of criteria that can cascade into this result                   |
+| `grader`                                        | Verifier or judge identity and pinned version                             |
+| `rationale`                                     | Human-readable explanation grounded in observable evidence                |
+| `evidence_refs`                                 | Typed references to retained events, tests, outputs, or artifacts         |
 
 The score-reconciliation object records the aggregation rule, reported score, calculated score, pass threshold, hard-gate results, and whether the values reconcile. A duplicate criterion ID, unknown criterion, dangling evidence reference, or unexplained score mismatch blocks publication.
 
@@ -192,14 +218,14 @@ curl --fail-with-body \
 
 Request fields:
 
-| Field | Accepted value |
-| --- | --- |
-| `content_type` | `application/zip` |
-| `contract_version` | `gdpx-review-bundle/1.1.0` |
-| `mode` | `task_and_evidence` or `evidence_only` |
+| Field                     | Accepted value                                 |
+| ------------------------- | ---------------------------------------------- |
+| `content_type`            | `application/zip`                              |
+| `contract_version`        | `gdpx-review-bundle/1.1.0`                     |
+| `mode`                    | `task_and_evidence` or `evidence_only`         |
 | `target_task_revision_id` | Required for `evidence_only`; otherwise `null` |
-| `adapter_mode` | `canonical` or `terra_compatibility` |
-| `publication_policy` | `publish_when_review_ready` |
+| `adapter_mode`            | `canonical` or `terra_compatibility`           |
+| `publication_policy`      | `publish_when_review_ready`                    |
 
 The response returns `gdpx_submission_id` plus same-origin relations for upload authorization, completion, polling, and cancellation. Upload signing and finalization reuse the v2 upload-session transport linked by the response. Follow those links. Do not construct storage URLs, persist resumable-session credentials, or send the Standard Data API key to object storage.
 
@@ -263,7 +289,12 @@ GET /api/v3/gdpx/catalog/current
 The active catalog is the immutable benchmark revision selected by that durable catalog head.
 
 <Warning>
-  GDPx publication is not a temporary preview. Submit only task revisions intended to remain in the tenant's benchmark history. Corrections create a new immutable revision for the same logical task. The public v3 API does not delete evidence or change publication authority; an operator-controlled revocation excludes a task through a new head and catalog revision without erasing history.
+  GDPx publication is not a temporary preview. Submit only task revisions
+  intended to remain in the tenant's benchmark history. Corrections create a new
+  immutable revision for the same logical task. The public v3 API does not
+  delete evidence or change publication authority; an operator-controlled
+  revocation excludes a task through a new head and catalog revision without
+  erasing history.
 </Warning>
 
 ## Terra compatibility mode
@@ -285,6 +316,8 @@ Every generated field records its exact source path and file SHA-256, RFC 6901 p
 
 If an exact rubric and final output exist but the criterion ledger is absent, rerun the original verifier or judge against the retained output. A policy-approved stronger compatible judge may be used under the judge-dominance rule, but the result must be labeled as regrading. Preserve both scores and block publication for adjudication if they disagree.
 
+Regrading uses a two-stage integrity boundary. Before import, a KMS-signed, one-time intent must bind the exact original evidence, unchanged subject attempt, replay inputs, grader, and policy approval. After import, Audit—not the model or uploader—derives the regenerated Master, evidence-commit, criterion-ledger, complete subject-evidence, and final-output-manifest hashes and writes the immutable dual-ledger record. A pre-import service cannot declare those final hashes. Until the signed-intent and processor-finalization capability is advertised, migration regrade rows stop with `GDPX_RECOVERY_REGRADE_INTENT_AUTHORITY_REQUIRED`, produce no candidate, and never call the regrader.
+
 Judge dominance is an explicit approval, not a model-name comparison made by the uploader. The approval binds the tenant, exact task revision, rubric SHA-256, declared judge identity and digest, replacement judge identity and digest, compatibility finding, dominance finding, policy hash, approver, rationale, and timestamp. The replacement must be a different judge, must evaluate the unchanged retained output under the same scoring contract, and must be approved as both compatible with and stronger than the declared judge. An exact replay with the original judge does not require dominance approval. A missing approval, a changed rubric or output, or a score disagreement blocks publication pending adjudication.
 
 ## Legacy migration and reruns
@@ -304,7 +337,15 @@ Regrade a retained final output when the source rubric and verifier are availabl
 
 There is no public batch-migration endpoint. A migration inventory or report does not import evidence, approve execution, establish current readiness, or publish a catalog. Operators recover each exact task/run/rollout from canonical Audit evidence, reviewer companions, immutable release artifacts, and the original partner delivery—in that order—then submit complete canonical v3 bundles through the same admission path described above.
 
-Recovery, verifier regrading, and managed GPT-5.6 Luna execution are separate operations. A retained output may be regraded only with its exact rubric and verifier or a policy-approved judge-dominant replacement. A missing primary output requires a fresh managed Modal/Harbor QC1 rollout on the exact revision and native harness. If approved tooling cannot produce the canonical bundle and managed-execution approval, the task remains blocked; an operator may not edit the migration report or database to make it review-ready.
+Local recovery sources may enter the operator boundary only through the create-only source-promotion command. It writes content-addressed objects and accepts an existing object only after tenant metadata, exact generation, size, media type, SHA-256, and byte readback reconcile. Promotion produces a distinct immutable cloud-bound source manifest. It does not authorize a model call, QC1 launch, submission, membership change, or catalog switch.
+
+Source promotion must run as the dedicated migration source-promoter identity with create/readback-only access to the exact source prefix. Developer ADC, the public API runtime, and the migration operator identity are not acceptable substitutes.
+
+Migration recovery has two coherent phases for its active path. In the closed phase, the operator runtime, normalizer authority, managed-QC1 authority, and managed execution are all disabled. In the executable phase, all four are enabled. Mixed phases are rejected. The executable phase requires new deployment hashes plus exact read-only infrastructure and IAM readback before any recovery call.
+
+The migration regrader is excluded from both phases. It remains undeployed and dormant, with no operator invoker or storage authority, until the signed regrade-intent and processor-finalization boundary is implemented and reviewed. Do not configure, deploy, or invoke it as part of either phase.
+
+Normalization and managed GPT-5.6 Luna execution are separate active-path operations. Regrading is a dormant operation and remains unavailable until the signed-intent boundary above is active. A retained output may then be regraded only with its exact rubric and verifier or a policy-approved judge-dominant replacement. A missing primary output requires a fresh managed Modal/Harbor QC1 rollout on the exact revision and native harness. Managed execution is asynchronous: an idempotent ensure operation is observed through bounded status reads and may return a canonical bundle only after a terminal success. If approved tooling cannot produce the canonical bundle and managed-execution approval, the task remains blocked; an operator may not edit the migration report or database to make it review-ready.
 
 Before switching the active catalog, operators must review immutable JSON, CSV, and human-readable migration reports; validate exactly one canonical finance, LuminAI healthcare, Engram biology, legal, hardware, and code canary; and prove that every candidate has complete Master evidence, all six forensic sections, a reconciled criterion ledger, verified artifacts, its exact retained canonical source ZIP generation, and current publication and execution authority. The catalog switch is one compare-and-swap to a new immutable benchmark revision. Any stale authority, missing field, unresolved task, failed domain canary, or unavailable rollback procedure blocks cutover.
 
@@ -313,7 +354,10 @@ The internal `gdpx:orchestrate-migration` command builds a hash-bound dry-run pl
 Before cutover, generate and retain a `gdpx:rollback-catalog` plan for the exact current and previous head. Applying it requires the exact plan SHA-256 plus the unchanged expected current revision and generation. Rollback revalidates the target revision under current policy and performs a compare-and-swap; it has no force mode and does not erase the rejected revision.
 
 <Warning>
-  The legacy v39 backfill command is inventory-only and cannot publish evidence or switch the GDPx catalog. The current internal migration reporter can publish only a cohort that is already current-policy `review_ready`; it does not reconstruct evidence, rerun a verifier, or schedule Modal/Harbor work.
+  The legacy v39 backfill command is inventory-only and cannot publish evidence
+  or switch the GDPx catalog. The current internal migration reporter can
+  publish only a cohort that is already current-policy `review_ready`; it does
+  not reconstruct evidence, rerun a verifier, or schedule Modal/Harbor work.
 </Warning>
 
 See [Rollout viewer evidence](/gdpx/rollout-viewer-evidence) for the display contract and [Partner delivery and review](/gdpx/benchmark-task-delivery) for QC requirements.

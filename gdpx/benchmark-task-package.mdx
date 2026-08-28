@@ -71,7 +71,7 @@ Numeric examples in templates are illustrative. Set criterion count, verifier mi
 
 ## Package a delivery batch for upload
 
-The single-task bundle above is the canonical normalized task unit. A publishable v1.1 delivery contains exactly one task, one QC1 run, and one rollout in the layout documented in [Upload an evaluation bundle](/gdpx/evaluation-bundle-upload). Create separate bundles for other task attempts. `GDPX_BUNDLE.json` must inventory every file and bind the exact task, run, and rollout identities.
+The task directory above is the canonical normalized task unit. A publishable v1.1 `task_and_evidence` delivery contains 1–100 unique task directories in the layout documented in [Upload an evaluation bundle](/gdpx/evaluation-bundle-upload), with exactly one QC1 run and one rollout for each task. The whole bundle imports atomically. Use a separate bundle for another attempt of the same task. `GDPX_BUNDLE.json` must inventory every file and bind every exact task, run, and rollout identity.
 
 The canonical task directory also contains `PUBLICATION_AUTHORITY.json`. This is the uploaded publication declaration, not agent-visible task material and not an operator grant. It binds the exact task revision, task-content hash, full workspace-inventory hash, source delivery, rights basis, agreement state, owner intent, and source mappings. Audit publishes only when that declaration also matches an immutable grant and active head in Standard Data's operator-controlled registry. Do not place it in the runtime workspace, copy it between task revisions, or infer it from a successful upload.
 

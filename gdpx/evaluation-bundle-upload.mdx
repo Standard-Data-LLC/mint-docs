@@ -65,7 +65,7 @@ The capability response is authoritative for the active contract version, maximu
 
 ## Canonical ZIP layout
 
-The canonical contract version is `gdpx-review-bundle/1.1.0`. Each ZIP contains exactly one task, one QC1 run, and one rollout:
+The canonical contract version is `gdpx-review-bundle/1.1.0`. A `task_and_evidence` ZIP contains 1–100 unique tasks. Each task has exactly one evaluation and one QC1 rollout, and the entire set imports atomically:
 
 ```text
 GDPX_BUNDLE.json
@@ -91,7 +91,7 @@ evaluations/
             └── artifacts/
 ```
 
-`GDPX_BUNDLE.json` is a complete inventory. For every retained file, record its normalized relative path, byte size, media type, and SHA-256. It binds the one task, one run, and one rollout to their exact `task_revision_id`, `run_id`, and `rollout_id`. A multi-task or multi-rollout ZIP is invalid; create one immutable submission per task attempt.
+`GDPX_BUNDLE.json` is a complete inventory. For every retained file, record its normalized relative path, byte size, media type, and SHA-256. It binds every task, run, and rollout to the exact `task_id`, `task_revision_id`, `logical_task_id`, `run_id`, and `rollout_id`. Task, revision, logical-task, run, and rollout identities must be unique across the ZIP. Multiple rollouts for one task remain invalid; create another immutable submission for another attempt. `evidence_only` remains a one-task append to its declared `target_task_revision_id`.
 
 `TASK.json` uses `gdpx-task/1.1.0`. It binds the exact prompt, rubric, verifier, `task_content_sha256`, and a complete `workspace_files` inventory. Each workspace entry declares its normalized path, SHA-256, byte size, media type, artifact kind, and visibility. `environment.workspace_inventory_sha256` covers the sorted inventory, including every one of those fields. `RUN.json` uses `gdpx-run/1.1.0` and must repeat the same workspace-inventory binding. `ROLLOUT.json` uses `gdpx-rollout/1.1.0`. The derived Master projection uses `gdpx-master-evidence/1.1.0` and binds that inventory again.
 

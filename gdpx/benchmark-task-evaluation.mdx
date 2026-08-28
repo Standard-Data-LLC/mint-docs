@@ -40,7 +40,7 @@ If both tiers resolve a task zero times, do not infer difficulty from failure al
 
 Do not invent a top-level rollout section in `task.toml`. Index the attempts in `TASK.json`, keep the underlying `reward.json` files, and include the canonical evaluation records required by the [v3 review bundle](/gdpx/evaluation-bundle-upload). Audit derives `rollout_n`, reward statistics, `pass_rate`, mean steps, cost, and token totals from retained primary evidence.
 
-For publication, package each countable QC1 attempt as its own `gdpx-review-bundle/1.1.0` ZIP with exactly one task, one run, and one rollout. Bind the complete workspace inventory and task content to the run. An uploaded score or receipt remains archive-only until Audit records a matching operator-authenticated managed-execution approval.
+For publication, package exactly one countable QC1 attempt for each task included in a `gdpx-review-bundle/1.1.0` ZIP. A `task_and_evidence` bundle may contain 1–100 unique tasks and is admitted atomically; each task has exactly one evaluation and one rollout. Bind the complete workspace inventory and task content to its run. An uploaded score or receipt remains archive-only until Audit records a matching operator-authenticated managed-execution approval.
 
 A trusted-runtime attestation rejection before model launch is an infrastructure failure, not a subject rollout. It must not enter rollout totals, pass rates, or score distributions. A successful gate requires a completed one-shot privilege attestation plus an independently validated canonical sidecar that matches frame A before model launch. Empty stdout and stderr do not prove success. Empty stderr may omit the marker only when the sidecar and frame A validate; non-empty stderr requires one well-formed, first, byte-identical marker.
 
@@ -147,7 +147,7 @@ Required:
 - Every countable rollout satisfies the [reviewer-visible evidence contract](/gdpx/benchmark-task-package#preserve-reviewer-visible-rollout-evidence), including inspectable native work products.
 - Model, harness, version, prompt, tool, sampling, budget, timeout, context, judge, and retry settings are pinned for every supplied rollout.
 - Every rollout retains a final answer or primary work product, all six forensic sections, criterion decisions, and a reconciling score ledger.
-- Every canonical bundle contains exactly one task, one run, and one rollout and binds the full workspace inventory by path, hash, size, media type, kind, and visibility.
+- Every `task_and_evidence` bundle contains 1–100 unique tasks, exactly one run and one QC1 rollout per task, and binds each full workspace inventory by path, hash, size, media type, kind, and visibility. The set imports atomically.
 - The qualifying QC1 rollout has a matching managed-execution approval; uploader-supplied validation claims do not count.
 - Every failed rollout has evidence-backed root-cause analysis, a taxonomy label, solvability status, and confidence or ambiguity status.
 - Dataset-level failure taxonomy, per-model and cross-task distributions, and the task-count histogram are complete.

@@ -18,6 +18,7 @@
       {
         "group": "GDPx",
         "pages": [
+          "gdpx/workflow",
           "gdpx/benchmark-task-rubric-best-practices",
           "gdpx/benchmark-task-design",
           "gdpx/benchmark-task-package",

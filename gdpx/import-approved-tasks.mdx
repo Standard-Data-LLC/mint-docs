@@ -8,7 +8,7 @@ keywords: ["GDPx", "Audit v2", "draft workspace", "resumable upload", "immutable
 The v2 workspace API accepts one ZIP, sanitizes and maps it, runs the pinned v15 static admission policy, and may create immutable **draft** task revisions in Audit. It is retained for compatibility with existing workspace clients.
 
 <Warning>
-  v2 does not publish a task into GDPx or Wilderness. Use [Upload an evaluation bundle](/gdpx/evaluation-bundle-upload) for the v3 task-and-evidence contract. Only a v1.1 submission with current publication authority, an approved managed execution, and current-policy `review_ready` status can enter the active GDPx catalog.
+  v2 does not publish a task into GDPx or Wilderness. Follow [GDPx workflow](/gdpx/workflow) and use [Upload an evaluation bundle](/gdpx/evaluation-bundle-upload) only with the contract version advertised by v3 capabilities. Publication also requires current authority, approved managed execution, current-policy `review_ready` status, and active catalog membership.
 </Warning>
 
 V2 also has no internal-QA exact-byte attestation path. It cannot authorize retention of credential-like fixture literals or substitute for the v3 attestation, operator statement, grant, and active-head checks.

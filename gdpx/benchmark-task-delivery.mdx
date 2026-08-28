@@ -43,7 +43,7 @@ The required artifacts must satisfy the [reviewer-visible rollout evidence contr
 
 `TASK.json` is the Standard Data intake manifest shipped with the Harbor task. Put it beside `task.toml` under `tasks/<task_name>/`. Its `rollouts` field indexes the result set. Full traces, rewards, and failure analyses stay under the root-level `trajectory/` directory.
 
-Fetch the authoritative publication contract from `GET /api/v3/gdpx/schemas/review-bundle` with your API key. The v3 capability response links to the same route and controls adapter availability. The current v1.1 `task_and_evidence` contract accepts 1–100 unique tasks per ZIP, with exactly one evaluation and one QC1 rollout for each task. Task, revision, logical-task, run, and rollout identities must be unique as required by the live schema, and the set imports atomically. There is no supported `/api/v2/intake-schemas/task-json` endpoint.
+Fetch the authoritative publication contract from `GET /api/v3/gdpx/schemas/review-bundle` with your API key. The v3 capability response links to the same route and controls the deployed version and adapter availability. When v1.1 is active, `task_and_evidence` accepts 1–100 unique tasks per ZIP, with exactly one evaluation and one QC1 rollout for each task. Task, revision, logical-task, run, and rollout identities must be unique as required by the live schema, and the set imports atomically. There is no supported `/api/v2/intake-schemas/task-json` endpoint.
 
 Add `rollouts` to the existing task-taxonomy manifest; do not remove the identity, construct, runtime, scoring, horizon, evidence, or provenance fields described above. The shortened example below shows the rollout extension.
 

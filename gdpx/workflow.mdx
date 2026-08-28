@@ -1,0 +1,112 @@
+---
+title: "GDPx workflow"
+sidebarTitle: "Workflow and responsibilities"
+description: "Understand GDPx, run the supported intake flow, and know where partner and operator responsibilities differ."
+keywords: ["GDPx", "Audit", "Wilderness", "managed QC1", "publication"]
+---
+
+GDPx measures whether an agent can complete realistic, economically useful
+knowledge work. A result binds the exact Harbor task and workspace to the
+observable trajectory, verifier decisions, native work products, runtime
+configuration, usage, and immutable evidence hashes.
+
+<Warning>
+  **Audit is the authority; Wilderness is a reader.** Never publish by editing
+  Firestore, object storage, a fixture, or a Wilderness snapshot.
+</Warning>
+
+## Who does what
+
+| Actor | Responsibility |
+| --- | --- |
+| Partner or coding agent | Build the exact task and evidence bundle, discover the live contract, submit when admission is open, poll the submission, and correct source-package blockers. |
+| Standard Data operator | Launch or verify managed QC1, issue the separate execution approval, establish review readiness, and advance benchmark membership and the active catalog. |
+| Wilderness | Read the active Audit catalog and render admitted evidence. It creates no publication authority. |
+
+Submission credentials cannot launch or approve managed execution. Direct
+Firestore and object-storage access is not a supported partner interface.
+Partners and coding agents must use the tenant-scoped API.
+
+## End-to-end path
+
+```text
+build exact task and evidence
+  → discover live capabilities and schema
+  → v3 submission and archive-only import
+  → Standard Data managed QC1
+  → retained receipt and committed evidence
+  → operator-authenticated execution approval
+  → exact replay or resubmission when advertised
+  → current-policy review readiness
+  → immutable benchmark membership
+  → active GDPx catalog
+  → Wilderness
+```
+
+### 1. Discover the deployed contract
+
+```bash
+export STANDARD_DATA_API_BASE="https://api.standarddata.io"
+
+curl --fail-with-body \
+  --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
+  "${STANDARD_DATA_API_BASE}/api/v3/gdpx/capabilities" \
+  --output gdpx-capabilities.json
+
+curl --fail-with-body \
+  --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
+  "${STANDARD_DATA_API_BASE}/api/v3/gdpx/schemas/review-bundle" \
+  --output gdpx-review-bundle.schema.json
+```
+
+The capability response and linked schema are authoritative. Documentation may
+describe a newer contract before it is activated. Do not submit that version,
+guess unavailable fields, or bypass a disabled or allowlisted admission state.
+
+### 2. Build and submit
+
+Follow [Package a benchmark task](/gdpx/benchmark-task-package), then
+[upload an evaluation bundle](/gdpx/evaluation-bundle-upload). Only
+`POST /api/v3/gdpx-submissions` can lead to GDPx publication. The legacy v2
+workspace flow creates draft Audit revisions only.
+
+Offer an upload only when capabilities report both `access.can_submit: true`
+and `admission.can_submit: true`. A successful upload is archive retention, not
+publication.
+
+### 3. Hand off managed QC1
+
+There is no public managed-rollout launch endpoint. Give the Standard Data
+operator the submission ID, exact task revision, run and rollout IDs, task
+content hash, workspace-inventory hash, and required model/harness envelope.
+The operator runs or verifies the exact revision through the approved managed
+path and independently approves the committed evidence bytes.
+
+A local Harbor run, provider-console result, Prime evaluation, or
+uploader-created receipt remains supplied evidence. It cannot approve itself.
+
+### 4. Verify publication
+
+Check all three layers:
+
+```text
+GET /api/v3/tasks/{task_revision_id}/review-readiness
+GET /api/v3/tasks/{task_revision_id}/runs/{run_id}/rollouts/{rollout_id}
+GET /api/v3/gdpx/catalog/current
+```
+
+The task is published only when current readiness is eligible, the exact
+rollout is retrievable, and the active catalog contains the task revision.
+
+## Stop conditions
+
+Stop before upload, rollout, or publication claims when:
+
+- capabilities advertise another contract version or disabled admission;
+- the exact workspace inventory or required evidence is incomplete;
+- managed execution or its independent approval is unavailable;
+- readiness is blocked or stale; or
+- the active catalog does not contain the exact task revision.
+
+For evidence requirements, see [Rollout evidence in Wilderness](/gdpx/rollout-viewer-evidence).
+Standard Data operators use the separate internal backend and rollout runbook.

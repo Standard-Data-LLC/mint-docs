@@ -285,6 +285,8 @@ Every generated field records its exact source path and file SHA-256, RFC 6901 p
 
 If an exact rubric and final output exist but the criterion ledger is absent, rerun the original verifier or judge against the retained output. A policy-approved stronger compatible judge may be used under the judge-dominance rule, but the result must be labeled as regrading. Preserve both scores and block publication for adjudication if they disagree.
 
+Judge dominance is an explicit approval, not a model-name comparison made by the uploader. The approval binds the tenant, exact task revision, rubric SHA-256, declared judge identity and digest, replacement judge identity and digest, compatibility finding, dominance finding, policy hash, approver, rationale, and timestamp. The replacement must be a different judge, must evaluate the unchanged retained output under the same scoring contract, and must be approved as both compatible with and stronger than the declared judge. An exact replay with the original judge does not require dominance approval. A missing approval, a changed rubric or output, or a score disagreement blocks publication pending adjudication.
+
 ## Legacy migration and reruns
 
 For existing tasks, recover evidence in this order:

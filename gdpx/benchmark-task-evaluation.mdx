@@ -147,6 +147,7 @@ Required:
 - Every countable rollout satisfies the [reviewer-visible evidence contract](/gdpx/benchmark-task-package#preserve-reviewer-visible-rollout-evidence), including inspectable native work products.
 - Model, harness, version, prompt, tool, sampling, budget, timeout, context, judge, and retry settings are pinned for every supplied rollout.
 - Every rollout retains a final answer or primary work product, all six forensic sections, criterion decisions, and a reconciling score ledger.
+- A custom aggregation includes the bounded deterministic formula that Audit can recompute; a prose description or uploaded total alone is archive-only.
 - Every `task_and_evidence` bundle contains 1–100 unique tasks, exactly one run and one QC1 rollout per task, and binds each full workspace inventory by path, hash, size, media type, kind, and visibility. The set imports atomically.
 - The qualifying QC1 rollout has a matching managed-execution approval; uploader-supplied validation claims do not count.
 - Every failed rollout has evidence-backed root-cause analysis, a taxonomy label, solvability status, and confidence or ambiguity status.

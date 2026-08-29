@@ -57,7 +57,7 @@ The scorecard appears immediately after the answer. Each criterion shows:
 
 Color reinforces status but is never the only indicator. Failed and blocked criteria open by default. Passed criteria start collapsed. Reviewers can search criteria and filter by **All**, **Failed**, **Blocked**, or **Unscored**.
 
-The summary shows the reported and calculated totals, aggregation rule, threshold, hard gates, and reconciliation status. A non-reconciling score is a publication blocker, not a UI warning.
+The summary shows the reported and calculated totals, aggregation rule, threshold, hard gates, and reconciliation status. For a custom aggregation, Master also shows the exact deterministic formula, a readable expression, and its ordered operations. A non-reconciling score is a publication blocker, not a UI warning.
 
 ### Observable trajectory
 
@@ -132,7 +132,7 @@ A Terra-derived field includes its exact source path and file hash plus an RFC 6
 
 The projection may join or format existing facts. It may not invent a missing final answer, criterion decision, rationale, test result, score, or artifact. If one of those primary facts is unavailable, the task remains blocked from the active GDPx catalog.
 
-Use `GET /api/v3/tasks/{task_revision_id}/review-readiness` to inspect the exact immutable readiness attestation selected by the active catalog membership, including its rights authority and managed-execution approval. A staged or newer draft/latest readiness pointer is not returned as catalog authority. Use `GET /api/v3/tasks/{task_revision_id}/runs/{run_id}/rollouts/{rollout_id}` to retrieve the same complete retained evidence projection that Master renders. Historical evidence remains immutable, but every rollout shown as current publishable evidence in Wilderness Results must satisfy the current readiness policy. Passing readiness for the qualifying anchor does not make another rollout current.
+Use `GET /api/v3/tasks/{task_revision_id}/review-readiness` to inspect readiness, including its rights authority and managed-execution approval. For a task reached through the active Wilderness catalog, verify that the response matches the membership-bound attestation; a staged or newer draft/latest readiness pointer is never catalog authority. The endpoint can also return a pre-membership record for an exact same-tenant external submission reservation, but that record must not appear in Wilderness until the catalog admits it. Use `GET /api/v3/tasks/{task_revision_id}/runs/{run_id}/rollouts/{rollout_id}` to retrieve the same complete retained evidence projection that Master renders. Historical evidence remains immutable, but every rollout shown as current publishable evidence in Wilderness Results must satisfy the current readiness policy. Passing readiness for the qualifying anchor does not make another rollout current.
 
 Reader visibility follows the active v3 catalog, not a legacy task or run row. A staged compatibility projection remains invisible until the catalog admits the exact task revision, run, rollout, Master hash, and evidence hash. Wilderness must not show a rollout row unless the corresponding Master route is admitted and retrievable.
 

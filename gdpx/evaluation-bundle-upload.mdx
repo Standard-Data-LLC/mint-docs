@@ -61,9 +61,9 @@ fi
 
 Creating a submission requires `uploads:write` and `imports:write`. Polling `GET /api/v3/gdpx-submissions/{gdpx_submission_id}` requires `imports:write`, including when you follow the returned `self` link. Capabilities, schema, catalog, readiness, and rollout reads require `tasks:read`. Authentication is always tenant-bound.
 
-Call the authenticated OpenAPI 3.1 route only when capabilities include `openapi_endpoint`. It requires `tasks:read`, rejects anonymous and upload-only credentials, and returns a private, non-cacheable response. Absence of that field means the route is not deployed on that API release. This page documents the v1.1 submission schema, `https://standard-data.dev/contracts/gdpx-review-bundle/1.1.0/schema.json`. Use it only when the capability response advertises v1.1.
+Call the authenticated OpenAPI 3.1 route only when capabilities include `openapi_endpoint`. It requires `tasks:read`, rejects anonymous and upload-only credentials, and returns a private, non-cacheable response. Absence of that field means the route is not deployed on that API release. This page documents the v1.1 submission schema, `https://standard-data.dev/contracts/gdpx-review-bundle/1.1.0/schema.json`. Use it only when the capability response advertises v1.1. A v1.0 request or inner manifest is archive-era input and receives `GDPX_REVIEW_BUNDLE_CONTRACT_UPGRADE_REQUIRED`; rebuild it against the fetched v1.1 schema rather than retrying unchanged. Unknown versions are unsupported.
 
-The capability response is authoritative for the active contract version, maximum ZIP size, supported adapter modes, publication policy, and resumable-upload limits. Do not hard-code those values from an older response.
+The capability response is authoritative for the active contract version, maximum ZIP size, supported adapter modes, publication policy, and resumable-upload limits. Do not hard-code those values from an older response. The current v1.1 ceiling is 256 MiB inclusive for the compressed ZIP, each archive member, and total expanded bytes; all three checks use the same advertised constant.
 
 <Warning>
   Submission is fail-closed. Offer an upload action only when `/v1/whoami`
@@ -243,6 +243,8 @@ Each item in `criterion-decisions.json` must contain:
 
 The criterion ledger must contain exactly one decision for every criterion declared by the source rubric. This includes criteria marked `blocked`, `not_applicable`, or `unscored`; do not omit them. The score-reconciliation object records the aggregation rule, reported score, calculated score, pass threshold, hard-gate results, and whether the values reconcile. A duplicate criterion ID, missing or unknown criterion, dangling evidence reference, or unexplained score mismatch blocks publication.
 
+For `aggregation_rule: "custom"`, prose is not an executable scoring contract. Supply `custom_calculation.formula` using `gdpx-custom-score-formula/1.0.0`: a bounded reverse-Polish instruction list containing constants, exact criterion-field references, arithmetic, minimum/maximum, absolute value, negation, and clamp operations. Audit evaluates that data-only formula itself; uploader-supplied code and uploader-calculated totals are never executed or trusted. The formula must match the task rubric exactly and cannot read a blocked, unscored, not-applicable, missing, or duplicate criterion. Historical description-only custom scores remain readable as archive evidence but cannot publish.
+
 ## Create a submission
 
 Hash the exact ZIP and send one idempotent request:
@@ -333,7 +335,7 @@ The catalog returns lightweight admitted-rollout identities and evidence hashes.
 
 `review_ready` always means ready under the policy recorded by that attestation. A historical readiness attestation remains immutable. A changed rights head, revoked authorization, mismatched execution approval, or newer policy requires new matching records and a new benchmark revision before the catalog can change; staging or changing a draft/latest readiness pointer alone never changes what Wilderness serves.
 
-Before publication, inspect the submission resource and its `blocking_issues`; the catalog-selected review-readiness route returns `404` for an unpublished or internal-QA-only revision. After publication, verify the exact task revision:
+Before publication, inspect the submission resource and its `blocking_issues`. The review-readiness route may expose the exact retained record for that same-tenant externally reserved v3 revision, but it does not confer catalog membership; internal-QA-only and unreserved unpublished revisions return `404`. After publication, verify the exact task revision and catalog binding:
 
 ```text
 GET /api/v3/tasks/{task_revision_id}/review-readiness
@@ -356,6 +358,8 @@ The active catalog is the immutable benchmark revision selected by that durable 
 
 Choose `terra_compatibility` only for a legacy or partner-specific package that cannot be emitted canonically **and** only when the current capabilities response lists `terra_compatibility` in `adapter_modes`. If the server does not advertise that adapter, submit a canonical bundle or wait for the trusted adapter to become available; never emulate the adapter client-side. The capabilities response and fetched schema—not this page or a cached client copy—are authoritative for availability and accepted fields.
 
+The raw pre-authority path stays disabled until its model adapter provides durable create-or-observe generation and exact response readback, and an external end-to-end canary has exercised that generation, KMS signing, scanner admission, create-only publication, and exact readback on the pinned deployment. The built-in OpenAI `store=false` adapter does not provide that recovery contract and is therefore unavailable for this path. A configuration-only or read-only probe cannot prove the mutating dependencies and must not enable the capability.
+
 When advertised, the pinned compatibility model may identify source files, map heterogeneous fields, and assign source-derived stable IDs. It does not summarize or paraphrase source evidence. Any presentation field it emits must reproduce a source-bound value under the exact locator rules below. Its exact model revision, adapter prompt version, and release are recorded in the normalized evidence. The public contract does not permit callers to select or substitute a model.
 
 Terra must not:
@@ -369,6 +373,8 @@ Terra must not:
 
 Every generated field records its exact source path and file SHA-256, RFC 6901 pointer or retained byte span, input and output hashes, model revision, adapter prompt version, and timestamp. Stable derived IDs bind those source locators; identical values in different locations must not alias. An ambiguous, uncited, colliding, or source-unbound mapping blocks publication. Legacy adapter records remain readable under their frozen contract but cannot create a new transformation.
 
+Raw compatibility normalization is replay-safe. Audit reserves one Firestore operation for the exact tenant, source revision, selector, prompt, model, worker release, authority deployment, and signing key. A renewable fenced lease covers generation, publication, scanning, and commit; stale workers cannot complete after takeover. System-owned immutable request, generation, and publication checkpoints let a retry reuse the exact retained model result and derived source rather than repeat an external effect. A lost caller response replays the first terminal result after exact derived-source and task-authority readback. Before any model call, the selector inspects supported UTF-8 bytes independent of their declared media type, including JSON, NDJSON, YAML-like structures, Unicode-normalized keys, and protected-answer prose. A protected answer, expected output, ideal response, correct or oracle answer/output, target answer, private rubric, privileged message role, publication-control record, agreement, or source-delivery binding excludes that candidate. Ambiguous structured content fails closed. Request and response support records are bounded, hash-bound chunks so every accepted input remains readable under the downstream per-file limit.
+
 Source transport bytes remain inside the recovery-source boundary. Audit copies normalized bundles, transformation records, and certification provenance create-only into the canonical certification store. Before admission, it verifies the exact bucket, object, generation, size, media type, and SHA-256.
 
 If an exact rubric and final output exist but the criterion ledger is absent, rerun the original verifier or judge against the retained output. A policy-approved stronger compatible judge may be used under the judge-dominance rule, but the result must be labeled as regrading. Preserve both scores and block publication for adjudication if they disagree.
@@ -378,6 +384,10 @@ Regrading uses a two-stage integrity boundary. Before import, a KMS-signed, one-
 After import, Audit—not the model or uploader—derives the regenerated Master, evidence-commit, criterion-ledger, complete subject-evidence, and final-output-manifest hashes. It then writes the immutable dual-ledger record. The intent progresses from `reserved` to `produced` to `completed`; Audit consumes it only after the dual ledger is durable. A pre-import service cannot declare final hashes. A crash between phases must resume the same immutable intent instead of minting another attempt.
 
 The regrader protocol is a deterministic `ensure`/`readback` exchange. Both operations bind the complete authorized request, provider operation and result hashes, and the exact grader release. A timeout, disconnect, or process crash is ambiguous—not a terminal failure—so recovery reads the existing provider result and resumes the same reservation instead of launching another grading call.
+
+Provider and executor each retain a deterministic outbox before making the next call. Retrying an outbox is a create-or-observe operation under the same idempotency identity, never a second grading attempt. Source verification streams the exact generation and hash before the bounded canonical ZIP is materialized. The final `RESULT.json` is written create-only, read back by exact generation, and retained with tenant, object, byte-size, media-type, and SHA-256 bindings before the operation can complete.
+
+The checked-in executor boundary does not imply that a native grader is available. Until capabilities advertise an independently reviewed and attested create-or-observe grader adapter, the executor returns an explicit unavailable state and the regrade remains blocked. Never treat a configured route, disabled deployment descriptor, or retained historical score as proof that native regrading occurred.
 
 Recovery history is append-only and compare-and-swap protected. An expired intent that was never reserved may receive a successor only after the authority atomically records an authenticated `absent_fenced` retirement; that fence and any late reservation contend in the same transaction. Reserved, produced, completed, failed, and otherwise ambiguous intents are never renewed. Concurrent recovery attempts must converge on the winning journal generation, and any missing narrow journal store blocks regrading rather than risking a duplicate judge call.
 
@@ -394,7 +404,7 @@ For existing tasks, recover evidence in this order:
 
 A derived Master projection must cite those retained sources and record the transformer version. It may improve presentation, but it may not invent missing primary evidence.
 
-Regrade a retained final output when the source rubric and verifier are available. Run a fresh GPT-5.6 Luna QC1 rollout only when primary evidence cannot be recovered or the task revision changed. Bind a rerun to the exact immutable revision and native harness; do not use a new run to overwrite historical evidence.
+Regrade a retained final output when the source rubric and verifier are available. When the historical criterion ledger is wholly absent, record that absence explicitly with null ledger roots and the exact generation- and hash-bound retained source; never fabricate an “original” decision set. The signed regrade records the regenerated ledger as a new immutable revision. Preserve and compare any historical aggregate score: disagreement blocks publication for adjudication, while agreement still retains both the historical observation and regenerated evidence. A regrade source may be exact retained JSON or ZIP evidence; a managed QC1 source remains ZIP-only. Run a fresh GPT-5.6 Luna QC1 rollout only when primary evidence cannot be recovered or the task revision changed. Bind a rerun to the exact immutable revision and native harness; do not use a new run to overwrite historical evidence.
 
 ### Operator migration boundary
 
@@ -420,6 +430,14 @@ Local recovery sources may enter the operator boundary only through the create-o
 Source promotion must run as the dedicated migration source-promoter identity with create/readback-only access to the exact source prefix. Developer ADC, the public API runtime, and the migration operator identity are not acceptable substitutes.
 
 Migration recovery has two coherent phases for its active path. In the closed phase, the operator runtime, normalizer authority, managed-QC1 authority, and managed execution are all disabled. In the executable phase, all four are enabled. Mixed phases are rejected. The executable phase requires new deployment hashes plus exact read-only infrastructure and IAM readback before any recovery call.
+
+The recovery CLI keeps fresh model execution off by default. An operator may add `--managed-qc1` only to an `--apply` invocation that also supplies the exact signed authorization manifest and expected migration-report SHA-256. That flag installs the deployment-owned authenticated QC1 port; it does not bypass configuration, per-task signed rollout approval, native-harness, or evidence-completeness checks. Without the flag—or when any required runtime binding is absent—tasks that need a fresh rollout remain explicitly blocked.
+
+The native-control service reads the authoritative operation from the dedicated journal and enforces the allowed port/state transition before contacting a provider. Observation is read-only and distinguishes an absent resource from an asynchronous pending resource. Canonical candidates contain compact, replay-stable generation/hash references instead of embedding trajectories or rollout bodies; large native values must be retained as exact object references rather than Firestore document fields.
+
+<Warning>
+  The checked-in Modal/Harbor QC1 worker remains capture-only. Harbor 0.21 cannot execute both the exact prepared Modal image ID and an immutable model revision, so it fails closed with `PINNED_HARBOR_EXECUTION_UNSUPPORTED`. Do not substitute Prime, a model alias, metadata labels, or an unpinned image. Fresh migration QC1 remains unavailable until a reviewed Modal/Harbor create-or-observe provider supplies both immutable execution authorities and passes lost-reply, IAM, artifact-readback, and live canary checks.
+</Warning>
 
 The migration regrader is excluded from both normalization/QC1 phases and has its own disabled-by-default authority boundary. The signed regrade-intent and processor-finalization contracts do not make that runtime available by themselves. Enable it only when capabilities advertise the separately pinned authority, grader, storage, KMS, and finalization releases; do not route regrading through the normalization or managed-QC1 identities.
 

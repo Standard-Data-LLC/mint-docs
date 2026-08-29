@@ -41,7 +41,7 @@ export STANDARD_DATA_API_KEY="<your-standard-data-api-key>"
 | `GET` | `/api/v3/gdpx/schemas/review-bundle` | Fetch the canonical review-bundle JSON Schema |
 | `POST` | `/api/v3/gdpx-submissions` | Upload complete task and rollout evidence for GDPx publication |
 | `GET` | `/api/v3/gdpx-submissions/{gdpx_submission_id}` | Read one immutable submission workflow |
-| `GET` | `/api/v3/tasks/{task_revision_id}/review-readiness` | Read catalog-selected current-policy readiness for one published revision |
+| `GET` | `/api/v3/tasks/{task_revision_id}/review-readiness` | Read exact same-tenant readiness; catalog proof is required unless v3 retained an explicit external reservation |
 | `GET` | `/api/v3/tasks/{task_revision_id}/runs/{run_id}/rollouts/{rollout_id}` | Read the complete sanitized Master and criterion evidence |
 | `GET` | `/api/v3/gdpx/catalog/current` | Read the immutable benchmark revision selected by the active catalog head |
 
@@ -76,7 +76,7 @@ Use [Analyze a benchmark rollout](/gdpx/benchmark-rollout-analysis) after a roll
 
 A complete v3 publication proceeds from an archive-only submission to a managed QC1 run and retained receipt. Audit then verifies the committed evidence generations and creates an immutable operator-authenticated managed-execution approval. Replay or resubmit the exact bundle when the capability response instructs you to do so; only then can it reach current-policy readiness, immutable benchmark membership, and the active catalog head. Partner-supplied validation claims remain archive-only until the managed approval exists. A compatibility-reader projection stays hidden until that catalog head admits the same task, rollout, Master hash, and evidence hash.
 
-Until a revision is selected by the active catalog, inspect its submission resource and `blocking_issues`. `GET /api/v3/tasks/{task_revision_id}/review-readiness` is a publication-verification read: it returns the catalog-selected immutable attestation and returns `404` for unpublished or internal-QA-only revisions.
+Until a revision is selected by the active catalog, inspect its submission resource and `blocking_issues`. `GET /api/v3/tasks/{task_revision_id}/review-readiness` is a publication-verification read. It may return the exact retained readiness record before catalog membership only when that revision has an explicit same-tenant external access reservation created by the v3 submission path. That response does not publish the task or authorize Wilderness visibility. A reservation-less legacy revision must have current catalog proof, and internal-QA-only, cross-tenant, missing, or removed revisions return `404`.
 
 ## Submit a document
 

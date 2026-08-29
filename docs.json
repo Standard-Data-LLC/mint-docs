@@ -24,6 +24,7 @@
           "gdpx/benchmark-task-package",
           "gdpx/benchmark-task-evaluation",
           "gdpx/benchmark-rollout-analysis",
+          "gdpx/upload-rollout-evidence-and-analysis",
           "gdpx/evaluation-bundle-upload",
           "gdpx/rollout-viewer-evidence",
           "gdpx/benchmark-task-delivery",
@@ -35,7 +36,8 @@
         "group": "Quality control",
         "pages": [
           "qc-stages-for-benchmark",
-          "gdpx/benchmark-rollout-analysis"
+          "gdpx/benchmark-rollout-analysis",
+          "gdpx/upload-rollout-evidence-and-analysis"
         ]
       },
       {

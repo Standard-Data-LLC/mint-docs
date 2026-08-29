@@ -8,8 +8,26 @@ keywords: ["GDPx", "Audit v2", "draft workspace", "resumable upload", "immutable
 The v2 workspace API accepts one ZIP, sanitizes and maps it, runs the pinned v15 static admission policy, and may create immutable **draft** task revisions in Audit. It is retained for compatibility with existing workspace clients.
 
 <Warning>
-  v2 does not publish a task into GDPx or Wilderness. Follow [GDPx workflow](/gdpx/workflow) and use [Upload an evaluation bundle](/gdpx/evaluation-bundle-upload) only with the contract version advertised by v3 capabilities. Publication also requires current authority, approved managed execution, current-policy `review_ready` status, and active catalog membership.
+  v2 does not publish a task into GDPx or surface its draft in Wilderness
+  **Review Tasks**. Follow [GDPx workflow](/gdpx/workflow) and use [Upload an
+  evaluation bundle](/gdpx/evaluation-bundle-upload) only with contracts and
+  modes advertised by v3 capabilities. Publication also requires current
+  authority, approved managed execution, current-policy `review_ready` status,
+  and active catalog membership.
 </Warning>
+
+## Choose v2 or a v3 Audit-only draft
+
+Use v2 for compatibility with an existing workspace client that needs the v15 mapping and static-admission workflow. Use `mode: "audit_task_draft"` on the v3 submission endpoint when you need a task to exist natively in the v3 backend and appear as a blocked record in Wilderness **Review Tasks**.
+
+| Path | Retained record | Wilderness visibility | Publication effect |
+| --- | --- | --- | --- |
+| v2 workspace submission | Immutable v2 task revision after mapping and preflight | None | Cannot create v3 readiness or membership |
+| v3 canonical Audit draft | Exact canonical task and complete workspace inventory | **Review Tasks** with `GDPX_QC1_EVIDENCE_REQUIRED` | None |
+| v3 legacy-snapshot Audit draft | Exact raw release row, release generation and hash, row index, and unavailable-field list | **Review Tasks** with `GDPX_CANONICAL_TASK_DEFINITION_REQUIRED` | None |
+| v3 task-and-evidence submission | Exact task plus complete QC1 evidence | **Results** only after every publication gate passes | May become a catalog member |
+
+A v3 Audit-only import deliberately ends in `blocked` with `GDPX_AUDIT_TASK_DRAFT_IMPORTED`. This means Audit retained and read back the exact immutable drafts. It does not mean that QC1, review readiness, or publication succeeded.
 
 V2 also has no internal-QA exact-byte attestation path. It cannot authorize retention of credential-like fixture literals or substitute for the v3 attestation, operator statement, grant, and active-head checks.
 
@@ -52,7 +70,7 @@ The response state is:
 
 The response also returns `reason_code`, effective and missing scopes, ZIP limits, the pinned `protocolrev_dq_v15_15_0_0` policy, component readiness, and same-origin links. Create a submission only when `state` is `ready`.
 
-The v2 capability response may describe its legacy workspace contract. It is not the GDPx publication schema. Fetch the current publication contract from `GET /api/v3/gdpx/schemas/review-bundle` and treat the v3 capability response as authoritative for admission and adapter availability.
+The v2 capability response may describe its legacy workspace contract. It is not a v3 draft or publication schema. Fetch v3 capabilities, follow `audit_task_draft.schema_endpoint` for Audit-only retention, and fetch `GET /api/v3/gdpx/schemas/review-bundle` for publication candidates. Treat the v3 capability response as authoritative for admission, accepted modes, and adapter availability.
 
 ## 2. Create one durable submission
 
@@ -112,7 +130,7 @@ The workflow imports all mapped draft tasks or none. Warnings do not block. Miss
 
 ## Verify reviewer evidence after import
 
-After a submission succeeds, inspect each created revision in Audit’s draft viewer. Confirm that the task bytes and any supplied evidence are mapped as expected. A v2 draft does not appear in Wilderness. Inspecting a rollout in Wilderness is possible only after a qualifying v3 submission, managed execution approval, current-policy readiness, and active catalog membership.
+After a submission succeeds, inspect each created revision in Audit’s v2 draft viewer. Confirm that the task bytes and any supplied evidence are mapped as expected. A v2 draft does not appear in Wilderness. If you need immutable v3 draft visibility in Wilderness **Review Tasks**, use the separately advertised `gdpx-audit-task-draft-bundle/1.0.0` contract. Inspecting a rollout in Wilderness **Results** is possible only after a qualifying v3 submission, managed execution approval, current-policy readiness, and active catalog membership.
 
 A visible score with unavailable rollout detail is a source-evidence gap, not a reviewer-permission issue. Do not count that attempt toward QC or difficulty assessment. Recover the exact original execution evidence, rebuild the archive, and submit it as a new immutable revision. Do not substitute a different model run or attach evidence from another task revision.
 

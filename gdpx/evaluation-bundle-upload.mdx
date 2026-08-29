@@ -1,7 +1,7 @@
 ---
 title: "Upload an evaluation bundle"
 sidebarTitle: "Evaluation bundle upload"
-description: "Upload tasks and complete rollout evidence through the GDPx v3 publication workflow."
+description: "Upload Audit-only task drafts or complete rollout evidence through GDPx v3."
 keywords:
   [
     "GDPx",
@@ -13,17 +13,18 @@ keywords:
   ]
 ---
 
-`POST /api/v3/gdpx-submissions` is the only submission path that can publish a task into the GDPx/Wilderness catalog. It accepts a ZIP that binds runnable task bytes, rollout evidence, criterion decisions, and review artifacts into one immutable delivery.
+`POST /api/v3/gdpx-submissions` accepts both Audit-only task drafts and complete publication candidates. Only a `gdpx-review-bundle/1.1.0` submission can lead to the active GDPx/Wilderness catalog. The separate `gdpx-audit-task-draft-bundle/1.0.0` contract retains exact task definitions or legacy snapshot rows without claiming that rollout evidence exists.
 
 Start with [GDPx workflow](/gdpx/workflow) for the end-to-end sequence and the
 boundary between partner, operator, and Wilderness responsibilities.
 
 <Warning>
-  A successful byte upload is not publication. A task appears in Wilderness only
-  after managed execution approval, current-policy `review_ready` status, and
-  inclusion in the active catalog revision. A task with missing or
-  irreconcilable evidence remains in Audit as `blocked` and is not included in
-  the active GDPx catalog.
+  A successful byte upload is not publication. A blocked v3 draft may appear in
+  Wilderness **Review Tasks** after Audit retains and reads back its immutable
+  record. It appears in Wilderness **Results** only after managed execution
+  approval, current-policy `review_ready` status, and inclusion in the active
+  catalog revision. Draft visibility never implies QC1 credit, readiness, or
+  catalog membership.
 </Warning>
 
 The legacy `/api/v2/workspace-submissions` workflow may still create draft Audit revisions. It cannot add a task to the GDPx benchmark revision or Wilderness catalog.
@@ -50,6 +51,14 @@ curl --fail-with-body \
   "${STANDARD_DATA_API_BASE}/api/v3/gdpx/schemas/review-bundle" \
   --output gdpx-review-bundle.schema.json
 
+DRAFT_SCHEMA_PATH="$(jq -r '.audit_task_draft.schema_endpoint // empty' gdpx-capabilities.json)"
+if [ -n "${DRAFT_SCHEMA_PATH}" ]; then
+  curl --fail-with-body \
+    --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
+    "${STANDARD_DATA_API_BASE}${DRAFT_SCHEMA_PATH}" \
+    --output gdpx-audit-task-draft-bundle.schema.json
+fi
+
 OPENAPI_PATH="$(jq -r '.openapi_endpoint // ""' gdpx-capabilities.json)"
 if [ -n "${OPENAPI_PATH}" ]; then
   curl --fail-with-body \
@@ -63,7 +72,7 @@ Creating a submission requires `uploads:write` and `imports:write`. Polling `GET
 
 Call the authenticated OpenAPI 3.1 route only when capabilities include `openapi_endpoint`. It requires `tasks:read`, rejects anonymous and upload-only credentials, and returns a private, non-cacheable response. Absence of that field means the route is not deployed on that API release. This page documents the v1.1 submission schema, `https://standard-data.dev/contracts/gdpx-review-bundle/1.1.0/schema.json`. Use it only when the capability response advertises v1.1. A v1.0 request or inner manifest is archive-era input and receives `GDPX_REVIEW_BUNDLE_CONTRACT_UPGRADE_REQUIRED`; rebuild it against the fetched v1.1 schema rather than retrying unchanged. Unknown versions are unsupported.
 
-The capability response is authoritative for the active contract version, maximum ZIP size, supported adapter modes, publication policy, and resumable-upload limits. Do not hard-code those values from an older response. The current v1.1 ceiling is 256 MiB inclusive for the compressed ZIP, each archive member, and total expanded bytes; all three checks use the same advertised constant.
+The capability response is authoritative for the active contract version, accepted modes, maximum ZIP size, supported adapter modes, publication policies, draft contract, and resumable-upload limits. Do not hard-code those values from an older response. Offer the Audit-only path only when `accepted_modes` contains `audit_task_draft` and `audit_task_draft.schema_endpoint` is present. The current v1.1 review-bundle ceiling is 256 MiB inclusive for the compressed ZIP, each archive member, and total expanded bytes; all three checks use the same advertised constant.
 
 <Warning>
   Submission is fail-closed. Offer an upload action only when `/v1/whoami`
@@ -73,6 +82,20 @@ The capability response is authoritative for the active contract version, maximu
   may be disabled or tenant-allowlisted even though the schema and read APIs are
   reachable.
 </Warning>
+
+## Choose a submission mode
+
+| Mode | Contract and policy | Evidence | Result |
+| --- | --- | --- | --- |
+| `audit_task_draft` | `gdpx-audit-task-draft-bundle/1.0.0` and `audit_only` | Zero evaluations; exact canonical task bytes or an exact legacy snapshot row | Immutable blocked draft in Audit and Wilderness **Review Tasks**; never readiness or catalog authority |
+| `task_and_evidence` | `gdpx-review-bundle/1.1.0` and `publish_when_review_ready` | Exactly one evaluation and one QC1 rollout per task | Archive evidence that may reach **Results** after every independent publication gate passes |
+| `evidence_only` | `gdpx-review-bundle/1.1.0` and `publish_when_review_ready` | Exactly one run and rollout for one retained task revision | Immutable append candidate requiring separate operator admission |
+
+Use `audit_task_draft` when you have an exact task definition but no complete QC1 evidence. With `adapter_mode: "canonical"`, Audit retains the canonical task and complete workspace inventory, then records `GDPX_QC1_EVIDENCE_REQUIRED`. With `adapter_mode: "legacy_snapshot"`, Audit retains the exact raw release row, release-object generation and hash, row index, and an explicit list of unavailable canonical fields, then records `GDPX_CANONICAL_TASK_DEFINITION_REQUIRED`.
+
+Both variants finish in the durable `blocked` state by design. A successful draft import returns `GDPX_AUDIT_TASK_DRAFT_IMPORTED`; treat that code as successful Audit retention, not as publication failure. The import creates no rollout, score, readiness attestation, compatibility projection, benchmark membership, or catalog head.
+
+List retained drafts with `GET /api/v3/gdpx/audit-task-drafts?limit=100`. Follow `next_after_id` for pagination, or read one exact record at `GET /api/v3/gdpx/audit-task-drafts/{gdpx_submission_id}/{task_revision_id}`. Both routes require `tasks:read`, enforce tenant isolation, and return immutable content hashes. In Wilderness, the corresponding read-only surface is **Review Tasks**.
 
 ## Canonical ZIP layout
 
@@ -269,7 +292,7 @@ curl --fail-with-body \
   --output gdpx-submission.json
 ```
 
-Request fields:
+Publication-candidate request fields:
 
 | Field                     | Accepted value                                 |
 | ------------------------- | ---------------------------------------------- |
@@ -283,6 +306,32 @@ Request fields:
 Migration staging is not a public submission policy. A governed operator may retain complete candidate evidence through a separate authenticated workflow. A partner upload cannot select staging, advance a readiness head, or alter the active catalog's eligibility generation.
 
 The response returns `gdpx_submission_id` plus same-origin relations for upload authorization, completion, polling, and cancellation. Upload signing and finalization reuse the v2 upload-session transport linked by the response. Follow those links. Do not construct storage URLs, persist resumable-session credentials, or send the Standard Data API key to object storage.
+
+### Submit an Audit-only task draft
+
+Build the ZIP from the schema endpoint advertised in `audit_task_draft.schema_endpoint`, then use the same submission and upload-session transport:
+
+```bash
+curl --fail-with-body \
+  --request POST "${STANDARD_DATA_API_BASE}/api/v3/gdpx-submissions" \
+  --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
+  --header "Content-Type: application/json" \
+  --header "Idempotency-Key: gdpx-draft-<stable-client-operation-id>" \
+  --data '{
+    "filename": "task-drafts.zip",
+    "content_type": "application/zip",
+    "size_bytes": 123456,
+    "sha256": "<64-lowercase-hex>",
+    "contract_version": "gdpx-audit-task-draft-bundle/1.0.0",
+    "mode": "audit_task_draft",
+    "target_task_revision_id": null,
+    "adapter_mode": "canonical",
+    "publication_policy": "audit_only"
+  }' \
+  --output gdpx-draft-submission.json
+```
+
+Use `adapter_mode: "legacy_snapshot"` only when the fetched draft schema advertises it and the ZIP binds an immutable source release object and exact raw rows. Do not convert guessed or reconstructed fields into a canonical task. A legacy snapshot draft remains blocked until a later immutable submission supplies the missing canonical task definition.
 
 ### Evidence-only submissions
 
@@ -303,6 +352,7 @@ Poll `GET /api/v3/gdpx-submissions/{gdpx_submission_id}` or the returned `self` 
 
 Handle `blocked` according to its issue code:
 
+- `GDPX_AUDIT_TASK_DRAFT_IMPORTED` means Audit retained and read back every exact draft in the submission. This is the expected terminal result for `audit_task_draft`. Inspect the records through the draft-list API or Wilderness **Review Tasks**. Do not interpret the code as readiness or publication.
 - `GDPX_EVIDENCE_ONLY_OPERATOR_ADMISSION_REQUIRED` means Audit already verified the external evidence-only delivery and froze an exact append candidate. Do not edit or resubmit it. Give the retained candidate ID, candidate SHA-256, and expected catalog revision and generation to the operator admission workflow. The operator either admits those exact bytes or rejects the stale candidate; the public submission remains terminal.
 - A malformed, incomplete, mismatched, or otherwise unfrozen source package has no admissible append candidate. Correct the reported source fields and create a new submission. Do not reuse the old submission ID or claim that its terminal record changed.
 
@@ -322,6 +372,8 @@ v3 submission and archive-only import
 ```
 
 ### Catalog admission and reader activation
+
+Audit-only task drafts use a separate reader path. They may be visible in Wilderness **Review Tasks**, but they are absent from `GET /api/v3/gdpx/catalog/current`, have no current rollout, and never appear in **Results**. Their blocker and provenance are the authoritative explanation of what must be supplied next.
 
 `review_ready` is an immutable attestation for one exact task revision, qualifying rollout, Master projection, and policy version. It does not make a task visible by itself. Audit copies that attestation ID and SHA-256 into an immutable benchmark-revision membership, then advances the active GDPx catalog head to the complete benchmark revision. The membership-bound attestation—not a mutable latest-readiness pointer—is the catalog authority.
 
@@ -408,7 +460,9 @@ Regrade a retained final output when the source rubric and verifier are availabl
 
 ### Operator migration boundary
 
-There is no public batch-migration endpoint. A migration inventory or report does not import evidence, approve execution, establish current readiness, or publish a catalog. Operators recover each exact task/run/rollout from canonical Audit evidence, reviewer companions, immutable release artifacts, and the original partner delivery—in that order. Complete candidates then enter a separate, disabled-by-default internal staging service; partners cannot select this mode through `/api/v3/gdpx-submissions`.
+The public v3 submission endpoint may retain current task definitions or exact legacy release rows with `mode: "audit_task_draft"`. This is the supported fast migration boundary for visibility in Audit and Wilderness **Review Tasks**. It preserves known source bytes and explicitly names unavailable canonical fields. It does not recover rollout evidence or create readiness, benchmark membership, or catalog authority.
+
+There is no public batch-migration endpoint that converts historical records into publishable tasks. A migration inventory or report does not approve execution, establish current readiness, or publish a catalog. Operators recover each exact task/run/rollout from canonical Audit evidence, reviewer companions, immutable release artifacts, and the original partner delivery—in that order. Complete candidates then enter a separate, disabled-by-default internal staging service; partners cannot select this complete-evidence staging mode through `/api/v3/gdpx-submissions`.
 
 The staging service accepts only the dedicated Google OIDC service account and an exact source object locator: bucket, object, generation, byte size, media type, and SHA-256. It copies the ZIP create-only into the private canonical upload boundary. It binds the copy to a deterministic submission and staging intent, completes the normal scanner and processor path, and waits for a durable `retained_inactive` receipt.
 
@@ -417,12 +471,12 @@ The receipt binds the reviewed migration report and plan, task revision, stage r
 Every phase is idempotent. A retry after source copy, intent retention, upload finalization, queue dispatch, or processor completion must resume and verify the same objects and records. It must not create a different submission, replace bytes, or treat a missing receipt as success.
 
 <Warning>
-  The checked-in migration deployment remains disabled. Activation is blocked
-  until Standard Data provisions and verifies a narrow persistence broker or
-  dedicated staging database, plus a production orchestration runner with
-  exact service, identity, revision, image, route, audience, IAM, and readback
-  bindings. The staging identity must not receive database-wide Firestore
-  access.
+  Audit-only draft retention does not prove that the complete-evidence migration
+  runtime is available. Use the live capability response for the draft path.
+  The separate publication migration remains disabled until Standard Data
+  verifies its staging database or persistence broker, orchestration runner,
+  identities, revisions, images, routes, audiences, IAM, and readbacks. The
+  staging identity must not receive database-wide Firestore access.
 </Warning>
 
 Local recovery sources may enter the operator boundary only through the create-only source-promotion command. It writes content-addressed objects and accepts an existing object only after tenant metadata, exact generation, size, media type, SHA-256, and byte readback reconcile. Promotion produces a distinct immutable cloud-bound source manifest. It does not authorize a model call, QC1 launch, submission, membership change, or catalog switch.

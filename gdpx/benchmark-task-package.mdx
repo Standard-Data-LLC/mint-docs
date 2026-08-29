@@ -9,6 +9,8 @@ keywords: ["GDPx", "Harbor", "task package", "TASK.json", "workspace ZIP"]
 
 The [Harbor task](/gdpx/quickstart#the-runnable-task) is the portable runtime core. GDPx adds a canonical per-task layer so we can isolate the grader, reproduce a score, and normalize the task into the `gdpx-review-bundle/1.1.0` contract. This is the publication target: you may author it directly or provide the batch evidence package below for reviewed adaptation.
 
+If the task definition is ready but complete QC1 evidence is not, use the separate `gdpx-audit-task-draft-bundle/1.0.0` contract only when v3 capabilities advertise `audit_task_draft`. Audit retains the exact canonical task and workspace as a blocked draft, and Wilderness may show it in **Review Tasks**. Do not add placeholder evaluations or fabricated logs to satisfy the publication bundle. Later evidence must bind the same immutable task revision exactly.
+
 ```text
 <TASK_ID>/
 ├── TASK.json
@@ -79,7 +81,7 @@ An internal-QA review bundle may also include root-level `INTERNAL_QA_CREDENTIAL
 
 `TASK.json` must inventory every workspace file by normalized path, SHA-256, byte size, media type, artifact kind, and visibility. The sorted inventory determines `environment.workspace_inventory_sha256`. `task_content_sha256` binds the complete canonical task graph. `RUN.json` and Master must repeat the exact workspace-inventory binding. Audit also retains the original canonical ZIP as an immutable storage object and binds its exact object name, generation, media type, byte size, tenant/upload session, and SHA-256 to the canonical task record. A missing or changed source ZIP makes the task ineligible even when its projected fields still exist. Audit rejects an omitted path or any hash, size, media-type, kind, visibility, archive-generation, or archive-byte mismatch.
 
-Execution evidence cannot approve itself. Partner-uploaded run records and receipts remain `not_execution_validated` until Audit verifies the exact managed run and creates a separate operator-authenticated managed-execution approval. Unapproved evidence stays archive-only and does not appear in Wilderness.
+Execution evidence cannot approve itself. Partner-uploaded run records and receipts remain `not_execution_validated` until Audit verifies the exact managed run and creates a separate operator-authenticated managed-execution approval. Unapproved evidence stays archive-only and does not appear in Wilderness **Results**.
 
 The older batch envelope below remains useful as an authoring and partner-handoff format. Submit it with `adapter_mode: "terra_compatibility"` only when you cannot emit the canonical v3 layout. Adaptation may map and cite existing facts, but it may not invent missing evidence or change the task or rubric.
 

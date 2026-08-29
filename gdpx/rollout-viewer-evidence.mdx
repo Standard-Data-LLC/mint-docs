@@ -15,6 +15,13 @@ keywords:
 
 Every rollout published in Wilderness opens on **Master**. The canonical submission baseline derives `gdpx-master-evidence/1.1.0`. A managed native run derives typed `gdpx-rollout/1.2.1` and `gdpx-master-evidence/1.2.1`, preserving typed content and native provenance as a readable projection of retained evidence. Neither Master version replaces or fabricates the six forensic source sections.
 
+<Note>
+  This page describes Wilderness **Results**, not **Review Tasks**. An
+  Audit-only v3 draft may be visible in **Review Tasks** without a rollout or
+  Master view. Its visible blocker and source provenance do not count as QC1
+  evidence, review readiness, or catalog membership.
+</Note>
+
 Typed `gdpx-rollout/1.2.0` and `gdpx-master-evidence/1.2.0` remain readable only for immutable legacy compatibility. New managed captures emit `1.2.1`. A legacy typed record cannot become current publishable evidence because it lacks the required native criterion-chunk inventory and one-to-one canonical mapping.
 
 <Info>
@@ -132,7 +139,7 @@ A Terra-derived field includes its exact source path and file hash plus an RFC 6
 
 The projection may join or format existing facts. It may not invent a missing final answer, criterion decision, rationale, test result, score, or artifact. If one of those primary facts is unavailable, the task remains blocked from the active GDPx catalog.
 
-Use `GET /api/v3/tasks/{task_revision_id}/review-readiness` to inspect readiness, including its rights authority and managed-execution approval. For a task reached through the active Wilderness catalog, verify that the response matches the membership-bound attestation; a staged or newer draft/latest readiness pointer is never catalog authority. The endpoint can also return a pre-membership record for an exact same-tenant external submission reservation, but that record must not appear in Wilderness until the catalog admits it. Use `GET /api/v3/tasks/{task_revision_id}/runs/{run_id}/rollouts/{rollout_id}` to retrieve the same complete retained evidence projection that Master renders. Historical evidence remains immutable, but every rollout shown as current publishable evidence in Wilderness Results must satisfy the current readiness policy. Passing readiness for the qualifying anchor does not make another rollout current.
+Use `GET /api/v3/tasks/{task_revision_id}/review-readiness` to inspect readiness, including its rights authority and managed-execution approval. For a task reached through the active Wilderness catalog, verify that the response matches the membership-bound attestation; a staged or newer draft/latest readiness pointer is never catalog authority. The endpoint can also return a pre-membership record for an exact same-tenant external submission reservation, but that record must not appear in Wilderness **Results** until the catalog admits it. Use `GET /api/v3/tasks/{task_revision_id}/runs/{run_id}/rollouts/{rollout_id}` to retrieve the same complete retained evidence projection that Master renders. Historical evidence remains immutable, but every rollout shown as current publishable evidence in Wilderness Results must satisfy the current readiness policy. Passing readiness for the qualifying anchor does not make another rollout current.
 
 Reader visibility follows the active v3 catalog, not a legacy task or run row. A staged compatibility projection remains invisible until the catalog admits the exact task revision, run, rollout, Master hash, and evidence hash. Wilderness must not show a rollout row unless the corresponding Master route is admitted and retrievable.
 

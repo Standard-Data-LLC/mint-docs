@@ -39,6 +39,9 @@ export STANDARD_DATA_API_KEY="<your-standard-data-api-key>"
 | `GET` | `/api/v3/gdpx/capabilities` | Read the GDPx task-and-evidence publication contract |
 | `GET` | `/api/v3/gdpx/openapi.json` | Fetch the authenticated GDPx OpenAPI 3.1 document when capabilities advertise it |
 | `GET` | `/api/v3/gdpx/schemas/review-bundle` | Fetch the canonical review-bundle JSON Schema |
+| `GET` | `/api/v3/gdpx/schemas/audit-task-draft-bundle` | Fetch the canonical blocked task-draft bundle JSON Schema |
+| `GET` | `/api/v3/gdpx/audit-task-drafts` | List tenant-scoped immutable blocked task drafts shown in **Review Tasks** |
+| `GET` | `/api/v3/gdpx/audit-task-drafts/{gdpx_submission_id}/{task_revision_id}` | Read one blocked task draft, its provenance, and its exact publication blocker |
 | `POST` | `/api/v3/gdpx-submissions` | Upload complete task and rollout evidence for GDPx publication |
 | `GET` | `/api/v3/gdpx-submissions/{gdpx_submission_id}` | Read one immutable submission workflow |
 | `GET` | `/api/v3/tasks/{task_revision_id}/review-readiness` | Read exact same-tenant readiness; catalog proof is required unless v3 retained an explicit external reservation |

@@ -97,6 +97,135 @@ Both variants finish in the durable `blocked` state by design. A successful draf
 
 List retained drafts with `GET /api/v3/gdpx/audit-task-drafts?limit=100`. Follow `next_after_id` for pagination, or read one exact record at `GET /api/v3/gdpx/audit-task-drafts/{gdpx_submission_id}/{task_revision_id}`. Both routes require `tasks:read`, enforce tenant isolation, and return immutable content hashes. In Wilderness, the corresponding read-only surface is **Review Tasks**.
 
+## Resolve a blocked Review Task
+
+A blocked Review Task is an immutable Audit record. You cannot edit it with
+`PATCH` or `PUT`. Read its blocker, correct or complete the source package, and
+create a new immutable submission. The original draft remains in Audit history.
+
+### 1. Read the exact blocker
+
+List drafts, then follow the returned `links.self` value. Do not construct a
+detail URL from a task title or logical-task ID.
+
+```bash
+curl --fail-with-body \
+  --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
+  "${STANDARD_DATA_API_BASE}/api/v3/gdpx/audit-task-drafts?limit=100" \
+  --output gdpx-audit-task-drafts.json
+
+DRAFT_SELF="$(jq -r \
+  '.items[] | select(.draft.task_revision_id == "taskrev_<exact-revision>") | .links.self' \
+  gdpx-audit-task-drafts.json)"
+
+curl --fail-with-body \
+  --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
+  "${STANDARD_DATA_API_BASE}${DRAFT_SELF}" \
+  --output gdpx-audit-task-draft.json
+
+jq '{
+  task_revision_id: .draft.task_revision_id,
+  logical_task_id: .draft.logical_task_id,
+  definition_kind: .draft.definition_kind,
+  blocker: .draft.blocker,
+  unavailable_canonical_fields: .draft.unavailable_canonical_fields
+}' gdpx-audit-task-draft.json
+```
+
+If `DRAFT_SELF` is empty or the capability-advertised schema route is not
+available, stop. Do not guess a relation or fall back to a fixture.
+
+### 2. Supply the missing canonical task definition
+
+Use this path when `blocker.code` is
+`GDPX_CANONICAL_TASK_DEFINITION_REQUIRED`. The draft is an exact legacy release
+row, not a canonical task. Retrieve the original partner delivery and provide a
+canonical `TASK.json` plus every declared workspace byte. The canonical task
+must include the exact prompt, environment, rubric, verifier, threshold,
+aggregation rule, criterion definitions, and complete workspace inventory.
+Never infer missing task content from the legacy row or from domain knowledge.
+
+Keep the existing `logical_task_id`. Keep the exact `task_revision_id` only when
+the canonical package faithfully supplies fields omitted from that same release.
+If you change task instructions, rubric meaning, weights, threshold, verifier,
+environment, or materials, create a new content-bound `task_revision_id` for the
+successor revision.
+
+Build a canonical `gdpx-audit-task-draft-bundle/1.0.0` ZIP from the fetched
+draft schema. If you have the checked-in Audit CLI, verify and submit it with
+the `--file` option:
+
+```bash
+cd /absolute/path/to/standard_data_audit/services/audit
+export STANDARD_DATA_GDPX_BEARER_TOKEN="${STANDARD_DATA_API_KEY}"
+
+pnpm submit:gdpx-review-bundle -- \
+  --file /absolute/path/to/canonical-task-draft.zip \
+  --origin "${STANDARD_DATA_API_BASE}" \
+  --idempotency-prefix canonical-task-<stable-operation-id> \
+  --mode audit_task_draft \
+  --adapter-mode canonical \
+  --apply
+```
+
+The replacement submission should retain the canonical task and finish as a
+blocked draft with `GDPX_QC1_EVIDENCE_REQUIRED`. That result confirms the task
+definition is available; it does not publish the task.
+
+### 3. Attach complete QC1 evidence
+
+Use this path when `blocker.code` is `GDPX_QC1_EVIDENCE_REQUIRED`. Obtain one
+complete managed QC1 attempt for the exact retained revision. Package its run,
+rollout, observable trajectory, final output, six forensic sections, verifier
+results, criterion decisions, score reconciliation, and artifacts under
+`gdpx-review-bundle/1.1.0`.
+
+The `TASK.json`, task-content hash, workspace inventory, rubric, verifier, and
+environment in the evidence bundle must be byte-identical to the retained
+canonical task. Then submit exactly one run and rollout with `evidence_only`:
+
+```bash
+cd /absolute/path/to/standard_data_audit/services/audit
+export STANDARD_DATA_GDPX_BEARER_TOKEN="${STANDARD_DATA_API_KEY}"
+
+pnpm submit:gdpx-review-bundle -- \
+  --file /absolute/path/to/qc1-evidence.zip \
+  --origin "${STANDARD_DATA_API_BASE}" \
+  --idempotency-prefix qc1-evidence-<stable-operation-id> \
+  --mode evidence_only \
+  --target-task-revision-id taskrev_<exact-revision> \
+  --adapter-mode canonical \
+  --apply
+```
+
+There is no public managed-rollout launch or approval endpoint. A coding agent
+can construct and submit the exact bundle, but a Standard Data operator must run
+or verify managed QC1, issue the independent execution approval, and admit a
+frozen evidence-only candidate. If the terminal issue is
+`GDPX_EVIDENCE_ONLY_OPERATOR_ADMISSION_REQUIRED`, do not alter or resubmit that
+candidate. Give its ID, SHA-256, and expected catalog revision and generation to
+the operator.
+
+For any malformed, incomplete, or hash-mismatched source package, correct the
+reported JSON pointers and submit a new ZIP with a new idempotency prefix. Never
+reuse the old submission ID or claim that a blocked record changed in place.
+
+### 4. Verify the new immutable records
+
+Follow the CLI receipt or the submission's `links.self` relation until it reaches
+a terminal state. Then verify each publication layer with exact IDs:
+
+```text
+GET /api/v3/gdpx/audit-task-drafts/{gdpx_submission_id}/{task_revision_id}
+GET /api/v3/tasks/{task_revision_id}/review-readiness
+GET /api/v3/tasks/{task_revision_id}/runs/{run_id}/rollouts/{rollout_id}
+GET /api/v3/gdpx/catalog/current
+```
+
+The repair is visible in **Results** only when readiness is eligible, the exact
+rollout is readable, and the active catalog contains the task revision. A newer
+blocked draft in **Review Tasks** is not publication.
+
 ## Canonical ZIP layout
 
 Under `gdpx-review-bundle/1.1.0`, a `task_and_evidence` ZIP contains 1–100 unique tasks. Each task has exactly one evaluation and one QC1 rollout, and the entire set imports atomically:

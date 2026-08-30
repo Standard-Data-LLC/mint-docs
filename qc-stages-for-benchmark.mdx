@@ -36,6 +36,17 @@ See [Partner delivery and review](/gdpx/benchmark-task-delivery) for the full ev
 
 ## Upload rollout evidence and analysis
 
+Send completed work to the v3-native Audit backend through the live
+`/api/v3/gdpx-submissions` workflow. Do not edit a Wilderness fixture, release
+snapshot, Firestore row, or object-store path. Wilderness renders the active v3
+catalog and its retained evidence, so backend submission and catalog admission
+are what make a result survive UI deployments.
+
+For a revised task, preserve its `logical_task_id` and create a new immutable
+`task_revision_id`. Package that exact revision with the rollout that ran those
+bytes. For another rollout of an unchanged retained revision, use the advertised
+`evidence_only` mode. Never attach a new rollout to an older task revision or
+replace an earlier run's evidence.
 
 Use this procedure for every benchmark rollout. A rollout is not delivered when
 only its score, summary, or failure classification is visible. Delivery is

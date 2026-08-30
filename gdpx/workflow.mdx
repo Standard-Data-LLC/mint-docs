@@ -15,6 +15,32 @@ configuration, usage, and immutable evidence hashes.
   Firestore, object storage, a fixture, or a Wilderness snapshot.
 </Warning>
 
+## What “the v3 fixture” means
+
+Teams sometimes call the data currently shown by Wilderness “the v3 fixture.”
+That phrase means the **v3-native retained task, evidence, readiness, membership,
+and catalog records served by Audit**. It does not mean a checked-in JSON file,
+a frontend fixture, or a data snapshot tied to one Wilderness deployment.
+
+Upload through `POST /api/v3/gdpx-submissions` using the contract and relations
+advertised by the live capabilities response. A compatible Wilderness build
+reads the resulting backend records; adding or replacing a task does not require
+editing or redeploying a Wilderness fixture.
+
+An updated task is an immutable successor, not an in-place overwrite:
+
+- keep the existing `logical_task_id`;
+- assign the changed bytes a new content-bound `task_revision_id`;
+- submit the exact new task with its same-attempt rollout evidence and analysis;
+- use `evidence_only` only to append another immutable run and rollout to an
+  already retained, byte-identical task revision; and
+- verify the new revision at the submission, rollout, readiness, and current
+  catalog endpoints before saying it replaced the prior visible version.
+
+A task found only in **Review Tasks** is retained but not published. A successor
+replaces the prior Wilderness **Results** entry only when the active catalog head
+selects the new revision. Historical revisions and rollouts remain immutable.
+
 ## Who does what
 
 | Actor | Responsibility |

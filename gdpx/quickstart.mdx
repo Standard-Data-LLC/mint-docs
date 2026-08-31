@@ -1,34 +1,37 @@
 ---
-title: "RL and benchmark task taxonomy"
-description: "Required delivery package, evidence, and failure-analysis taxonomy for RL and benchmark tasks."
-sidebarTitle: "Task taxonomy"
-keywords: ["Harbor", "RL tasks", "benchmark tasks", "task format", "failure analysis", "rollout evidence"]
+title: "GDPx task format"
+description: "Understand the runnable task, partner handoff, rollout evidence, and GDPx submission layers."
+sidebarTitle: "Task format"
+keywords: ["Harbor", "GDPx", "benchmark tasks", "task format", "rollout evidence"]
 ---
 
-An RL task and a benchmark task share the same runnable core. The difference is the evidence around it: a benchmark needs enough evidence to defend a score, while an RL delivery needs enough rollout and reward data to train from the task.
+GDPx measures whether an agent can complete realistic, economically useful work. A task includes the job, source material, tools, expected work product, and a verifier that can explain the score.
 
-For multi-lab work, Harbor is the common intake format we use. OpenAI and Anthropic are destination exports as we keep Harbor as the source of truth and then translate it into the required native schema.
+## Start with the two delivery layers
 
-<Info>
-  Harbor defines one portable task package, not separate RL and benchmark formats. Start with the [task structure](https://www.harborframework.com/docs/tasks), then add the evidence your use case needs.
-</Info>
+GDPx uses two related formats. They are not interchangeable.
 
-## At a glance
+| Layer | Purpose | Format authority |
+| --- | --- | --- |
+| Partner source handoff | Delivers runnable tasks, native rollout evidence, and review notes to Standard Data | The agreed partner layout and any adapter advertised for that delivery |
+| Canonical GDPx submission | Creates immutable task and evidence records through the GDPx API | The live v3 capability response and linked JSON Schema |
 
-| Layer | Benchmark | RL | What it proves |
-| --- | --- | --- | --- |
-| Runnable Harbor task | Required | Required | The task can run, reset, and produce a reward |
-| Delivery package | Required | Required | Runnable tasks, rollout evidence, and documentation stay isolated |
-| Failed-rollout analysis | Required | Required | Every observed failure has an evidence-backed cause and status |
-| Failure taxonomy and distributions | Required | Required | Failure patterns can be compared across models and tasks |
-| Gold or Oracle solution | Required by Standard Data | Strongly recommended | The task is solvable and the verifier can recognize a correct result |
-| Rubric and calibration anchors | Required when judgment is involved | Conditional | The reward matches the intended capability |
-| Trial rollouts | Required for calibration | Required for training delivery | What the agent did and what reward it received |
-| Training telemetry | Not required | Conditional | How an RL run changed the policy |
+<Warning>
+  A partner handoff is not a canonical v3 review bundle. Standard Data may normalize an approved source layout, but an adapter cannot invent missing task files, trajectories, verifier evidence, work products, or identity bindings.
+</Warning>
+
+If you submit through the API, fetch the live contract before building the ZIP:
+
+```text
+GET /api/v3/gdpx/capabilities
+GET /api/v3/gdpx/schemas/review-bundle
+```
+
+The live response wins if an example in these docs differs from the deployed schema.
 
 ## The runnable task
 
-A standard single-step Harbor task looks like this:
+Harbor is the default portable runtime format. A standard single-step task looks like this:
 
 ```text
 <task-id>/
@@ -39,254 +42,96 @@ A standard single-step Harbor task looks like this:
 ├── tests/
 │   └── test.sh
 └── solution/
-    └── solve.sh
+    └── solve.sh                 # when a scripted reference is reasonable
 ```
 
-Harbor's [task documentation](https://www.harborframework.com/docs/tasks) is the schema authority. The [Harbor Cookbook](https://github.com/harbor-framework/harbor-cookbook) has runnable examples.
+Harbor's [task documentation](https://www.harborframework.com/docs/tasks) is the runtime schema authority.
 
 ### `task.toml`
 
-Required. This is the task's configuration and metadata: name, timeouts, resources, runtime, verifier settings, and any optional features. Do not copy an old Cookbook version stanza without checking the current schema.
+Define the runtime, resources, timeouts, and verifier entry point. Pin every dependency that can affect behavior.
 
 ### `instruction.md`
 
-Required for a single-step task. This is the instruction shown to the agent. It should describe the job and expected output without exposing the solution or grader.
-
-For a [multi-step task](https://www.harborframework.com/docs/tasks/multi-step), step-specific instructions, tests, and solutions move under `steps/<name>/`.
+Write the instruction shown to the agent. Describe the outcome and constraints without exposing the solution or hidden grading material.
 
 ### `environment/`
 
-Required as a runtime concept. Most tasks use `environment/Dockerfile`; a pinned image, Compose file, or another supported provider may define the runtime instead. Include only the fixtures and services the task uses. The environment must reset cleanly between runs.
+Include the complete starting state and every agent-visible source file. The environment must build from delivered files and reset cleanly between attempts.
 
 ### `tests/test.sh`
 
-Required on Linux (`test.bat` on Windows). This is the verifier entry point. It runs after the agent and writes `reward.txt` or `reward.json` under `/logs/verifier/`.
-
-Those reward files are runtime outputs. Do not pre-generate them in the submitted task.
+Run the verifier after the agent finishes. A direct GDPx Harbor delivery writes `/logs/verifier/reward.json` and preserves enough per-test evidence to explain that reward. A capability-advertised adapter may accept its documented native verifier output and normalize it into canonical evidence.
 
 ### `solution/solve.sh`
 
-Optional in generic Harbor, but required by Standard Data when an Oracle check can reasonably be supplied. It gives the Oracle agent a known-good path through the task. A native reference artifact or equivalent validation substrate can stand in when a shell script is the wrong shape.
+Provide a known-good path when a reference solution is reasonable. A native reference artifact may replace a shell script when that better matches the work.
 
-The agent must never be able to read the solution or verifier-only material during its run.
+The agent must not be able to read the solution, hidden tests, or verifier-only material during the attempt.
 
-## Required delivery package
+## Scoring terms
 
-Submit one top-level directory named `<dataset>-<batch>-<num>/`. A single-task delivery uses the same envelope with one task child. Keep runnable task bytes, rollout evidence, and review material in separate roots.
+- **Verifier:** the complete scoring system for the task.
+- **Deterministic checks:** code-based components of the verifier.
+- **Judge:** an optional model-based verifier component for criteria that require practitioner judgment.
+- **Rubric:** the set of observable criteria and aggregation rules used by the verifier.
 
-```text
-<dataset>-<batch>-<num>/
-├── tasks/                                      # required: task-local package
-│   └── <task_name>/
-│       ├── TASK.json                           # intake metadata for benchmark QC3
-│       ├── task.toml
-│       ├── instruction.md
-│       ├── environment/
-│       ├── tests/
-│       │   └── test.sh
-│       └── solution/
-│           └── solve.sh                        # optional when the reference has another form
-├── trajectory/                                 # required: complete delivered rollout evidence
-│   └── <task_name>/<model_name>/
-│       └── rollout_<harness@version>_<n>/
-│           ├── trajectory.json
-│           ├── reward.json
-│           └── failure_analysis/
-│               └── failure_analysis.md         # required when this rollout failed
-├── environment/                                # required only for private images
-│   ├── README.md
-│   └── <image_name>/
-│       ├── <loadable image or full build context>
-│       └── manifest.md
-└── docs/
-    ├── failure_analysis_metadata.md            # required
-    ├── README.md                               # recommended batch summary
-    ├── reward_hacking.md                       # recommended reward-integrity review
-    └── <task_name>/
-        └── report.md                           # recommended task report
-```
+## Evidence around the task
 
-<Info>
-  The package uses `trajectory/` in the singular. Each `task_name` must match across `tasks/`, `trajectory/`, and `docs/`. `TASK.json` is the only task-local intake file and is never mounted into the agent runtime. Keep reports, traces, hidden grading values, and failure analysis out of `tasks/`.
-</Info>
+A runnable task is necessary but not sufficient for a benchmark. Every rollout used for QC or reported results must preserve:
 
-Every task environment must build from the delivered files alone. Pin or include dependencies, workspace assets, tool definitions, and base images. When an image is private, the root `environment/` package must include a loadable artifact or full build context, exact `name:tag`, digest, optional registry, build or load instructions, and a map to every dependent task.
+- the exact task revision and agent-visible context;
+- the ordered observable trajectory, including tool calls and results;
+- the final answer and native work products;
+- verifier and per-test output;
+- criterion-level grading and score reconciliation;
+- the model, harness, configuration, limits, timing, and outcome; and
+- stable task, run, rollout, and artifact identities.
 
-### Required taxonomy metadata
+Do not collect or submit private chain of thought. Remove credentials, signed URLs, and provider-private fields while retaining the rest of the observable evidence.
 
-Record these fields in the task or batch manifest:
+See [Rollout viewer evidence](/gdpx/rollout-viewer-evidence) for the review surface.
 
-| Field | Required value |
-| --- | --- |
-| Mode and use | `benchmark`, `rl`, or `both`; dual-mode deliveries identify each task's target use and partition rationale |
-| Theme | One task-level scenario label from a declared, versioned theme taxonomy |
-| Capability slice | Training band, held-out evaluation, or contamination probe |
-| Value tier | A declared scale such as high-judgment, mixed, or commodity |
-| Verification class | Fully verifiable, partially verifiable, or not automatable |
-| Runtime surface | Harness, harness version, tools, action space, resources, context policy, budgets, and immutable environment identity |
-| Scoring | Atomic criteria, weights, failure tags, pass threshold, aggregation rule, and observable evidence requirements |
-| Source and rights | Minimal source, rights, sanitization, and overlap-risk metadata |
+## Choose the right path
 
-Tasks that are not verifiable by automation may still be useful for demonstrations or supervised training, but they are not automated-reward RL tasks. Raw preference pairs, pure trajectory collections, and catalogs use a separate intake path.
+### Send a source handoff
 
-Detailed contextual-information files and full edit-history snapshots are not part of this required package.
+Use the [partner handoff layout](/gdpx/benchmark-task-package#partner-source-handoff) when Standard Data will normalize the delivery. Send it through the delivery channel named in your onboarding agreement. Keep complete native evidence in its original structure and include a file inventory or crosswalk. Do not reorganize an existing export until Standard Data confirms the expected adapter.
 
-## Benchmark task
+Adapter acceptance means the source can be read. It does not mean the task passed QC or entered the benchmark.
 
-A benchmark task measures capability. In addition to the runnable task, the delivery needs:
+### Submit a canonical v3 bundle
 
-- a scoring contract, including deterministic checks and any judge rubric;
-- a known-good output and known-bad calibration anchors;
-- representative trial rollouts and a run manifest;
-- source, rights, sanitization, and overlap-risk metadata; and
-- enough environment and grader metadata to reproduce the score.
+Use the [evaluation bundle contract](/gdpx/evaluation-bundle-upload) when you are submitting directly through the GDPx API. The canonical `TASK.json` is strict. Rollout records live under `evaluations/`; they do not belong in a `rollouts` field inside `TASK.json`.
 
-GDPx uses a stricter bundle and visibility model. See [Benchmark best practices](/gdpx/benchmark-task-rubric-best-practices#gdpx-standardized-task-bundle) for the exact partner handoff.
+A `task_and_evidence` bundle carries one admission attempt for each included task. An `evidence_only` submission can attach the first QC1 attempt to an exact retained canonical Audit draft or retain a later attempt candidate for an already retained revision. A later candidate requires separate operator admission and leaves the qualifying QC1 anchor unchanged. A QC3 campaign can contain many attempts, but those attempts do not all go into one canonical task record or one v3 bundle.
 
-For benchmark QC3, run 16 completed subject rollouts for each pairing in the [current evaluation matrix](/gdpx/benchmark-task-delivery#qc3-benchmark-evaluation). Store full evidence under `trajectory/` and index those root-relative artifacts in `tasks/<task_name>/TASK.json`.
+## The review sequence
 
-Submit the required attempt evidence. We derive the normalized cross-model difficulty, grader bias, contamination, and calibration findings during review; do not prewrite those conclusions.
+GDPx uses four program review stages:
 
-## RL task
+1. **QC1 — Construction integrity:** Standard Data runs or verifies one qualifying managed smoke attempt on the exact task revision.
+2. **QC2 — Difficulty and reward integrity:** repeated attempts show a useful, non-saturated signal and a trustworthy verifier.
+3. **QC3 — Benchmark evaluation:** the approved model–harness matrix is run on the frozen revision.
+4. **QC4 — Release review:** Standard Data reviews results, normalizes accepted evidence, and decides final inclusion.
 
-An RL task uses the same Harbor core. Its delivery adds repeated trial evidence under the required package above.
+The v3 backend currently enforces the QC1 requirements for the active evidence catalog. QC2 through QC4 are separate program review gates. A record in the active evidence catalog is not part of the released GDPx benchmark until QC4 approves it.
 
-### `trajectory/`
+See [QC stages](/qc-stages-for-benchmark) for definitions and [Partner delivery](/gdpx/benchmark-task-delivery) for responsibilities.
 
-Required for an RL delivery and benchmark QC3. Use it for optional benchmark calibration runs as well. Preserve every delivered full, untruncated observable trace, tool call and result, relevant state transition, final output, reward, pass threshold, model and harness version, per-rollout configuration, and timing or token data. A trajectory is evidence about a task; it is not the task itself.
+## Next steps
 
-Bind every rollout to `task_name`, `model_name`, `harness_name`, `harness_version`, and an attempt index. Summary fields such as `rollout_n`, `reward_mean`, `reward_std`, `reward_min`, `reward_max`, `pass_rate`, `mean_steps`, `mean_cost_usd`, `mean_prompt_tokens`, and `mean_completion_tokens` are useful, but they never replace the underlying rewards and traces. Always declare the pass threshold used to compute `pass_rate`.
-
-### `docs/`
-
-Required outside `tasks/` so the runnable package stays clean. `failure_analysis_metadata.md` is always required. Batch summaries, reward-integrity notes, and per-task reports are recommended.
-
-### `environment/`
-
-Conditional at the package root. Use it only when a task depends on an image that cannot be pulled publicly. Include the image artifact, exact tag and digest, load or build instructions, and a map from the image to every dependent task.
-
-## Required failure analysis and distributions
-
-Every failed rollout must include:
-
-`trajectory/<task_name>/<model_name>/rollout_<harness@version>_<n>/failure_analysis/failure_analysis.md`
-
-### Per failed rollout
-
-Each analysis must contain:
-
-- the bound task and rollout identity;
-- one or more stable failure-mode IDs from the declared taxonomy;
-- a root-cause account grounded in observable messages, actions, tool results, state transitions, artifacts, and grader output rather than a surface symptom;
-- exact evidence references such as turn, tool-call, rubric-criterion, prompt-segment, or artifact identifiers;
-- a solvability check asking whether a qualified practitioner could complete the task with exactly the same context and tools;
-- a status of confirmed, hypothesis, or ambiguous-needs-human-review, with confidence and reviewer method; and
-- when a causal probe was run, its exact probe text, calibration rationale, rerun reference, outcome, and interpretation.
-
-<Warning>
-  Do not request, infer, retain, or expose private chain-of-thought. Observable messages, tool activity, state changes, artifacts, and final outputs are the evidence surface.
-</Warning>
-
-### Failure taxonomy
-
-Use a versioned label set. Start with these cross-domain classes and extend them only when a domain needs finer resolution:
-
-- capability failure;
-- prompt defect, including underspecified, contradictory, buried-context, unstated-domain, format-gap, and rubric-drift;
-- scaffolding or environment defect, including tool-absent, tool-broken, tool-silent-failure, action-mismatch, state-passing, context-exhausted, and feedback-absent;
-- rubric or verifier defect;
-- training-data defect;
-- orchestration defect;
-- triangulation failure, where task, prompt, and grader disagree; and
-- ambiguous-needs-human-review.
-
-A label without evidence is a hypothesis, not a confirmed failure mode. Retain ambiguous cases instead of forcing a category.
-
-### Dataset-level distribution
-
-The required root `docs/failure_analysis_metadata.md` must include:
-
-1. **Methodology:** taxonomy version and label definitions, analysis procedure, solvability gate, validation and confidence method, reviewer or judge calibration, and quality-assurance checks.
-2. **Per-model distribution:** counts and frequencies by model family, sample sizes, uncertainty caveats, and representative evidence-backed examples for material buckets.
-3. **Cross-task distribution:** aggregate counts and frequencies for every mode, named task or tool clusters, dominant and rare patterns, and structural failure flags.
-4. **Task histogram:** the number of tasks with one, two, three, and so on distinct failure modes.
-
-You may describe one or two distinct modes as concentrated and ten or more as diverse. For tasks between those ranges, report the exact count without forcing a label. Summary statistics must reconcile to the delivered rollout corpus.
-
-## Recommended QA and calibration
-
-The following practices are strongly recommended and should inform feedback, but they are not required fields in the task taxonomy.
-
-### Acceptance checks
-
-Run these checks against the final delivered bytes:
-
-- the environment builds and resets from the delivery alone;
-- a supplied reference solution or equivalent known-good artifact receives reward `1.0`; and
-- doing nothing receives reward `0.0`.
-
-Keep verifier material, reference solutions, and hidden grading values inaccessible to the agent. A shell Oracle is not required when another reference form is more faithful.
-
-### Difficulty evidence
-
-This is optional authoring calibration. It does not replace the required QC3 evaluation matrix.
-
-Prefer at least three model capability tiers and enough independent rollouts to report uncertainty. For an early delivery study, 16 baseline runs and 5 frontier runs are a practical minimum; treat the associated `<50%` and `<=40%` resolve-rate targets as calibration guidance, not universal acceptance gates.
-
-For published estimates, report `pass@1`, unbiased `pass@10` when `n >= 10`, `mean@10`, mean score, per-criterion pass rates, reward variance, token and cost distributions, wall-clock distributions, failures, and timeouts. Use multiple seeds and keep model, harness, prompt, tools, sampling, budget, timeout, context, retry, and judge revisions pinned.
-
-For RL, the productive core usually centers on `pass@1 = 0.5` with a `[0.25, 0.75]` training band and optional declared curriculum tails. For benchmarks, prefer a discrimination range where at least one frontier model scores above `0.30` and no model exceeds `0.85`. These are distributional diagnostics, not rigid per-task gates.
-
-A task with zero passes at `pass@10` or `pass@16` is unsolved at current capability. Do not claim that zero solves alone proves intrinsic difficulty, non-brokenness, or suitability for RL.
-
-### Hints as causal probes
-
-A calibrated hint is an advisory diagnostic, not a required taxonomy field or completion aid.
-
-1. Select a failed trajectory and identify a suspected root cause.
-2. Write a hint that names the dimension needing attention without revealing the answer.
-3. Rerun the same pinned evaluation condition.
-4. Record the exact hint, calibration rationale, rerun outcome, and interpretation.
-
-An over-specified hint gives away a file, function, constraint, or solution. An under-specified hint says only to try harder or pay attention. A calibrated hint redirects attention while leaving the reasoning and discovery to the agent.
-
-Partial progress can support a failure hypothesis when the rerun clears the original failure point and then fails elsewhere. A non-brokenness demonstration is stricter: the task must become solvable without the hint disclosing the answer. Keep hinted and unhinted runs in separate evaluation conditions and never pool their pass rates.
-
-### Reward integrity and reports
-
-Audit passing trajectories as well as failed ones. A recommended `docs/reward_hacking.md` covers observed verifier exploitation, detection methods, prevention, residual risk, and suggestions. If none was observed, state that and describe the breadth of the review. Retain confirmed exploited trajectories as evidence, exclude them from resolves, and recompute every affected aggregate.
-
-Detailed per-task reports and batch summaries are recommended. They should cover the rollout envelope, failure analysis and distributions, reward-integrity observations, limitations, and non-brokenness evidence when relevant. A detailed contextual-information package and full edit history are not required.
-
-## Conditional Harbor features
-
-Add a feature only when the task uses it.
-
-| Need | Add | Example |
-| --- | --- | --- |
-| Ordered stages | `steps/<name>/` | [Multi-step](https://www.harborframework.com/docs/tasks/multi-step) |
-| Local services | `environment/docker-compose.yaml` | [Multi-container](https://github.com/harbor-framework/harbor-cookbook/tree/e093c9a860b988d9d74901010ddddb9c7f124f92/harbor_cookbook/recipes/multi-container) |
-| Custom tools | MCP declarations and owned server files | [MCP tools](https://github.com/harbor-framework/harbor-cookbook/tree/e093c9a860b988d9d74901010ddddb9c7f124f92/harbor_cookbook/recipes/mcp-tools) |
-| Simulated requirements | User service and persona files | [Simulated user](https://github.com/harbor-framework/harbor-cookbook/tree/e093c9a860b988d9d74901010ddddb9c7f124f92/harbor_cookbook/recipes/simulated-user) |
-| Agent skills | One configured `SKILL.md` per skill | [Skills](https://github.com/harbor-framework/harbor-cookbook/tree/e093c9a860b988d9d74901010ddddb9c7f124f92/harbor_cookbook/recipes/skills) |
-| Several reward dimensions | Multi-key `reward.json` | [Multi-reward](https://github.com/harbor-framework/harbor-cookbook/tree/e093c9a860b988d9d74901010ddddb9c7f124f92/harbor_cookbook/recipes/multi-reward) |
-
-## Not required by default
-
-- A task-level `README.md`, Python test file, Compose file, MCP server, simulated user, or skills directory when the task does not use it.
-- A detailed `context_info.md` narrative, version-by-version task snapshots, review folders, or patch history. Keep only the minimal source, rights, and sanitization metadata required above.
-- A hint rerun for every failure. If no causal probe was run, mark the label as a hypothesis or ambiguous.
-- A reward-integrity report or detailed per-task report. Both are recommended, not required taxonomy fields.
-- Pre-generated verifier reward files.
-- Training checkpoints, reward curves, optimizer state, or KL logs for a pure benchmark.
-- A private image package when every image can be pulled by digest from a public registry.
-- Private chain-of-thought. Keep observable messages, tool activity, state changes, and final outputs.
-- Raw chat logs, preference pairs, or catalogs presented as runnable tasks. They use a separate intake path.
-
-## Test before canonical import
-
-Start with the [audit endpoint](/gdpx/audit-endpoint). Submit one Markdown or JSON document that describes the runnable task, required delivery package, rollout bindings, failed-rollout analyses, and dataset distribution metadata. The endpoint returns preflight feedback on the document and does not create canonical task records in Audit.
-
-The live one-document endpoint is a preflight surface, not proof that the complete ZIP satisfies every required package or v15 evaluation control. Review `ungraded_sections` and the applied guideline version in every response.
-
-After reviewing the document findings, follow [GDPx workflow](/gdpx/workflow). Check `GET /api/v3/gdpx/capabilities`, fetch the linked schema, and use only the contract version the server advertises. When v1.1 is active, `task_and_evidence` accepts 1–100 unique tasks per ZIP, with exactly one run and one QC1 rollout for each task; the set succeeds or fails atomically. Publication also requires current rights authority, an approved managed QC1 execution, current-policy `review_ready` status, and active catalog membership. The legacy [v2 workspace flow](/gdpx/import-approved-tasks) creates draft Audit revisions. Wilderness's legacy Task Explorer may project their preferred current revision, but v2 does not create a v3 **Review Tasks** draft or publish anything to **Results**.
+<CardGroup cols={2}>
+  <Card title="Design and grade" href="/gdpx/benchmark-task-design">
+    Define the work, environment, rubric, and calibration anchors.
+  </Card>
+  <Card title="Package the task" href="/gdpx/benchmark-task-package">
+    Prepare a source handoff or canonical v3 bundle without mixing the formats.
+  </Card>
+  <Card title="Evaluate the task" href="/gdpx/benchmark-task-evaluation">
+    Run authoring checks and analyze failures and reward integrity.
+  </Card>
+  <Card title="Deliver for review" href="/gdpx/benchmark-task-delivery">
+    Follow the QC sequence and hand off the exact frozen revision.
+  </Card>
+</CardGroup>

@@ -1,189 +1,86 @@
 ---
 title: "Test with the audit endpoint"
-sidebarTitle: "Audit Endpoint"
-description: "Review one task document before submitting the complete workspace."
+sidebarTitle: "Audit endpoint"
+description: "Review one task or methodology document before packaging the complete workspace."
 keywords: ["GDPx", "document feedback", "preflight endpoint", "API", "task specification"]
 ---
 
-`POST /v1/evaluate` reviews one task specification or benchmark methodology paper and returns structured blockers, warnings, evidence, and suggested fixes. Use it while you are still revising task content.
-
-<Info>
-  Document feedback does not create or modify source bundles, task revisions, runs, or certificates. The authoritative GDPx publication gate is the exact review bundle submitted through `/api/v3/gdpx-submissions`.
-</Info>
+`POST /v1/evaluate` reviews one task specification or benchmark methodology document. It returns structured feedback about missing evidence, internal contradictions, and suggested fixes.
 
 <Warning>
-  The legacy `aggregate_verdict.ready_to_submit` field describes only the document that `/v1/evaluate` received. It never authorizes a ZIP, even when its value is `true`.
+  This endpoint evaluates the document you send. It does not inspect a workspace ZIP, create a task revision, retain rollout evidence, pass a QC stage, or add a task to the active evidence catalog.
 </Warning>
 
-The feedback service may retain evaluation output and operational records for retrieval, rate limiting, and support. The submitted document does not become a canonical task.
+## Choose the right endpoint
 
-For the complete package, use the [task taxonomy](/gdpx/quickstart). For content and grading requirements, use [Benchmark best practices](/gdpx/benchmark-task-rubric-best-practices).
+| Goal | Endpoint |
+| --- | --- |
+| Review one document | `POST /v1/evaluate` |
+| Analyze one observable rollout | `POST /v1/benchmark-rollout-analyses` |
+| Discover the canonical GDPx contract | `GET /api/v3/gdpx/capabilities` |
+| Submit a canonical draft or active evidence-catalog candidate | `POST /api/v3/gdpx-submissions` |
+| Import a legacy workspace draft | `POST /api/v2/workspace-submissions` |
+
+The v1 services return feedback only. V2 creates legacy drafts only. V3 is the canonical task-and-evidence workflow.
 
 ## Configure one API origin and key
-
-Both API namespaces use the same partner-facing origin and tenant-scoped key:
 
 ```bash
 export STANDARD_DATA_API_BASE="https://api.standarddata.io"
 export STANDARD_DATA_API_KEY="<your-standard-data-api-key>"
 ```
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `GET` | `/v1/whoami` | Read identity, scopes, rate limit, and canonical-submission state |
-| `POST` | `/v1/evaluate` | Review one task specification or benchmark paper |
-| `POST` | `/v1/benchmark-rollout-analyses` | Classify one observable rollout and assess failure legitimacy |
-| `GET` | `/v1/evaluations/{evaluation_id}` | Retrieve an evaluation |
-| `GET` | `/v1/healthz` | Check service health without authentication |
-| `GET` | `/api/v2/intake-capabilities` | Read server-authoritative workspace-intake readiness |
-| `GET` | `/api/v3/gdpx/capabilities` | Read the GDPx task-and-evidence publication contract |
-| `GET` | `/api/v3/gdpx/openapi.json` | Fetch the authenticated GDPx OpenAPI 3.1 document when capabilities advertise it |
-| `GET` | `/api/v3/gdpx/schemas/review-bundle` | Fetch the canonical review-bundle JSON Schema |
-| `GET` | `/api/v3/gdpx/schemas/audit-task-draft-bundle` | Fetch the canonical blocked task-draft bundle JSON Schema |
-| `GET` | `/api/v3/gdpx/audit-task-drafts` | List tenant-scoped immutable blocked task drafts shown in **Review Tasks** |
-| `GET` | `/api/v3/gdpx/audit-task-drafts/{gdpx_submission_id}/{task_revision_id}` | Read one blocked task draft, its provenance, and its exact publication blocker |
-| `POST` | `/api/v3/gdpx-submissions` | Upload complete task and rollout evidence for GDPx publication |
-| `GET` | `/api/v3/gdpx-submissions/{gdpx_submission_id}` | Read one immutable submission workflow |
-| `GET` | `/api/v3/tasks/{task_revision_id}/review-readiness` | Read exact same-tenant readiness; catalog proof is required unless v3 retained an explicit external reservation |
-| `GET` | `/api/v3/tasks/{task_revision_id}/runs/{run_id}/rollouts/{rollout_id}` | Read the complete sanitized Master and criterion evidence |
-| `GET` | `/api/v3/gdpx/catalog/current` | Read the immutable benchmark revision selected by the active catalog head |
-
-Validate the key and discover the next step before presenting a submission action:
-
-```bash
-curl --fail-with-body \
-  --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
-  "${STANDARD_DATA_API_BASE}/v1/whoami"
-```
-
-`canonical_submission.state` is `ready`, `missing_access`, `temporarily_unavailable`, or `incompatible`. Follow its same-origin links; do not construct an `/api/v2` URL from an old task-feedback hostname.
-
-Treat `temporarily_unavailable` as a hard stop. It can mean GDPx admission, the pinned processor release, queue dispatch, object scanner, or tenant allowlist is not ready. Retry only after the advertised capability changes; a client must not route around that state through the legacy v2 importer.
-
-Fetch the API description with the same tenant-scoped bearer credential only when the capability response includes `openapi_endpoint`. This route requires `tasks:read`; it is not a public discovery document:
-
-```bash
-curl --fail-with-body \
-  --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
-  "${STANDARD_DATA_API_BASE}/api/v3/gdpx/openapi.json" \
-  --output gdpx-openapi.json
-```
-
-The v3 capability response and `GET /api/v3/gdpx/schemas/review-bundle` are authoritative for the active publication contract. If `openapi_endpoint` is absent, do not call or advertise the OpenAPI route on that release. When the server advertises `gdpx-review-bundle/1.1.0`, a `task_and_evidence` ZIP contains 1–100 unique tasks, with exactly one evaluation and one QC1 rollout for each task. The whole set is imported atomically, with exact task-content and full workspace-inventory bindings. An `evidence_only` ZIP remains a single-target append. Managed native normalization may derive typed rollout and Master `1.2.1` records after capture; that does not change the public submission version. Do not infer accepted fields, deployment availability, or adapter availability from this page, a cached schema, or a v2 response.
-
-The v2 workspace path creates draft Audit revisions only. It cannot approve an execution, reach `review_ready`, change the GDPx catalog, or route around a disabled v3 admission gate.
-
-Internal-QA exact-byte fixture retention also uses v3, with a source-bound attestation and active operator grant. It permits authenticated tenant review while that grant is valid but never authorizes external-catalog publication. `/v1/evaluate` and `/v1/benchmark-rollout-analyses` carry no such authority and must not be used to transport those credential-like fixture bytes.
-
-Use [Analyze a benchmark rollout](/gdpx/benchmark-rollout-analysis) after a rollout completes. That endpoint accepts one strict JSON rollout projection and returns judge-assisted QC evidence. It does not retain or publish the rollout and does not replace the [evaluation bundle workflow](/gdpx/evaluation-bundle-upload).
-
-A complete v3 publication proceeds from an archive-only submission to a managed QC1 run and retained receipt. Audit then verifies the committed evidence generations and creates an immutable operator-authenticated managed-execution approval. Replay or resubmit the exact bundle when the capability response instructs you to do so; only then can it reach current-policy readiness, immutable benchmark membership, and the active catalog head. Partner-supplied validation claims remain archive-only until the managed approval exists. A compatibility-reader projection stays hidden until that catalog head admits the same task, rollout, Master hash, and evidence hash.
-
-Until a revision is selected by the active catalog, inspect its submission resource and `blocking_issues`. `GET /api/v3/tasks/{task_revision_id}/review-readiness` is a publication-verification read. It may return the exact retained readiness record before catalog membership only when that revision has an explicit same-tenant external access reservation created by the v3 submission path. That response does not publish the task or authorize Wilderness visibility. A reservation-less legacy revision must have current catalog proof, and internal-QA-only, cross-tenant, missing, or removed revisions return `404`.
+Use the same API origin for the v1 request and any subsequent v3 discovery. Do not infer v3 availability from `/v1/whoami` or a v2 capability response.
 
 ## Submit a document
 
-Use multipart form data. The file field must be named `file`.
-
-<CodeGroup>
-
-```bash cURL
-curl --fail-with-body \
-  --request POST "${STANDARD_DATA_API_BASE}/v1/evaluate" \
-  --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
-  --form "file=@/absolute/path/to/task-spec.pdf;type=application/pdf" \
-  --form 'options={"checks_to_run":["all"],"verbosity":"full","include_suggested_fixes":true}' \
-  --max-time 1500 \
-  --output evaluation.json
-```
-
-```bash HTTPie
-http --form POST "${STANDARD_DATA_API_BASE}/v1/evaluate" \
-  Authorization:"Bearer ${STANDARD_DATA_API_KEY}" \
-  file@/absolute/path/to/task-spec.pdf \
-  'options={"checks_to_run":["all"],"verbosity":"full","include_suggested_fixes":true}'
-```
-
-</CodeGroup>
-
-`options` is optional JSON. Use `verbosity: "full"` while fixing a submission.
-
-To review a taxonomy-aligned task, include the delivery-package outline, required task metadata, rollout evidence bindings, failed-rollout analyses, and dataset-level failure taxonomy and distributions in the Markdown or JSON document. These are document contents, not separate v1 request fields.
-
-<Warning>
-  The v1 parser does not enforce the complete GDPx review-bundle contract. Review `ungraded_sections` and `guidelines_version_applied`; an absence of v1 findings is not package acceptance.
-</Warning>
-
-## JSON request
-
-Use JSON when the input is already text or base64-encoded bytes.
-
-```json
-{
-  "task_input": {
-    "format": "markdown",
-    "content": "# Task title\n\nTask instructions...",
-    "filename": "task.md"
-  },
-  "options": {
-    "checks_to_run": ["all"],
-    "guidelines_version": "v14",
-    "verbosity": "full",
-    "include_suggested_fixes": true
-  }
-}
-```
-
-`task_input.format` accepts `pdf`, `docx`, `markdown`, or `json`. PDF and DOCX content must be base64-encoded in JSON transport. The route accepts one document, not a Harbor directory or ZIP.
-
-## Response
-
-```json
-{
-  "kind": "task_spec",
-  "evaluation_id": "eval_...",
-  "aggregate_verdict": {
-    "ready_to_submit": true,
-    "blocking_issues_count": 0,
-    "warning_count": 3,
-    "info_count": 1,
-    "estimated_fix_time_minutes": 20
-  },
-  "ungraded_sections": [],
-  "guidelines_version_applied": "v14",
-  "canonical_submission": {
-    "state": "ready",
-    "reason_code": "READY",
-    "tenant_id": "tenant_...",
-    "effective_scopes": [
-      "evaluations:read",
-      "evaluations:write",
-      "imports:write",
-      "tasks:read",
-      "uploads:write"
-    ],
-    "required_scopes": ["imports:write", "tasks:read", "uploads:write"],
-    "missing_scopes": [],
-    "api_base_url": "https://api.standarddata.io",
-    "document_feedback_authorizes_submission": false
-  }
-}
-```
-
-`kind` is `task_spec` or `benchmark_paper`. Both response kinds include the caller-specific `canonical_submission` projection. Retrieve the result later with:
+Send one supported document as multipart form data:
 
 ```bash
 curl --fail-with-body \
+  --request POST "${STANDARD_DATA_API_BASE}/v1/evaluate" \
   --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
-  "${STANDARD_DATA_API_BASE}/v1/evaluations/eval_..." \
-  --output evaluation.json
+  --form "file=@task-specification.md" \
+  --output task-feedback.json
 ```
 
-## Limits and errors
+Use PDF, DOCX, Markdown, or JSON only when the endpoint advertises that media type. Do not send the complete task or evidence ZIP to this route.
 
-- Maximum document size: `10 MB`
-- Request ceiling: approximately `15 minutes`
-- Rate limit: returned by `/v1/whoami`
-- v1 evaluations do not support idempotency keys; do not retry while the original request remains open
+## Interpret the response
 
-Legacy v1 failures retain their backward-compatible `detail` field. If a client sends `/api/v2` to a legacy task-feedback origin, the service returns `421 WRONG_API_ORIGIN` with the canonical origin and remediation; it never redirects a bearer credential.
+The response may include:
+
+- an aggregate document verdict;
+- blocking findings;
+- warnings;
+- evidence citations into the submitted document; and
+- suggested corrections.
+
+Treat `ready_to_submit`, when present, as a verdict about the document only. It does not authorize a ZIP, prove the environment runs, validate rollout evidence, or add a task to the active evidence catalog.
+
+Resolve each blocker in the source document. Then rerun the document review if useful.
+
+## Continue to the real submission
+
+After document review:
+
+1. prepare the [partner source handoff or canonical bundle](/gdpx/benchmark-task-package);
+2. fetch `GET /api/v3/gdpx/capabilities`;
+3. follow the advertised schema, mode, adapter, and size limits; and
+4. use the [v3 evaluation bundle flow](/gdpx/evaluation-bundle-upload) for canonical submission.
+
+If you only need a legacy draft import, use the [v2 workspace flow](/gdpx/import-approved-tasks) when Standard Data explicitly directs you to it.
+
+## Common errors
+
+| Status | Meaning | Action |
+| --- | --- | --- |
+| `400` | Invalid request or unsupported document | Send one supported document |
+| `401` | Missing or invalid API key | Supply a valid bearer key |
+| `403` | Key lacks the required evaluation scope | Request the correct scope |
+| `413` | Document exceeds the advertised limit | Reduce the document without removing required evidence |
+| `422` | Document could not be evaluated under the request contract | Correct the reported field or file issue |
+| `429` | Rate limit exceeded | Follow `Retry-After` |
+| `5xx` | Service unavailable or evaluation failed | Retry only after checking service status |
+
+Never treat an endpoint error as a task score.

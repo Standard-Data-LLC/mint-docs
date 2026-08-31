@@ -34,8 +34,7 @@
       {
         "group": "Quality control",
         "pages": [
-          "qc-stages-for-benchmark",
-          "gdpx/benchmark-rollout-analysis"
+          "qc-stages-for-benchmark"
         ]
       },
       {

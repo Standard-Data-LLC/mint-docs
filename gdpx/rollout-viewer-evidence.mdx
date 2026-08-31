@@ -1,146 +1,108 @@
 ---
 title: "Rollout viewer evidence"
 sidebarTitle: "Rollout viewer evidence"
-description: "Understand the complete evidence required for the Master rollout view in Wilderness."
-keywords:
-  [
-    "Wilderness",
-    "Master",
-    "rollout viewer",
-    "rubric decisions",
-    "observable trajectory",
-    "GDPx",
-  ]
+description: "Understand the evidence required to review a GDPx rollout in Wilderness."
+keywords: ["Wilderness", "rollout viewer", "rubric decisions", "observable trajectory", "GDPx"]
 ---
 
-Every rollout published in Wilderness opens on **Master**. The canonical submission baseline derives `gdpx-master-evidence/1.1.0`. A managed native run derives typed `gdpx-rollout/1.2.1` and `gdpx-master-evidence/1.2.1`, preserving typed content and native provenance as a readable projection of retained evidence. Neither Master version replaces or fabricates the six forensic source sections.
+Wilderness **Results** presents retained evidence selected for the active evidence catalog. A reviewer should be able to explain what the agent saw, what it did, what it produced, how it was graded, and why the final score is correct. This catalog state is separate from inclusion in the released GDPx benchmark.
 
 <Note>
-  This page describes Wilderness **Results**, not **Review Tasks**. An
-  Audit-only v3 draft may be visible in **Review Tasks** without a rollout or
-  Master view. Its visible blocker and source provenance do not count as QC1
-  evidence, review readiness, or catalog membership.
+  **Review Tasks** is different. It may show a retained, blocked draft without a rollout or complete evidence. Draft visibility does not mean the task passed QC1 or entered Results.
 </Note>
 
-Typed `gdpx-rollout/1.2.0` and `gdpx-master-evidence/1.2.0` remain readable only for immutable legacy compatibility. New managed captures emit `1.2.1`. A legacy typed record cannot become current publishable evidence because it lacks the required native criterion-chunk inventory and one-to-one canonical mapping.
+## What the reviewer sees
 
-<Info>
-  A displayed score must be explainable criterion by criterion. If the source
-  evidence cannot support that explanation, the rollout is incomplete and is not
-  published in Wilderness Results.
-</Info>
+The default review view presents:
 
-## What Master shows
+1. run configuration and execution outcome;
+2. the exact task prompt and relevant agent-visible context;
+3. the final response and native work products;
+4. the rubric scorecard and score reconciliation;
+5. the observable trajectory; and
+6. artifacts, provenance, and completeness.
 
-Master presents the evidence in review order:
+Unavailable optional metrics should appear as **Not supplied**, not as zero.
 
-1. Run statistics and execution outcome.
-2. Exact task prompt and relevant agent-visible context.
-3. Final model answer and primary work product.
-4. Rubric scorecard and score reconciliation.
-5. Collapsed observable trajectory.
-6. Artifacts, provenance, transformations, and completeness.
+## Required source sections
 
-The statistics header may include score, threshold, tests, turns or steps, tool calls and errors, input and output tokens, peak context, duration, cost, model, harness, judge or verifier, timestamps, and stop condition. An unavailable optional metric is labeled `Not supplied`; it is never displayed as zero.
+Every countable rollout needs all six sections:
 
-The execution label comes from Audit, not from an uploader-provided claim. A qualifying QC1 run shows managed execution validation only when its exact task, workspace inventory, run, rollout, evidence files, and runtime receipt match an operator-authenticated managed-execution approval. Otherwise, the evidence remains `not_execution_validated` and archive-only.
+| Section | Required content |
+| --- | --- |
+| **Problem** | Exact task instruction and relevant agent-visible context |
+| **Setup Logs** | Environment build, initialization, reset, dependency, and harness output |
+| **Agent Logs** | Ordered observable messages, tool calls, tool results, state changes, and errors |
+| **Results** | Final response, produced work products, patches, and result metadata |
+| **Test Logs** | Raw verifier and per-test output with criterion bindings |
+| **Grading** | Criterion decisions, rationale, evidence references, and score reconciliation |
 
-### Prompt and answer
+Use `not_applicable` only when a section genuinely cannot apply and include a source-grounded reason. Missing evidence is not `not_applicable`.
 
-Master renders the exact prompt before the model response. Plain text and Markdown are readable without opening raw JSON.
+## Prompt and work products
 
-The answer area shows the final response and the primary work product. Document, PDF, spreadsheet, image, and code artifacts use their native previewers when available and retain a download link to the hash-bound source artifact. A server-supplied, hash-attested presentation is preferred. For verified Office files without one, Wilderness may build a bounded local preview from the downloaded bytes after checking the declared generation, size, and SHA-256; the immutable source download remains authoritative.
+Show the exact prompt before the model response. Preserve native artifacts such as spreadsheets, documents, drawings, images, and code. A rendered preview is helpful, but the hash-bound native download remains authoritative.
 
-### Rubric scorecard
+The result must include every work product the verifier graded. A text summary cannot replace a missing workbook, document, patch, or other deliverable.
 
-The scorecard appears immediately after the answer. Each criterion shows:
+## Rubric scorecard
 
-- its exact wording and stable ID;
-- weight and awarded contribution when applicable;
-- `passed`, `failed`, `partial`, `blocked`, `not_applicable`, or `unscored` as text and an icon;
-- the grader rationale;
-- direct and dependency-cascaded results; and
-- links to the exact event, test, output, or artifact used as evidence.
+Each criterion must show:
 
-Color reinforces status but is never the only indicator. Failed and blocked criteria open by default. Passed criteria start collapsed. Reviewers can search criteria and filter by **All**, **Failed**, **Blocked**, or **Unscored**.
+- the stable criterion ID and exact wording;
+- its weight or aggregation role;
+- `passed`, `failed`, `partial`, `blocked`, `not_applicable`, or `unscored`;
+- the verifier rationale; and
+- direct references to the event, test, output, or artifact used as evidence.
 
-The summary shows the reported and calculated totals, aggregation rule, threshold, hard gates, and reconciliation status. For a custom aggregation, Master also shows the exact deterministic formula, a readable expression, and its ordered operations. A non-reconciling score is a publication blocker, not a UI warning.
+The summary must show the reported score, recalculated score, aggregation rule, threshold, hard gates, and reconciliation status. A score that does not reconcile blocks acceptance.
 
-### Observable trajectory
+## Observable trajectory
 
-The trajectory shows model-visible messages, assistant responses, tool calls, tool results, state transitions, produced artifacts, and errors in order. Long tool payloads use progressive disclosure and link to retained raw evidence.
+Retain observable messages, assistant responses, tool calls, tool results, relevant state transitions, produced artifacts, errors, and the final stop condition in order.
 
-Do not call this view “chain of thought.” Hidden or private reasoning is not collected or displayed. A reviewer may see only observable messages and operational actions that were part of the retained run.
+Do not call this chain of thought. GDPx does not require or display private model reasoning. Remove actual credentials, signed URLs, and provider-private fields. Preserve the remaining observable content rather than replacing it with a blanket redaction or summary.
 
-Typed managed evidence retains model-visible system and user context, assistant messages, tool calls, tool results, failures, the final answer, and non-text content such as images. Each successful tool call must have exactly one content-bearing result. Private reasoning fields and events are removed at ingestion; the remaining typed content is retained rather than flattened into a lossy text summary.
+If a trajectory is too large to render inline, retain the complete artifact and provide a bounded preview. A preview is not a substitute for the full retained evidence.
 
-### Pre-launch execution rejection
+## Run metadata
 
-A trusted-runtime attestation rejection is infrastructure evidence, not a model score. Master labels the attempt **Execution rejected before scoring** and may show only the bounded reason (`missing_marker`, `duplicate_marker`, `marker_not_first`, `malformed_marker`, `missing_sidecar`, `malformed_sidecar`, `mismatched_sidecar_a`, `controller_timeout`, or `controller_terminated`); marker count and first-line check; capped stdout and stderr line and byte counts with truncation flags; return code when available; elapsed time; and sidecar presence and validity. It never displays raw stdout, stderr, marker values, or sidecar bytes from that diagnostic. Zero-byte stdout and stderr are not a successful attestation by themselves: the canonical sidecar and frame A must still validate and match before launch. An empty stderr stream may omit the marker only under that verified sidecar/frame-A condition. No rollout, score, or QC credit is created. This display contract does not imply that any runtime build passed a live canary.
+Retain the values emitted by the harness, including:
 
-## Source sections
+- model, provider, and immutable model revision when available;
+- harness and harness version;
+- prompt and tool configuration;
+- environment and verifier versions;
+- turn, token, time, and cost data;
+- budgets, timeout, retry policy, and stop reason; and
+- task, run, rollout, and artifact identities.
 
-The forensic tabs remain available after Master:
+Do not fabricate missing metrics. Record them as not supplied.
 
-| Tab            | Required contents                                                                     |
-| -------------- | ------------------------------------------------------------------------------------- |
-| **Problem**    | Exact task instruction, runtime kickoff, and agent-visible context                    |
-| **Setup Logs** | Environment build, initialization, reset, dependency, and orchestration evidence      |
-| **Agent Logs** | Observable messages, tool calls, tool results, and agent-visible errors               |
-| **Results**    | Final response, produced artifacts, patches, and result metadata                      |
-| **Test Logs**  | Per-test output, status, criterion bindings, and verifier runtime evidence            |
-| **Grading**    | Criterion decisions, rationale, judge/verifier fingerprints, and score reconciliation |
+## Failure analysis
 
-Each tab is either complete or explicitly `not_applicable` with a source-grounded reason. A missing section cannot be converted to `not_applicable` merely to satisfy admission.
+Every failed attempt used in review needs a readable failure-analysis summary tied to the same task, run, and rollout. It must identify the first observable failure, affected tests or criteria, failure origin, evidence references, solvability, and any required repair.
 
-Master is the default tab for new navigation, but every existing deep link to **Problem**, **Setup Logs**, **Agent Logs**, **Results**, **Test Logs**, or **Grading** remains valid and opens the requested source section. Migration must not rewrite or invalidate stored reviewer URLs.
+The optional [rollout-analysis endpoint](/gdpx/benchmark-rollout-analysis) returns supporting analysis. If used, keep its request and response beside the rollout. That response does not replace the trajectory, verifier output, criterion ledger, or human QC decision.
 
-The viewer uses the page's normal vertical flow. It must not place Master, a forensic section, a long trajectory, or a large rubric inside a fixed-height nested scrolling region. Use progressive disclosure, in-page anchors, and artifact previews or downloads while keeping the browser's main scroll position authoritative.
+## Evidence completeness
 
-## Access and permanent omissions
+A rollout is incomplete when any required evidence body is absent, truncated at the source, attached to another attempt, or represented only by an ID or aggregate.
 
-Every authenticated tenant user with `tasks:read` receives the same complete sanitized Master projection and all six source sections. Wilderness does not require a separate trace-review role, companion entitlement, or client-side evidence gate. Do not display an “authorized viewer only” message to a tenant reader who already has `tasks:read`.
+An adapter may map and preserve existing evidence. It cannot reconstruct content that the source never retained.
 
-Sanitization is a narrow ingestion boundary, not a presentation mode. After actual or live credentials, private reasoning, and provider-private fields have been removed, render the remaining prompt, messages, tool inputs and outputs, tests, grading, and work-product content verbatim. Never replace retained sanitized content with `Content redacted`, `[OMITTED SENSITIVE SUPPLIED CONTENT]`, a structural-event-only table, or another blanket placeholder. If the source bundle did not retain a body, label it `Not retained`; do not imply that a viewer permission can reveal it.
+## API readback
 
-The same rule applies to work-product presentations. The browser must verify the admitted artifact identity, generation, size, and SHA-256 and keep bounded preview limits, but it must not run a second content classifier over a server-admitted presentation or a verified Office fallback. Presentation-layer rescanning can hide legitimate benchmark fixtures and sanitized evidence, making QC impossible.
+The canonical bundle format is documented under [Evaluation bundle upload](/gdpx/evaluation-bundle-upload#canonical-zip-layout).
 
-An approved internal-QA attestation is the narrow exception for credential-like literals that are proven synthetic, fixture-bound, offline, and unreachable. Those source and Master bytes render verbatim. Master shows the attestation status, corpus hash, classification counts and types, hash-bound classification provenance, and active authority generation without adding another permission gate. Revoked, mismatched, incomplete, or external-origin evidence fails closed.
+For a rollout already selected by the active evidence catalog, retrieve the exact retained evidence with:
 
-Every `gdpx-rollout-detail/1.0.0` response must include `review_access` with exactly `access_class`, `classified_synthetic_fixture_values_present`, and `internal_qa_attestation_summary`. For external-catalog evidence, the classified-value flag is `false` and the summary is `null`. A missing, extra, or contradictory boundary is invalid; it does not trigger a legacy browser fallback.
+```text
+GET /api/v3/tasks/{task_revision_id}/runs/{run_id}/rollouts/{rollout_id}
+```
 
-The rollout API exposes bounded internal-QA metadata as `review_access.internal_qa_attestation_summary`. For an active internal-QA projection it contains `status`, `corpus_sha256`, `classification_count`, sorted `classification_types`, sorted and deduplicated provenance entries, and `head_generation`. Each provenance entry carries an opaque authority-bound `sha256:` identifier plus a retained fixture-root or parser-container hash. It never contains corpus entries, source paths, raw world or parser IDs, fixture literals, matched values, expression/value hashes, or the raw attestation document. Wilderness renders this summary under **Immutable provenance**; the literal evidence remains in its ordinary prompt, output, trajectory, section, or artifact location.
+This route is not a general pre-admission preview. A retained candidate outside the active evidence catalog normally returns `404`.
 
-For this exact path, the rollout response declares `review_access.access_class: "internal_qa"`, `review_access.classified_synthetic_fixture_values_present: true`, `redaction_policy.credentials_omitted: true`, `redaction_policy.actual_credentials_omitted: true`, and `redaction_policy.credentials_omitted_semantics: "actual_credentials_only"`. It also declares that hidden reasoning and provider-private state remain omitted. A viewer must preserve the attested fixture bytes under that complete server-authorized boundary; it must not apply a second credential-pattern filter in the browser. The semantics do not authorize actual credentials or private reasoning.
+Confirm that every returned artifact matches its declared path, size, media type, and SHA-256.
 
-Internal-QA evidence exists only in the V3 review-evidence store and exact V3 task/run/rollout routes. It does not create a V2 task, workspace, run, readiness record, family, data sheet, or catalog member. This separation prevents a review-only fixture from leaking into external task discovery through a stale legacy index.
-
-These boundaries remain permanent:
-
-- anonymous users cannot read tenant evidence;
-- one tenant cannot read another tenant’s evidence;
-- actual or live credentials, signed URLs, secret values, and provider-private state are omitted;
-- hidden or private reasoning is omitted; and
-- verifier-only gold material remains outside the rollout projection when disclosure would leak the benchmark answer.
-
-Removing an unnecessary viewing gate does not weaken these tenant, secret, or benchmark-integrity boundaries.
-
-## Completeness and provenance
-
-Master identifies whether a field was supplied canonically, normalized from a source bundle, derived from retained legacy evidence, or regenerated by a verifier or approved judge. Its ordered **Transformation history** is outside the immutable Master content hash but terminates at that exact Master hash. Each step shows its kind and state, transformer or grader identity, model and prompt version when applicable, timestamp, input and output hashes, generated field paths, and retained source references. Regrading shows the original and regenerated ledgers separately; a disagreement remains blocked for adjudication.
-
-A retained `gdpx-rollout/1.0.0` source marked `regraded` remains a readable draft because that schema cannot bind the exact pre-regrade Master. It does not produce current Master evidence or appear in Wilderness Results. Only a `gdpx-rollout/1.1.0` regrade with that original-Master binding and a completed signed-intent and processor-finalization path can become publishable evidence.
-
-For managed `1.2.1` evidence, provenance distinguishes the canonical GDPx workspace inventory from the native materialized Harbor task-root inventory. A hash-bound `workspace_file_mappings` list covers every file exactly once and maps each native relative path to `tasks/<task_id>/source/<native-path>` with byte-identical size and SHA-256. The canonical descriptor additionally binds media type, artifact kind, and visibility. Master retains both inventory hashes and the mapping hash; none is an alias for another.
-
-Master also retains the native verifier chunk inventory. Each native chunk's exact ID, sequence, and content SHA-256 maps one-to-one to a separate canonical criterion-chunk ID, ordinal, and semantic content SHA-256. The viewer may present canonical criterion sections, but provenance must keep the native identity and retained bytes available for verification. Retained work products and logs remain path-, size-, hash-, media-type-, and generation-bound artifacts rather than metadata summaries.
-
-A Terra-derived field includes its exact source path and file hash plus an RFC 6901 pointer or retained byte span. The viewer does not infer absent provenance. If only the older coarse Master provenance exists, it labels that retained projection explicitly rather than inventing field-level citations. Master also binds the exact `task_content_sha256` and `workspace_inventory_sha256` used for execution.
-
-The projection may join or format existing facts. It may not invent a missing final answer, criterion decision, rationale, test result, score, or artifact. If one of those primary facts is unavailable, the task remains blocked from the active GDPx catalog.
-
-Use `GET /api/v3/tasks/{task_revision_id}/review-readiness` to inspect readiness, including its rights authority and managed-execution approval. For a task reached through the active Wilderness catalog, verify that the response matches the membership-bound attestation; a staged or newer draft/latest readiness pointer is never catalog authority. The endpoint can also return a pre-membership record for an exact same-tenant external submission reservation, but that record must not appear in Wilderness **Results** until the catalog admits it. Use `GET /api/v3/tasks/{task_revision_id}/runs/{run_id}/rollouts/{rollout_id}` to retrieve the same complete retained evidence projection that Master renders. Historical evidence remains immutable, but every rollout shown as current publishable evidence in Wilderness Results must satisfy the current readiness policy. Passing readiness for the qualifying anchor does not make another rollout current.
-
-Reader visibility in **Results** follows the active v3 catalog, not a legacy task or run row. A staged compatibility projection remains invisible there until the catalog admits the exact task revision, run, rollout, Master hash, and evidence hash. Wilderness **Results** must not show a rollout row unless the corresponding Master route is admitted and retrievable.
-
-See [Upload an evaluation bundle](/gdpx/evaluation-bundle-upload) for the canonical source contract.
+Backend readback confirms the retained evidence record. The separate benchmark tracker records QC2–QC4 program review.

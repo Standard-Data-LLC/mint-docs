@@ -1,247 +1,77 @@
 ---
 title: "Upload an evaluation bundle"
 sidebarTitle: "Evaluation bundle upload"
-description: "Upload Audit-only task drafts or complete rollout evidence through GDPx v3."
-keywords:
-  [
-    "GDPx",
-    "v3",
-    "evaluation bundle",
-    "rollout evidence",
-    "Wilderness",
-    "resumable upload",
-  ]
+description: "Submit an Audit draft or a canonical task-and-evidence bundle through GDPx v3."
+keywords: ["GDPx", "v3", "evaluation bundle", "rollout evidence", "Wilderness", "resumable upload"]
 ---
 
-`POST /api/v3/gdpx-submissions` accepts both Audit-only task drafts and complete publication candidates. Only a `gdpx-review-bundle/1.1.0` submission can lead to the active GDPx/Wilderness catalog. The separate `gdpx-audit-task-draft-bundle/1.0.0` contract retains exact task definitions or legacy snapshot rows without claiming that rollout evidence exists.
-
-Start with [GDPx workflow](/gdpx/workflow) for the end-to-end sequence and the
-boundary between partner, operator, and Wilderness responsibilities.
+Use `POST /api/v3/gdpx-submissions` for canonical GDPx drafts and active evidence-catalog candidates. Do not send an unconverted partner source handoff to this endpoint unless the live capability response advertises and Standard Data confirms the matching adapter.
 
 <Warning>
-  A successful byte upload is not publication. A blocked v3 draft may appear in
-  Wilderness **Review Tasks** after Audit retains and reads back its immutable
-  record. It appears in Wilderness **Results** only after managed execution
-  approval, current-policy `review_ready` status, and inclusion in the active
-  catalog revision. Draft visibility never implies QC1 credit, readiness, or
-  catalog membership.
+  A successful upload is not a passed QC stage or inclusion in the released GDPx benchmark. Audit may retain a blocked record for diagnosis. Wilderness **Review Tasks** and **Results** represent different states.
 </Warning>
 
-The legacy `/api/v2/workspace-submissions` workflow may still create draft Audit revisions, and the legacy Wilderness Task Explorer may project their preferred current revision. V2 cannot create a native v3 **Review Tasks** record or add a task to the active GDPx **Results** catalog.
+## Discover the live contract
 
-## Authenticate and discover the contract
-
-Use the shared Standard Data API origin and a tenant-scoped key:
+Use one API origin and a tenant-scoped key:
 
 ```bash
 export STANDARD_DATA_API_BASE="https://api.standarddata.io"
 export STANDARD_DATA_API_KEY="<your-standard-data-api-key>"
-```
 
-Read capabilities and the current JSON Schema before building a bundle:
-
-```bash
 curl --fail-with-body \
   --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
   "${STANDARD_DATA_API_BASE}/api/v3/gdpx/capabilities" \
   --output gdpx-capabilities.json
+```
 
+The v3 capability response is the authority for:
+
+- `access.can_submit` and `admission.can_submit`;
+- accepted modes and contract versions;
+- schema links;
+- adapter modes;
+- upload and archive limits; and
+- `managed_execution_trust.managed_qc1_execution.available` and its blocker.
+
+Do not use `/v1/whoami` or the v2 intake state as a v3 admission gate. Those fields describe the legacy v2 workflow.
+
+Fetch the schema relation returned by capabilities. The static path below is valid only when the response advertises it:
+
+```bash
 curl --fail-with-body \
   --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
   "${STANDARD_DATA_API_BASE}/api/v3/gdpx/schemas/review-bundle" \
   --output gdpx-review-bundle.schema.json
-
-DRAFT_SCHEMA_PATH="$(jq -r '.audit_task_draft.schema_endpoint // empty' gdpx-capabilities.json)"
-if [ -n "${DRAFT_SCHEMA_PATH}" ]; then
-  curl --fail-with-body \
-    --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
-    "${STANDARD_DATA_API_BASE}${DRAFT_SCHEMA_PATH}" \
-    --output gdpx-audit-task-draft-bundle.schema.json
-fi
-
-OPENAPI_PATH="$(jq -r '.openapi_endpoint // ""' gdpx-capabilities.json)"
-if [ -n "${OPENAPI_PATH}" ]; then
-  curl --fail-with-body \
-    --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
-    "${STANDARD_DATA_API_BASE}${OPENAPI_PATH}" \
-    --output gdpx-openapi.json
-fi
 ```
 
-Creating a submission requires `uploads:write` and `imports:write`. Polling `GET /api/v3/gdpx-submissions/{gdpx_submission_id}` requires `imports:write`, including when you follow the returned `self` link. Capabilities, schema, catalog, readiness, and rollout reads require `tasks:read`. Authentication is always tenant-bound.
+Creating and completing a submission requires the scopes returned by the service, typically `uploads:write` and `imports:write`. Readback typically requires `tasks:read`.
 
-Call the authenticated OpenAPI 3.1 route only when capabilities include `openapi_endpoint`. It requires `tasks:read`, rejects anonymous and upload-only credentials, and returns a private, non-cacheable response. Absence of that field means the route is not deployed on that API release. This page documents the v1.1 submission schema, `https://standard-data.dev/contracts/gdpx-review-bundle/1.1.0/schema.json`. Use it only when the capability response advertises v1.1. A v1.0 request or inner manifest is archive-era input and receives `GDPX_REVIEW_BUNDLE_CONTRACT_UPGRADE_REQUIRED`; rebuild it against the fetched v1.1 schema rather than retrying unchanged. Unknown versions are unsupported.
+If `managed_qc1_execution.available` is false, the service may still accept and retain a draft or evidence bundle. You cannot promise end-to-end QC1 completion or active evidence-catalog admission until the blocker is resolved.
 
-The capability response is authoritative for the active contract version, accepted modes, maximum ZIP size, supported adapter modes, publication policies, draft contract, and resumable-upload limits. Do not hard-code those values from an older response. Offer the Audit-only path only when `accepted_modes` contains `audit_task_draft` and `audit_task_draft.schema_endpoint` is present. The current v1.1 review-bundle ceiling is 256 MiB inclusive for the compressed ZIP, each archive member, and total expanded bytes; all three checks use the same advertised constant.
+## Choose a mode
 
-<Warning>
-  Submission is fail-closed. Offer an upload action only when `/v1/whoami`
-  reports `canonical_submission.state` as `ready` **and**
-  `/api/v3/gdpx/capabilities` reports `access.can_submit` as `true`. Inspect
-  `admission.blockers` when it is false. During a controlled rollout, admission
-  may be disabled or tenant-allowlisted even though the schema and read APIs are
-  reachable.
-</Warning>
-
-## Choose a submission mode
-
-| Mode | Contract and policy | Evidence | Result |
+| Mode | Use it when | Evidence in the ZIP | Expected result |
 | --- | --- | --- | --- |
-| `audit_task_draft` | `gdpx-audit-task-draft-bundle/1.0.0` and `audit_only` | Zero evaluations; exact canonical task bytes or an exact legacy snapshot row | Immutable blocked draft in Audit and Wilderness **Review Tasks**; never readiness or catalog authority |
-| `task_and_evidence` | `gdpx-review-bundle/1.1.0` and `publish_when_review_ready` | Exactly one evaluation and one QC1 rollout per task | Archive evidence that may reach **Results** after every independent publication gate passes |
-| `evidence_only` | `gdpx-review-bundle/1.1.0` and `publish_when_review_ready` | Exactly one run and rollout for one retained task revision | Immutable append candidate requiring separate operator admission |
+| `audit_task_draft` | You have an exact canonical task, or a supported legacy snapshot, but no complete QC1 attempt | No evaluation | Immutable blocked draft; may appear in **Review Tasks** |
+| `task_and_evidence` | You have complete task source and one admission attempt for each task | One evaluation and one rollout per task | Active evidence-catalog candidate; not a final benchmark-release decision |
+| `evidence_only` | You are attaching first QC1 evidence to an exact retained canonical draft, or one later attempt to a retained revision | One evaluation and one rollout for one task revision | Immutable evidence candidate |
 
-Use `audit_task_draft` when you have an exact task definition but no complete QC1 evidence. With `adapter_mode: "canonical"`, Audit retains the canonical task and complete workspace inventory, then records `GDPX_QC1_EVIDENCE_REQUIRED`. With `adapter_mode: "legacy_snapshot"`, Audit retains the exact raw release row, release-object generation and hash, row index, and an explicit list of unavailable canonical fields, then records `GDPX_CANONICAL_TASK_DEFINITION_REQUIRED`.
+An `audit_task_draft` submission is intentionally blocked. A canonical draft can later receive its first QC1 attempt through `evidence_only`. A legacy-snapshot draft must first be replaced by a complete canonical task definition.
 
-Both variants finish in the durable `blocked` state by design. A successful draft import returns `GDPX_AUDIT_TASK_DRAFT_IMPORTED`; treat that code as successful Audit retention, not as publication failure. The import creates no rollout, score, readiness attestation, compatibility projection, benchmark membership, or catalog head.
-
-List retained drafts with `GET /api/v3/gdpx/audit-task-drafts?limit=100`. Follow `next_after_id` for pagination, or read one exact record at `GET /api/v3/gdpx/audit-task-drafts/{gdpx_submission_id}/{task_revision_id}`. Both routes require `tasks:read`, enforce tenant isolation, and return immutable content hashes. In Wilderness, the corresponding read-only surface is **Review Tasks**.
-
-## Resolve a blocked Review Task
-
-A blocked Review Task is an immutable Audit record. You cannot edit it with
-`PATCH` or `PUT`. Read its blocker, correct or complete the source package, and
-create a new immutable submission. The original draft remains in Audit history.
-
-### 1. Read the exact blocker
-
-List drafts, then follow the returned `links.self` value. Do not construct a
-detail URL from a task title or logical-task ID.
-
-```bash
-curl --fail-with-body \
-  --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
-  "${STANDARD_DATA_API_BASE}/api/v3/gdpx/audit-task-drafts?limit=100" \
-  --output gdpx-audit-task-drafts.json
-
-DRAFT_SELF="$(jq -r \
-  '.items[] | select(.draft.task_revision_id == "taskrev_<exact-revision>") | .links.self' \
-  gdpx-audit-task-drafts.json)"
-
-curl --fail-with-body \
-  --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
-  "${STANDARD_DATA_API_BASE}${DRAFT_SELF}" \
-  --output gdpx-audit-task-draft.json
-
-jq '{
-  task_revision_id: .draft.task_revision_id,
-  logical_task_id: .draft.logical_task_id,
-  definition_kind: .draft.definition_kind,
-  blocker: .draft.blocker,
-  unavailable_canonical_fields: .draft.unavailable_canonical_fields
-}' gdpx-audit-task-draft.json
-```
-
-If `DRAFT_SELF` is empty or the capability-advertised schema route is not
-available, stop. Do not guess a relation or fall back to a fixture.
-
-### 2. Supply the missing canonical task definition
-
-Use this path when `blocker.code` is
-`GDPX_CANONICAL_TASK_DEFINITION_REQUIRED`. The draft is an exact legacy release
-row, not a canonical task. Retrieve the original partner delivery and provide a
-canonical `TASK.json` plus every declared workspace byte. The canonical task
-must include the exact prompt, environment, rubric, verifier, threshold,
-aggregation rule, criterion definitions, and complete workspace inventory.
-Never infer missing task content from the legacy row or from domain knowledge.
-
-Keep the existing `logical_task_id`. Keep the exact `task_revision_id` only when
-the canonical package faithfully supplies fields omitted from that same release.
-If you change task instructions, rubric meaning, weights, threshold, verifier,
-environment, or materials, create a new content-bound `task_revision_id` for the
-successor revision.
-
-Build a canonical `gdpx-audit-task-draft-bundle/1.0.0` ZIP from the fetched
-draft schema. If you have the checked-in Audit CLI, verify and submit it with
-the `--file` option:
-
-```bash
-cd /absolute/path/to/standard_data_audit/services/audit
-export STANDARD_DATA_GDPX_BEARER_TOKEN="${STANDARD_DATA_API_KEY}"
-
-pnpm submit:gdpx-review-bundle -- \
-  --file /absolute/path/to/canonical-task-draft.zip \
-  --origin "${STANDARD_DATA_API_BASE}" \
-  --idempotency-prefix canonical-task-<stable-operation-id> \
-  --mode audit_task_draft \
-  --adapter-mode canonical \
-  --apply
-```
-
-The replacement submission should retain the canonical task and finish as a
-blocked draft with `GDPX_QC1_EVIDENCE_REQUIRED`. That result confirms the task
-definition is available; it does not publish the task.
-
-### 3. Attach complete QC1 evidence
-
-Use this path when `blocker.code` is `GDPX_QC1_EVIDENCE_REQUIRED`. Obtain one
-complete managed QC1 attempt for the exact retained revision. Package its run,
-rollout, observable trajectory, final output, six forensic sections, verifier
-results, criterion decisions, score reconciliation, and artifacts under
-`gdpx-review-bundle/1.1.0`.
-
-The `TASK.json`, task-content hash, workspace inventory, rubric, verifier, and
-environment in the evidence bundle must be byte-identical to the retained
-canonical task. Then submit exactly one run and rollout with `evidence_only`:
-
-```bash
-cd /absolute/path/to/standard_data_audit/services/audit
-export STANDARD_DATA_GDPX_BEARER_TOKEN="${STANDARD_DATA_API_KEY}"
-
-pnpm submit:gdpx-review-bundle -- \
-  --file /absolute/path/to/qc1-evidence.zip \
-  --origin "${STANDARD_DATA_API_BASE}" \
-  --idempotency-prefix qc1-evidence-<stable-operation-id> \
-  --mode evidence_only \
-  --target-task-revision-id taskrev_<exact-revision> \
-  --adapter-mode canonical \
-  --apply
-```
-
-There is no public managed-rollout launch or approval endpoint. A coding agent
-can construct and submit the exact bundle, but a Standard Data operator must run
-or verify managed QC1, issue the independent execution approval, and admit a
-frozen evidence-only candidate. If the terminal issue is
-`GDPX_EVIDENCE_ONLY_OPERATOR_ADMISSION_REQUIRED`, do not alter or resubmit that
-candidate. Give its ID, SHA-256, and expected catalog revision and generation to
-the operator.
-
-For any malformed, incomplete, or hash-mismatched source package, correct the
-reported JSON pointers and submit a new ZIP with a new idempotency prefix. Never
-reuse the old submission ID or claim that a blocked record changed in place.
-
-### 4. Verify the new immutable records
-
-Follow the CLI receipt or the submission's `links.self` relation until it reaches
-a terminal state. Then verify each publication layer with exact IDs:
-
-```text
-GET /api/v3/gdpx/audit-task-drafts/{gdpx_submission_id}/{task_revision_id}
-GET /api/v3/tasks/{task_revision_id}/review-readiness
-GET /api/v3/tasks/{task_revision_id}/runs/{run_id}/rollouts/{rollout_id}
-GET /api/v3/gdpx/catalog/current
-```
-
-The repair is visible in **Results** only when readiness is eligible, the exact
-rollout is readable, and the active catalog contains the task revision. A newer
-blocked draft in **Review Tasks** is not publication.
+For the same byte-identical retained canonical revision, `evidence_only` freezes one later attempt candidate without replacing the existing task bytes or qualifying anchor. A separate operator admission is required before that candidate can become current.
 
 ## Canonical ZIP layout
 
-Under `gdpx-review-bundle/1.1.0`, a `task_and_evidence` ZIP contains 1–100 unique tasks. Each task has exactly one evaluation and one QC1 rollout, and the entire set imports atomically:
+When the service advertises `gdpx-review-bundle/1.1.0`, a canonical review bundle follows this outline:
 
 ```text
 GDPX_BUNDLE.json
-INTERNAL_QA_CREDENTIAL_ATTESTATION.json   # internal-QA deliveries only
 tasks/
 └── <task_id>/
     ├── TASK.json
     ├── PUBLICATION_AUTHORITY.json
-    ├── task.toml
-    ├── instruction.md
-    ├── environment/
-    ├── tests/
-    └── solution/
+    └── <inventoried task and workspace files>
 evaluations/
 └── <task_id>/
     └── <run_id>/
@@ -254,152 +84,81 @@ evaluations/
             └── artifacts/
 ```
 
-`GDPX_BUNDLE.json` is a complete inventory of every other retained file in the ZIP. Do not add `GDPX_BUNDLE.json` to its own inventory. For each archive file except the manifest itself—including any other root-level control file—record its normalized relative path, byte size, media type, and SHA-256. The manifest binds every task, run, and rollout to the exact `task_id`, `task_revision_id`, `logical_task_id`, `run_id`, and `rollout_id`. Task, revision, logical-task, run, and rollout identities must be unique across the ZIP. Multiple rollouts for one task remain invalid; create another immutable submission for another attempt. `evidence_only` remains a one-task append to its declared `target_task_revision_id`.
+Do not wrap this canonical layout in an extra batch directory. `GDPX_BUNDLE.json` belongs at the ZIP root.
 
-`TASK.json` uses `gdpx-task/1.1.0`. It binds the exact prompt, rubric, verifier, `task_content_sha256`, and a complete `workspace_files` inventory. Each workspace entry declares its normalized path, SHA-256, byte size, media type, artifact kind, and visibility. `environment.workspace_inventory_sha256` covers the sorted inventory, including every one of those fields. `RUN.json` uses `gdpx-run/1.1.0` and must repeat the same workspace-inventory binding. The canonical submission baseline remains `gdpx-rollout/1.1.0`; its ordinary derived Master baseline is `gdpx-master-evidence/1.1.0`.
+The live JSON Schema defines every required field. The following rules prevent the most common format errors.
 
-A successful managed native normalization produces a separate typed `gdpx-rollout/1.2.1` and materializes `gdpx-master-evidence/1.2.1`. These are derived managed evidence records, not a new public review-bundle version and not values to substitute into a `gdpx-review-bundle/1.1.0` upload. Existing typed `gdpx-rollout/1.2.0` and `gdpx-master-evidence/1.2.0` records remain readable as immutable compatibility evidence. They cannot be emitted by a new managed capture or become newly publishable because they do not bind native criterion-chunk provenance.
+### `GDPX_BUNDLE.json`
 
-For a current rollout with `provenance.source_type: "regraded"`, `provenance.source_sha256` is required and must bind the exact retained pre-regrade Master. A current non-regraded rollout must omit that field. Retained `gdpx-rollout/1.0.0` sources remain readable under their frozen schema, which did not define `provenance.source_sha256`. A legacy 1.0 rollout marked `regraded` therefore remains a read-only draft and cannot materialize current Master evidence or a publication candidate. Do not add a 1.1 field to historical bytes; create new 1.1 regraded evidence through the signed-intent and processor-finalization path below.
+Inventory every other retained ZIP member. Record the path, byte size, media type, and SHA-256 required by the schema. Bind each task, run, rollout, and artifact to its exact identifier.
 
-<Warning>
-  Do not treat an environment directory hash, image digest, file count, or list
-  of paths as a workspace inventory. Every agent-visible, tool-mediated,
-  verifier-only, and publication-only task file must appear with its exact path,
-  hash, size, media type, kind, and visibility.
-</Warning>
+Do not inventory `GDPX_BUNDLE.json` itself.
 
-### Strict JSON and canonical hashing
+### Canonical `TASK.json`
 
-Every JSON document whose exact retained bytes become evidence, authority, scan or transformation input, or a signed/hash-bound managed-runtime record uses strict UTF-8 before schema validation, projection, hashing, or signing. At those exact-evidence boundaries, Audit rejects duplicate object keys, integral numbers outside JavaScript's safe integer range, unpaired Unicode surrogates, non-finite numbers, trailing content, and values outside the JSON data model. Valid values are hashed as RFC 8785/JCS canonical JSON; source-object SHA-256 fields still bind the exact retained bytes. Ordinary API request envelopes continue to use their documented request-schema validation and are not evidence merely because they are authenticated.
+Describe the immutable task, exact prompt, rubric, verifier, task-content hash, and complete workspace inventory.
 
-Do not rely on a parser's last-key-wins behavior, float coercion, Unicode replacement, or property order. A document that would decode differently across implementations is invalid rather than normalized into evidence.
+Do not add a `rollouts` field. Canonical `TASK.json` is strict. Runs and rollouts belong under `evaluations/` in `RUN.json` and `ROLLOUT.json`.
 
-### Uploaded publication declaration
+Every workspace file must use the path, hash, size, media type, artifact kind, and visibility required by the fetched schema. A directory hash, image digest, file count, or path list is not a complete workspace inventory.
 
-Every task submitted with `publication_policy: "publish_when_review_ready"` must include `tasks/<task_id>/PUBLICATION_AUTHORITY.json` using `gdpx-publication-authority/1.1.0`. The bundle manifest records that file with role `publication_authority` and binds its path and SHA-256 from the task descriptor. Missing, blocked, mismatched, or tampered declaration evidence is a publication blocker even when every technical evaluation check passes.
+### `PUBLICATION_AUTHORITY.json`
 
-The partner-uploaded declaration binds the exact task, task-content hash, workspace-inventory hash, logical task, source delivery, rights basis, agreement status, owner intent, and source mappings. Its self-attestation hash covers the canonical JSON record. An external-catalog declaration must state `publication_target: "external_catalog"`, set `intended_catalog_member: true`, carry an applicable executed-agreement or first-party rights basis, and include approval scoped to `gdpx_benchmark_qc_and_publication`.
+Include the source-side rights and publication declaration in every direct canonical review bundle. Bind it to the exact task and source delivery. Keep it outside the agent runtime.
 
-The uploaded declaration is necessary but not sufficient. Audit separately requires an immutable publication-rights grant in Standard Data's operator-controlled registry and an active authority head that resolves to that grant. The grant and head bind the exact declaration, source delivery, task-content hash, and workspace-inventory hash. Submission credentials cannot create, replace, or advance either record.
+A separate Audit-draft or adapter contract may retain a blocked archive without this file when its live schema permits that case. For a direct canonical review bundle, the file is required, hash-bound, and matched to Standard Data's active rights record before catalog membership. It does not approve managed execution or replace Standard Data's QC4 release review.
 
-If the active policy changes or an owner revokes publication, Audit first publishes a replacement catalog revision that excludes the task, then advances the authority head to the new immutable decision. The old grant, head revision, benchmark membership, task, and evidence remain in history. The current readiness projection becomes blocked. Audit never silently rewrites the old benchmark membership or makes the active catalog unavailable during revocation.
+### Evaluation evidence
 
-<Warning>
-  Upload permission is not publication authority. A valid API key, successful
-  transport, complete rollout, partner declaration, self-hash, or technical
-  candidate cannot substitute for a task-bound declaration, matching immutable
-  operator grant, and current authority head. Never reuse an authority file
-  across revisions or deliveries.
-</Warning>
+For every rollout, include:
 
-### Internal-QA exact-byte fixture retention
+- one `RUN.json` and `ROLLOUT.json` with consistent task, run, and rollout identities;
+- a complete observable trajectory;
+- the final answer and native work products;
+- verifier and per-test output;
+- exactly one decision for every rubric criterion;
+- score aggregation, threshold, outcome, and reconciliation; and
+- declared artifacts with matching paths, sizes, media types, and hashes.
 
-Use the internal-QA path only when an isolated benchmark world intentionally contains credential-like fixture literals that reviewers must inspect byte for byte. It is not a general secret-scanner exception.
+Do not include private reasoning, actual credentials, signed URLs, or provider-private payloads.
 
-An internal-QA bundle that includes `INTERNAL_QA_CREDENTIAL_ATTESTATION.json` is singleton-only: it must contain exactly one task, one run, and one rollout. Do not combine an attested internal-QA task with any other task or evaluation in the same ZIP.
+## Keep submission and evaluation counts separate
 
-The declaration must state `publication_target: "internal_qa"`, set `intended_catalog_member: false`, use a first-party rights basis, and include approval scoped to `gdpx_internal_qa_synthetic_fixture_retention`. Standard Data separately retains an operator-controlled `INTERNAL_QA_CREDENTIAL_STATEMENT.json` using `gdpx-internal-qa-credential-statement/1.0.0`. Its semantic statement hash, exact file hash, immutable control object, active grant, and authority-head generation are distinct bindings; an uploader cannot create or advance them.
+Under `gdpx-review-bundle/1.1.0`:
 
-The review bundle includes `INTERNAL_QA_CREDENTIAL_ATTESTATION.json` and inventories it in `GDPX_BUNDLE.json` with role `internal_qa_credential_attestation`. The attestation must include:
+- a `task_and_evidence` ZIP can declare 1–100 unique tasks;
+- each declared task has exactly one evaluation and one rollout in that ZIP;
+- an `evidence_only` ZIP targets one retained task revision with one evaluation and one rollout; and
+- one blocked declared task prevents the active evidence catalog from changing for the admission cohort.
 
-- a complete, sorted, hash-bound corpus covering every retained and projected credential-like occurrence;
-- exactly one source-bound classification for every detector match;
-- `synthetic_fixture_literal` records with exact source, fixture, and Master pointers and hashes, offline-world provenance, isolated execution, disabled network egress, and no environment, secret-manager, or provider origin;
-- `non_value_syntax` records with parser proof for identifiers, expressions, and empty literals; and
-- clean high-confidence, provider-format, and grouped-token entropy scans plus a `network_origin` verdict of `offline_only` over the same corpus hash.
+Audit may still retain immutable source, evidence, and blocker records from a blocked cohort. The active evidence-catalog update is cohort-atomic; diagnostic retention is not rolled back.
 
-Source and Master bytes must match the attested fixture bytes exactly. Placeholders, rewritten values, an incomplete corpus, an uncited match, or a blanket `internal` or `sanitized` flag blocks admission. Any byte, corpus, authority, or grant change requires a new statement, attestation, operator grant, and exact replay.
+A QC3 campaign can require many attempts. Standard Data owns QC3 ingestion and campaign mapping. Partners preserve the complete native corpus and submit individual attempts through `evidence_only` only when an operator provides the target revision and admission plan. The current API does not natively label a run as QC3. Do not place the complete QC3 corpus in `TASK.json` or add several attempts for one task to a single v1.1 review bundle.
 
-Internal-QA evidence may run through managed execution and remains readable to every authenticated tenant user with `tasks:read` while its exact active grant is valid. It never satisfies external-catalog readiness or membership. Revoking or replacing the grant closes every internal-QA review path without deleting immutable audit history.
+## Adapter submissions
 
-An internal-QA admission writes only the immutable V3 review binding, admission terminal, exact access reservation, Master evidence, criterion chunks, and artifact bindings. It must not create a V2 task projection, workspace, supplied run, readiness attestation, family, data sheet, or catalog record. Legacy V2 records found for a review-only revision are stale migration artifacts and must remain excluded from every reader until an operator reviews the dry-run inventory.
+An adapter is valid only when the live capability response advertises it and Standard Data confirms that it matches the delivered source revision.
 
-### Managed execution and approval
+Adapters may:
 
-An uploaded `RUN.json`, provider result, Harbor identifier, runtime receipt, or field that claims execution validation is evidence supplied by the uploader. It cannot authenticate its own execution.
+- preserve native source paths and bytes;
+- map existing task, run, rollout, and artifact fields;
+- return a preview or crosswalk; and
+- normalize supported evidence into the canonical record.
 
-There is no public managed-rollout launch endpoint. Submission credentials
-cannot start a managed run or issue its approval. Give the Standard Data
-operator the submission ID, exact task/run/rollout identities, task-content
-hash, workspace-inventory hash, and required model/harness envelope. The
-operator owns the managed launch and independent approval.
+Adapters may not:
 
-A rollout qualifies for QC1 publication only after Standard Data runs or verifies it through the approved managed execution path. The retained runtime receipt binds the exact task and workspace, run and rollout manifests, trajectory, verifier output, criterion ledger, work products, forensic sections, runtime configuration, harness result, logs, and immutable artifact hashes. After the evidence generations, Master, criterion chunks, and artifacts commit, Audit verifies their exact hashes and creates a separate operator-authenticated managed-execution approval for those canonical bytes.
+- invent missing trajectories or work products;
+- infer verifier or criterion decisions that were never retained;
+- turn a truncated export into complete evidence;
+- repair a mislabeled model or task silently; or
+- grant QC, readiness, or active evidence-catalog status.
 
-The canonical and materialized workspace hashes are different authorities:
+Large native archives may need to be split to satisfy the current capability-advertised compressed, member, and expanded-size limits.
 
-| Binding | Exact contents |
-| --- | --- |
-| `workspace_inventory_sha256` | Canonical descriptors under `tasks/<task_id>/source/...`, including path, size, SHA-256, media type, artifact kind, and visibility |
-| `materialized_workspace_inventory_sha256` | Native files in the Harbor task root before canonical projection, including each native path, size, and SHA-256 |
-| `workspace_file_mappings_sha256` | The complete one-to-one bridge between those two inventories |
+## Create the submission
 
-For every native file, the mapping must use the exact native relative path and the exact canonical path `tasks/<task_id>/source/<native-path>`. Both sides repeat the same byte size and SHA-256. The canonical side also records media type, artifact kind, and visibility. Native paths and canonical paths are each unique, the mappings are ordered by canonical path, and the mapping digest binds the domain `standard-data/gdpx-workspace-file-mappings/v1` plus the complete mapping array. Missing, extra, rewritten, or byte-mismatched files fail closed. Never place the materialized hash in the canonical field or derive one hash from the other.
-
-Managed capture retains the exact bytes for `result.json`, `config.json`, `lock.json`, `provider-readback.json`, `runtime-attestation.json`, `execution-binding.json`, `agent/trajectory.json`, `verifier/reward.json`, `verifier/criterion-report.json`, and every configured `artifacts/<output-path>`. The worker produces retained native result and observable-log objects, a task-materialization receipt, a worker receipt, sanitized logs, and work products. Receipts and approvals bind each object's path, role, byte size, SHA-256, and storage generation. A summary, provider ID, or reconstructed log cannot replace those bytes.
-
-Managed `1.2.1` evidence also preserves the verifier's native chunk inventory. Each entry binds the exact unnormalized `native_chunk_id`, contiguous `sequence`, and SHA-256 of the complete native chunk. A second hash-bound inventory maps it one-to-one to the distinct canonical `criterionchunk_...` ID, canonical ordinal, and semantic content SHA-256. The semantic digest excludes storage generations from evidence references, because materialization can change a generation without changing canonical evidence bytes. Dropping a native chunk, reusing an identity, changing its order, or substituting a canonical ID for a native ID invalidates the rollout.
-
-<Warning>
-  The checked-in native capture, control-port, and canonicalization protocols do
-  not establish deployment availability. The provider-native control service
-  and independent canonicalizer remain external dependencies. Managed execution
-  stays fail-closed until their exact deployments, service accounts, audiences,
-  release hashes, IAM bindings, and provider observation adapters are pinned and
-  advertised by capabilities. This documentation does not claim that a workload
-  can currently be launched.
-</Warning>
-
-The approval is not part of the uploaded authority declaration and cannot be created by submission credentials. Until the exact approval exists and verifies, the run remains `not_execution_validated`. Audit keeps the first import as archive evidence, but it cannot satisfy QC1, become `review_ready`, enter Wilderness Results, or support catalog membership. After approval, replay or resubmit the exact hash-bound bundle when the capability response instructs you to do so; any byte change requires new verification and approval.
-
-Trusted-runtime success requires the controller to finish the one-shot privilege attestation, independently validate the canonical create-only sidecar, bind that sidecar byte for byte to frame A, and only then open the model launch gate. Empty captured stdout and stderr do not establish success. An entirely empty stderr stream may omit the marker only when the sidecar and frame A both validate. If stderr contains any bytes, the marker must be unique, first, well formed, and byte-identical to the verified sidecar and frame A.
-
-If trusted-runtime attestation is rejected before model launch, retain only bounded structural diagnostics: `missing_marker`, `duplicate_marker`, `marker_not_first`, `malformed_marker`, `missing_sidecar`, `malformed_sidecar`, `mismatched_sidecar_a`, `controller_timeout`, or `controller_terminated`; marker count and first-line status; capped stdout and stderr line and byte counts with truncation flags; whether a chunk was observed; return code when available; elapsed time; and sidecar presence and validity. `missing_marker` applies only when a non-empty stderr stream requires a marker. Never retain raw stdout, stderr, marker values, or sidecar bytes in this diagnostic. A pre-launch rejection produces no subject rollout, no score, and no QC1 credit. Display it as an execution rejection, never as score `0`. These are admission semantics, not a claim that a particular runtime build has passed a live canary.
-
-Large trajectories and work products stay as hash-bound objects. Do not copy them into a metadata field or replace them with a summary.
-
-### Required rollout evidence
-
-Each rollout must retain:
-
-- the exact prompt and relevant agent-visible context;
-- an ordered observable trajectory with model messages, tool calls, tool results, environment events, and errors;
-- the final model answer or primary work product;
-- verifier output and all test results;
-- exactly one decision for every declared rubric criterion, including blocked, not-applicable, and unscored criteria;
-- score reconciliation, including aggregation, threshold, dependencies, and hard gates;
-- model, harness, environment, verifier, and judge versions;
-- duration, turns or steps, token usage, cost, stop condition, and execution outcome when supplied by the harness; and
-- immutable artifact hashes and object generations.
-
-The six forensic sections—Problem, Setup Logs, Agent Logs, Results, Test Logs, and Grading—must be present. A section with no applicable source data must use an explicit `not_applicable` status and a reason. Omitting a section is not equivalent to `not_applicable`.
-
-### Criterion decisions
-
-Each item in `criterion-decisions.json` must contain:
-
-| Field                                           | Requirement                                                               |
-| ----------------------------------------------- | ------------------------------------------------------------------------- |
-| `criterion_id`                                  | Stable ID that exactly matches one source-rubric criterion                |
-| `source_text`                                   | Exact source wording; do not paraphrase the grading contract              |
-| `status`                                        | `passed`, `failed`, `partial`, `blocked`, `not_applicable`, or `unscored` |
-| `weight`                                        | Source weight or scoring contribution when one exists                     |
-| `awarded_contribution` / `maximum_contribution` | Awarded and possible contribution when applicable                         |
-| `direct_result`                                 | Result before dependency or hard-gate effects                             |
-| `cascaded_result`                               | Result after dependency or hard-gate effects                              |
-| `dependency_criterion_ids`                      | Exact IDs of criteria that can cascade into this result                   |
-| `grader`                                        | Verifier or judge identity and pinned version                             |
-| `rationale`                                     | Human-readable explanation grounded in observable evidence                |
-| `evidence_refs`                                 | Typed references to retained events, tests, outputs, or artifacts; at least one is required for `passed`, `failed`, or `partial` |
-
-The criterion ledger must contain exactly one decision for every criterion declared by the source rubric. This includes criteria marked `blocked`, `not_applicable`, or `unscored`; do not omit them. The score-reconciliation object records the aggregation rule, reported score, calculated score, pass threshold, hard-gate results, and whether the values reconcile. A duplicate criterion ID, missing or unknown criterion, dangling evidence reference, or unexplained score mismatch blocks publication.
-
-For `aggregation_rule: "custom"`, prose is not an executable scoring contract. Supply `custom_calculation.formula` using `gdpx-custom-score-formula/1.0.0`: a bounded reverse-Polish instruction list containing constants, exact criterion-field references, arithmetic, minimum/maximum, absolute value, negation, and clamp operations. Audit evaluates that data-only formula itself; uploader-supplied code and uploader-calculated totals are never executed or trusted. The formula must match the task rubric exactly and cannot read a blocked, unscored, not-applicable, missing, or duplicate criterion. Historical description-only custom scores remain readable as archive evidence but cannot publish.
-
-## Create a submission
-
-Hash the exact ZIP and send one idempotent request:
+Use only values advertised by the live capability response:
 
 ```bash
 curl --fail-with-body \
@@ -421,102 +180,46 @@ curl --fail-with-body \
   --output gdpx-submission.json
 ```
 
-Publication-candidate request fields:
+The values above illustrate a v1.1 `task_and_evidence` request. Replace them with the current advertised contract and your exact ZIP metadata.
 
-| Field                     | Accepted value                                 |
-| ------------------------- | ---------------------------------------------- |
-| `content_type`            | `application/zip`                              |
-| `contract_version`        | `gdpx-review-bundle/1.1.0`                     |
-| `mode`                    | `task_and_evidence` or `evidence_only`         |
-| `target_task_revision_id` | Required for `evidence_only`; otherwise `null` |
-| `adapter_mode`            | `canonical` or `terra_compatibility`           |
-| `publication_policy`      | `publish_when_review_ready`                    |
+For `evidence_only`, set the exact `target_task_revision_id`. For `audit_task_draft`, use the separately advertised draft contract and policy.
 
-Migration staging is not a public submission policy. A governed operator may retain complete candidate evidence through a separate authenticated workflow. A partner upload cannot select staging, advance a readiness head, or alter the active catalog's eligibility generation.
+## Upload and poll
 
-The response returns `gdpx_submission_id` plus same-origin relations for upload authorization, completion, polling, and cancellation. Upload signing and finalization reuse the v2 upload-session transport linked by the response. Follow those links. Do not construct storage URLs, persist resumable-session credentials, or send the Standard Data API key to object storage.
+Follow the relations in the create response:
 
-### Submit an Audit-only task draft
+1. upload the exact bytes through the returned storage relation;
+2. send only the storage headers returned for that relation;
+3. complete the upload through the returned API relation; and
+4. poll the returned `self` relation until the submission reaches a terminal state.
 
-Build the ZIP from the schema endpoint advertised in `audit_task_draft.schema_endpoint`, then use the same submission and upload-session transport:
+Do not construct storage URLs. Do not send the Standard Data bearer key to object storage.
 
-```bash
-curl --fail-with-body \
-  --request POST "${STANDARD_DATA_API_BASE}/api/v3/gdpx-submissions" \
-  --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
-  --header "Content-Type: application/json" \
-  --header "Idempotency-Key: gdpx-draft-<stable-client-operation-id>" \
-  --data '{
-    "filename": "task-drafts.zip",
-    "content_type": "application/zip",
-    "size_bytes": 123456,
-    "sha256": "<64-lowercase-hex>",
-    "contract_version": "gdpx-audit-task-draft-bundle/1.0.0",
-    "mode": "audit_task_draft",
-    "target_task_revision_id": null,
-    "adapter_mode": "canonical",
-    "publication_policy": "audit_only"
-  }' \
-  --output gdpx-draft-submission.json
-```
+Retain:
 
-Use `adapter_mode: "legacy_snapshot"` only when the fetched draft schema advertises it and the ZIP binds an immutable source release object and exact raw rows. Do not convert guessed or reconstructed fields into a canonical task. A legacy snapshot draft remains blocked until a later immutable submission supplies the missing canonical task definition.
+- the submission ID;
+- source ZIP size and SHA-256;
+- contract, mode, and adapter;
+- terminal state; and
+- every blocker or warning code and JSON pointer.
 
-### Evidence-only submissions
+Correct a blocked source package and create a new immutable submission. Do not claim that the earlier record changed in place.
 
-Use `mode: "evidence_only"` only to attach one run and one rollout to a task revision that Audit already retains. Set `target_task_revision_id` to that exact revision. The submitted `TASK.json`, task-content hash, full workspace inventory, rubric, verifier, and environment bindings must exactly match the retained canonical task.
+## Interpret the result
 
-An evidence-only submission never changes the task head, replaces task bytes, creates a new task revision, or directly mutates the active catalog. Any mismatch blocks the submission. If the task changed, submit a new `task_and_evidence` bundle for the new immutable revision.
+| Result | Interpretation |
+| --- | --- |
+| Draft visible in **Review Tasks** | Audit retained a blocked draft |
+| Submission retained with blockers | Source or evidence is available for diagnosis; the active evidence catalog did not change |
+| `review_ready` | Current v3 technical readiness is satisfied |
+| Task in active evidence catalog and rollout readable | Audit selected that immutable record; this alone is not inclusion in the released GDPx benchmark |
+| QC2–QC4 complete in tracker | Standard Data completed the remaining program reviews |
 
-For an externally supplied evidence-only bundle, Audit first retains and verifies the exact source ZIP generation, signed compatibility authorization, signed completion, Master, criterion ledger, execution approval, and current task authority. It then freezes an immutable append candidate and stops before readiness, membership, catalog, or compatibility activation. An operator must explicitly admit that exact candidate hash against the expected catalog revision and generation. Admission creates a new immutable benchmark revision, preserves every existing rollout and the single qualifying QC1 anchor, appends the new rollout as non-qualifying evidence, prepares a hash-bound compatibility projection, and makes that projection eligible for selection only when the single compare-and-swap advances the matching v3 catalog head. A preparation or catalog conflict leaves the old cohort fully current. There is no public force or bypass parameter.
+The API does not currently expose native QC2, QC3, or QC4 states. Do not infer those stages from `review_ready` or catalog membership.
 
-## Follow the workflow
+## Verify exact readback
 
-```text
-awaiting_upload → sanitizing → normalizing → validating → importing → review_ready
-                                                                  └→ blocked
-```
-
-Poll `GET /api/v3/gdpx-submissions/{gdpx_submission_id}` or the returned `self` link with an `imports:write` credential. `blocked` is terminal for that immutable submission. Cancellation also ends in `blocked` with reason code `SUBMISSION_CANCELLED`; it does not introduce a separate workflow state. The result includes stable issue codes and JSON pointers to missing, mismatched, or unsafe fields.
-
-Handle `blocked` according to its issue code:
-
-- `GDPX_AUDIT_TASK_DRAFT_IMPORTED` means Audit retained and read back every exact draft in the submission. This is the expected terminal result for `audit_task_draft`. Inspect the records through the draft-list API or Wilderness **Review Tasks**. Do not interpret the code as readiness or publication.
-- `GDPX_EVIDENCE_ONLY_OPERATOR_ADMISSION_REQUIRED` means Audit already verified the external evidence-only delivery and froze an exact append candidate. Do not edit or resubmit it. Give the retained candidate ID, candidate SHA-256, and expected catalog revision and generation to the operator admission workflow. The operator either admits those exact bytes or rejects the stale candidate; the public submission remains terminal.
-- A malformed, incomplete, mismatched, or otherwise unfrozen source package has no admissible append candidate. Correct the reported source fields and create a new submission. Do not reuse the old submission ID or claim that its terminal record changed.
-
-Validation is all-or-nothing for publication. It verifies identity bindings, task and workspace hashes, publication declaration, active rights grant and head, managed-execution approval, artifact availability, rubric completeness, criterion evidence, score reconciliation, runtime status, secret scanning, and omission of private reasoning.
-
-The complete publication sequence is:
-
-```text
-v3 submission and archive-only import
-  → managed QC1 run and retained runtime receipt
-  → server verification of committed evidence generations
-  → immutable operator-authenticated managed-execution approval
-  → exact bundle replay or resubmission when advertised
-  → current-policy review-readiness attestation
-  → immutable benchmark-revision membership
-  → active GDPx catalog head
-```
-
-### Catalog admission and reader activation
-
-Audit-only task drafts use a separate reader path. They may be visible in Wilderness **Review Tasks**, but they are absent from `GET /api/v3/gdpx/catalog/current`, have no current rollout, and never appear in **Results**. Their blocker and provenance are the authoritative explanation of what must be supplied next.
-
-`review_ready` is an immutable attestation for one exact task revision, qualifying rollout, Master projection, and policy version. It does not make a task visible by itself. Audit copies that attestation ID and SHA-256 into an immutable benchmark-revision membership, then advances the active GDPx catalog head to the complete benchmark revision. The membership-bound attestation—not a mutable latest-readiness pointer—is the catalog authority.
-
-A catalog task may retain several complete QC1 rollouts, but exactly one admission is the qualifying QC1 anchor bound by membership and readiness. Every rollout exposed as current, publishable evidence must independently satisfy the current readiness policy, including complete evidence, execution approval, compatibility completion, task and workspace identity, source-archive retention, and artifact checks. Historical or compatibility-readable evidence may remain retained without being current or publishable. Additional current rollouts never replace or silently promote themselves over the anchor.
-
-Any compatibility projection used by older readers is prepared and hash-verified before publication, but remains hidden. Audit activates it only after the active v3 catalog admits the same task revision, run, rollout, Master hash, and evidence hash. A partial write therefore cannot expose a score without its Master evidence. Retrying an interrupted activation reuses the retained immutable authorization and completion bindings; it does not mint a different rollout or mutate the historical membership.
-
-The GDPx tab reads `GET /api/v3/gdpx/catalog/current`. It does not infer membership from publication flags, creator labels, run counts, legacy stage labels, or a mutable `is_current` field.
-
-The catalog returns lightweight admitted-rollout identities and evidence hashes. Retrieve the catalog-selected readiness attestation, including its execution approval and compatibility binding, from the review-readiness endpoint. Retrieve Master evidence, criterion chunks, transformation history, and artifact links from the task rollout endpoint.
-
-`review_ready` always means ready under the policy recorded by that attestation. A historical readiness attestation remains immutable. A changed rights head, revoked authorization, mismatched execution approval, or newer policy requires new matching records and a new benchmark revision before the catalog can change; staging or changing a draft/latest readiness pointer alone never changes what Wilderness serves.
-
-Before publication, inspect the submission resource and its `blocking_issues`. The review-readiness route may expose the exact retained record for that same-tenant externally reserved v3 revision, but it does not confer catalog membership; internal-QA-only and unreserved unpublished revisions return `404`. After publication, verify the exact task revision and catalog binding:
+For a record already selected by the active evidence catalog for Wilderness **Results**, check:
 
 ```text
 GET /api/v3/tasks/{task_revision_id}/review-readiness
@@ -524,123 +227,10 @@ GET /api/v3/tasks/{task_revision_id}/runs/{run_id}/rollouts/{rollout_id}
 GET /api/v3/gdpx/catalog/current
 ```
 
-The active catalog is the immutable benchmark revision selected by that durable catalog head.
+The external rollout route is not a general pre-admission preview. A retained candidate that is not selected by the active evidence catalog normally returns `404`; inspect the submission and its blockers instead.
 
-<Warning>
-  GDPx publication is not a temporary preview. Submit only task revisions
-  intended to remain in the tenant's benchmark history. Corrections create a new
-  immutable revision for the same logical task. The public v3 API does not
-  delete evidence or change publication authority; an operator-controlled
-  revocation excludes a task through a new head and catalog revision without
-  erasing history.
-</Warning>
+Confirm that the returned task, run, rollout, score, evidence, and artifact identities match the submitted bytes. Then check the separate benchmark review record for QC2–QC4 completion.
 
-## Terra compatibility mode
+## Legacy v2
 
-Choose `terra_compatibility` only for a legacy or partner-specific package that cannot be emitted canonically **and** only when the current capabilities response lists `terra_compatibility` in `adapter_modes`. If the server does not advertise that adapter, submit a canonical bundle or wait for the trusted adapter to become available; never emulate the adapter client-side. The capabilities response and fetched schema—not this page or a cached client copy—are authoritative for availability and accepted fields.
-
-The raw pre-authority path stays disabled until its model adapter provides durable create-or-observe generation and exact response readback, and an external end-to-end canary has exercised that generation, KMS signing, scanner admission, create-only publication, and exact readback on the pinned deployment. The built-in OpenAI `store=false` adapter does not provide that recovery contract and is therefore unavailable for this path. A configuration-only or read-only probe cannot prove the mutating dependencies and must not enable the capability.
-
-When advertised, the pinned compatibility model may identify source files, map heterogeneous fields, and assign source-derived stable IDs. It does not summarize or paraphrase source evidence. Any presentation field it emits must reproduce a source-bound value under the exact locator rules below. Its exact model revision, adapter prompt version, and release are recorded in the normalized evidence. The public contract does not permit callers to select or substitute a model.
-
-Terra must not:
-
-- rewrite task instructions or rubric meaning;
-- change weights, thresholds, dependencies, or hard gates;
-- invent a prompt, output, test, grading decision, or evidence;
-- summarize or paraphrase retained source evidence;
-- infer missing facts from domain knowledge; or
-- authoritatively rescore the rollout.
-
-Every generated field records its exact source path and file SHA-256, RFC 6901 pointer or retained byte span, input and output hashes, model revision, adapter prompt version, and timestamp. Stable derived IDs bind those source locators; identical values in different locations must not alias. An ambiguous, uncited, colliding, or source-unbound mapping blocks publication. Legacy adapter records remain readable under their frozen contract but cannot create a new transformation.
-
-Raw compatibility normalization is replay-safe. Audit reserves one Firestore operation for the exact tenant, source revision, selector, prompt, model, worker release, authority deployment, and signing key. A renewable fenced lease covers generation, publication, scanning, and commit; stale workers cannot complete after takeover. System-owned immutable request, generation, and publication checkpoints let a retry reuse the exact retained model result and derived source rather than repeat an external effect. A lost caller response replays the first terminal result after exact derived-source and task-authority readback. Before any model call, the selector inspects supported UTF-8 bytes independent of their declared media type, including JSON, NDJSON, YAML-like structures, Unicode-normalized keys, and protected-answer prose. A protected answer, expected output, ideal response, correct or oracle answer/output, target answer, private rubric, privileged message role, publication-control record, agreement, or source-delivery binding excludes that candidate. Ambiguous structured content fails closed. Request and response support records are bounded, hash-bound chunks so every accepted input remains readable under the downstream per-file limit.
-
-Source transport bytes remain inside the recovery-source boundary. Audit copies normalized bundles, transformation records, and certification provenance create-only into the canonical certification store. Before admission, it verifies the exact bucket, object, generation, size, media type, and SHA-256.
-
-If an exact rubric and final output exist but the criterion ledger is absent, rerun the original verifier or judge against the retained output. A policy-approved stronger compatible judge may be used under the judge-dominance rule, but the result must be labeled as regrading. Preserve both scores and block publication for adjudication if they disagree.
-
-Regrading uses a two-stage integrity boundary. Before import, a KMS-signed, one-time intent binds the exact original evidence, unchanged subject attempt, replay inputs, grader, and policy approval. Audit retains and verifies the original bundle before it accepts the regenerated bundle.
-
-After import, Audit—not the model or uploader—derives the regenerated Master, evidence-commit, criterion-ledger, complete subject-evidence, and final-output-manifest hashes. It then writes the immutable dual-ledger record. The intent progresses from `reserved` to `produced` to `completed`; Audit consumes it only after the dual ledger is durable. A pre-import service cannot declare final hashes. A crash between phases must resume the same immutable intent instead of minting another attempt.
-
-The regrader protocol is a deterministic `ensure`/`readback` exchange. Both operations bind the complete authorized request, provider operation and result hashes, and the exact grader release. A timeout, disconnect, or process crash is ambiguous—not a terminal failure—so recovery reads the existing provider result and resumes the same reservation instead of launching another grading call.
-
-Provider and executor each retain a deterministic outbox before making the next call. Retrying an outbox is a create-or-observe operation under the same idempotency identity, never a second grading attempt. Source verification streams the exact generation and hash before the bounded canonical ZIP is materialized. The final `RESULT.json` is written create-only, read back by exact generation, and retained with tenant, object, byte-size, media-type, and SHA-256 bindings before the operation can complete.
-
-The checked-in executor boundary does not imply that a native grader is available. Until capabilities advertise an independently reviewed and attested create-or-observe grader adapter, the executor returns an explicit unavailable state and the regrade remains blocked. Never treat a configured route, disabled deployment descriptor, or retained historical score as proof that native regrading occurred.
-
-Recovery history is append-only and compare-and-swap protected. An expired intent that was never reserved may receive a successor only after the authority atomically records an authenticated `absent_fenced` retirement; that fence and any late reservation contend in the same transaction. Reserved, produced, completed, failed, and otherwise ambiguous intents are never renewed. Concurrent recovery attempts must converge on the winning journal generation, and any missing narrow journal store blocks regrading rather than risking a duplicate judge call.
-
-Judge dominance is an explicit approval, not a model-name comparison made by the uploader. The approval binds the tenant, exact task revision, rubric SHA-256, declared judge identity and digest, replacement judge identity and digest, compatibility finding, dominance finding, policy hash, approver, rationale, and timestamp. The replacement must be a different judge, must evaluate the unchanged retained output under the same scoring contract, and must be approved as both compatible with and stronger than the declared judge. An exact replay with the original judge does not require dominance approval. A missing approval, a changed rubric or output, or a score disagreement blocks publication pending adjudication.
-
-## Legacy migration and reruns
-
-For existing tasks, recover evidence in this order:
-
-1. canonical retained Audit evidence;
-2. reviewer-evidence companions;
-3. immutable release artifacts; and
-4. the original partner delivery.
-
-A derived Master projection must cite those retained sources and record the transformer version. It may improve presentation, but it may not invent missing primary evidence.
-
-Regrade a retained final output when the source rubric and verifier are available. When the historical criterion ledger is wholly absent, record that absence explicitly with null ledger roots and the exact generation- and hash-bound retained source; never fabricate an “original” decision set. The signed regrade records the regenerated ledger as a new immutable revision. Preserve and compare any historical aggregate score: disagreement blocks publication for adjudication, while agreement still retains both the historical observation and regenerated evidence. A regrade source may be exact retained JSON or ZIP evidence; a managed QC1 source remains ZIP-only. Run a fresh GPT-5.6 Luna QC1 rollout only when primary evidence cannot be recovered or the task revision changed. Bind a rerun to the exact immutable revision and native harness; do not use a new run to overwrite historical evidence.
-
-### Operator migration boundary
-
-The public v3 submission endpoint may retain current task definitions or exact legacy release rows with `mode: "audit_task_draft"`. This is the supported fast migration boundary for visibility in Audit and Wilderness **Review Tasks**. It preserves known source bytes and explicitly names unavailable canonical fields. It does not recover rollout evidence or create readiness, benchmark membership, or catalog authority.
-
-There is no public batch-migration endpoint that converts historical records into publishable tasks. A migration inventory or report does not approve execution, establish current readiness, or publish a catalog. Operators recover each exact task/run/rollout from canonical Audit evidence, reviewer companions, immutable release artifacts, and the original partner delivery—in that order. Complete candidates then enter a separate, disabled-by-default internal staging service; partners cannot select this complete-evidence staging mode through `/api/v3/gdpx-submissions`.
-
-The staging service accepts only the dedicated Google OIDC service account and an exact source object locator: bucket, object, generation, byte size, media type, and SHA-256. It copies the ZIP create-only into the private canonical upload boundary. It binds the copy to a deterministic submission and staging intent, completes the normal scanner and processor path, and waits for a durable `retained_inactive` receipt.
-
-The receipt binds the reviewed migration report and plan, task revision, stage role, requested and retained object locators, canonical task and workspace hashes, compatibility completion, and immutable readiness-attestation ID and digest. Staging retains complete evidence. It never advances a readiness head, eligibility epoch, compatibility reader, benchmark membership, or catalog head.
-
-Every phase is idempotent. A retry after source copy, intent retention, upload finalization, queue dispatch, or processor completion must resume and verify the same objects and records. It must not create a different submission, replace bytes, or treat a missing receipt as success.
-
-<Warning>
-  Audit-only draft retention does not prove that the complete-evidence migration
-  runtime is available. Use the live capability response for the draft path.
-  The separate publication migration remains disabled until Standard Data
-  verifies its staging database or persistence broker, orchestration runner,
-  identities, revisions, images, routes, audiences, IAM, and readbacks. The
-  staging identity must not receive database-wide Firestore access.
-</Warning>
-
-Local recovery sources may enter the operator boundary only through the create-only source-promotion command. It writes content-addressed objects and accepts an existing object only after tenant metadata, exact generation, size, media type, SHA-256, and byte readback reconcile. Promotion produces a distinct immutable cloud-bound source manifest. It does not authorize a model call, QC1 launch, submission, membership change, or catalog switch.
-
-Source promotion must run as the dedicated migration source-promoter identity with create/readback-only access to the exact source prefix. Developer ADC, the public API runtime, and the migration operator identity are not acceptable substitutes.
-
-Migration recovery has two coherent phases for its active path. In the closed phase, the operator runtime, normalizer authority, managed-QC1 authority, and managed execution are all disabled. In the executable phase, all four are enabled. Mixed phases are rejected. The executable phase requires new deployment hashes plus exact read-only infrastructure and IAM readback before any recovery call.
-
-The recovery CLI keeps fresh model execution off by default. An operator may add `--managed-qc1` only to an `--apply` invocation that also supplies the exact signed authorization manifest and expected migration-report SHA-256. That flag installs the deployment-owned authenticated QC1 port; it does not bypass configuration, per-task signed rollout approval, native-harness, or evidence-completeness checks. Without the flag—or when any required runtime binding is absent—tasks that need a fresh rollout remain explicitly blocked.
-
-The native-control service reads the authoritative operation from the dedicated journal and enforces the allowed port/state transition before contacting a provider. Observation is read-only and distinguishes an absent resource from an asynchronous pending resource. Canonical candidates contain compact, replay-stable generation/hash references instead of embedding trajectories or rollout bodies; large native values must be retained as exact object references rather than Firestore document fields.
-
-<Warning>
-  The checked-in Modal/Harbor QC1 worker remains capture-only. Harbor 0.21 cannot execute both the exact prepared Modal image ID and an immutable model revision, so it fails closed with `PINNED_HARBOR_EXECUTION_UNSUPPORTED`. Do not substitute Prime, a model alias, metadata labels, or an unpinned image. Fresh migration QC1 remains unavailable until a reviewed Modal/Harbor create-or-observe provider supplies both immutable execution authorities and passes lost-reply, IAM, artifact-readback, and live canary checks.
-</Warning>
-
-The migration regrader is excluded from both normalization/QC1 phases and has its own disabled-by-default authority boundary. The signed regrade-intent and processor-finalization contracts do not make that runtime available by themselves. Enable it only when capabilities advertise the separately pinned authority, grader, storage, KMS, and finalization releases; do not route regrading through the normalization or managed-QC1 identities.
-
-Normalization and managed GPT-5.6 Luna execution are separate active-path operations. Regrading remains unavailable unless its distinct signed-intent, grader, and processor-finalization capabilities are all advertised. A retained output may then be regraded only with its exact rubric and verifier or a policy-approved judge-dominant replacement. A missing primary output requires a fresh managed Modal/Harbor QC1 rollout on the exact revision and native harness. Managed execution is asynchronous: an idempotent ensure operation is observed through bounded status reads and may return a canonical bundle only after a terminal success. If approved tooling cannot produce the canonical bundle and managed-execution approval, the task remains blocked; an operator may not edit the migration report or database to make it review-ready.
-
-Before switching the active catalog, operators must review immutable JSON, CSV, and human-readable migration reports. They must validate exactly one canonical finance, LuminAI healthcare, Engram biology, legal, hardware, and code canary. Every candidate must have complete Master evidence, all six forensic sections, a reconciled criterion ledger, verified artifacts, an exact retained canonical source ZIP generation, and current publication and execution authority.
-
-A receipt manifest must resolve every staging receipt by ID and hash. A first-time regrade requires both its original and regenerated receipts. Before cutover, Audit materializes and verifies the exact proposed revision, memberships, rollout admissions, compatibility candidates, and catalog head. The catalog switch is one compare-and-swap to that immutable benchmark revision. After the switch, Audit re-reads the selected head, revision, membership and admission roots, compatibility projections, and artifacts. Any stale authority, missing field, unresolved task, failed domain canary, or unavailable rollback procedure blocks cutover.
-
-The internal `gdpx:orchestrate-migration` command builds a hash-bound dry-run plan and immutable JSON, CSV, and Markdown reports. Apply mode accepts only the exact plan and migration-report hash. It invokes the internal staging service for each generation-bound candidate and emits a hash-bound receipt manifest. It never switches the catalog.
-
-Use the receipt manifest to build a fresh live snapshot and final migration report. `gdpx:verify-migration-candidate` materializes the exact proposed release through capture-only write ports and proves it before the catalog compare-and-swap. `gdpx:verify-migration-canaries` validates the six named canonical domain bundles. `gdpx:verify-current-release` performs the final read-only check against the exact active v3 catalog. It revalidates the committed membership and rollout-admission roots, membership-bound readiness attestations, every admitted rollout, and each artifact's bound generation, size, and SHA-256. A release requires passing reports with zero missing fields. These commands do not repair evidence or replace same-tenant, anonymous, and cross-tenant HTTP authorization tests.
-
-Before cutover, generate and retain a `gdpx:rollback-catalog` plan for the exact current and previous head. Applying it requires the exact plan SHA-256 plus the unchanged expected current revision and generation. Rollback revalidates the target revision under current policy and performs a compare-and-swap; it has no force mode and does not erase the rejected revision.
-
-<Warning>
-  The legacy v39 backfill command is inventory-only and cannot publish evidence
-  or switch the GDPx catalog. The current internal migration reporter can
-  publish only a cohort that is already current-policy `review_ready`; it does
-  not reconstruct evidence, rerun a verifier, or schedule Modal/Harbor work.
-</Warning>
-
-See [Rollout viewer evidence](/gdpx/rollout-viewer-evidence) for the display contract and [Partner delivery and review](/gdpx/benchmark-task-delivery) for QC requirements.
+`POST /api/v2/workspace-submissions` creates legacy draft revisions only. It cannot add a task to the active evidence catalog or certify any QC stage. Use it only when Standard Data explicitly directs you to the [legacy draft import](/gdpx/import-approved-tasks).

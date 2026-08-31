@@ -1,184 +1,67 @@
 ---
 title: "Import a draft workspace with v2"
 sidebarTitle: "Legacy draft import"
-description: "Upload and preflight a workspace as draft Audit revisions without publishing it to GDPx."
-keywords: ["GDPx", "Audit v2", "draft workspace", "resumable upload", "immutable task revision"]
+description: "Use the legacy v2 workspace flow only when Standard Data asks you to create draft Audit revisions."
+keywords: ["GDPx", "Audit v2", "draft workspace", "legacy import"]
 ---
 
-The v2 workspace API accepts one ZIP, sanitizes and maps it, runs the pinned v15 static admission policy, and may create immutable **draft** task revisions in Audit. It is retained for compatibility with existing workspace clients.
+`POST /api/v2/workspace-submissions` is a legacy draft-import workflow. It can retain draft task revisions for review. It cannot create a canonical v3 catalog candidate, pass a QC stage, or add a task to the active evidence catalog.
 
 <Warning>
-  v2 does not publish a task into GDPx or surface its draft in Wilderness
-  **Review Tasks**. Follow [GDPx workflow](/gdpx/workflow) and use [Upload an
-  evaluation bundle](/gdpx/evaluation-bundle-upload) only with contracts and
-  modes advertised by v3 capabilities. Publication also requires current
-  authority, approved managed execution, current-policy `review_ready` status,
-  and active catalog membership.
+  Do not use v2 when your goal is entry into the active evidence catalog. Use [v3 evaluation bundle upload](/gdpx/evaluation-bundle-upload).
 </Warning>
 
-## Choose v2 or a v3 Audit-only draft
+## When to use v2
 
-Use v2 for compatibility with an existing workspace client that needs the v15 mapping and static-admission workflow. Use `mode: "audit_task_draft"` on the v3 submission endpoint when you need a task to exist natively in the v3 backend and appear as a blocked record in Wilderness **Review Tasks**.
+Use this flow only when Standard Data explicitly directs you to create a legacy draft workspace.
 
-| Path | Retained record | Wilderness visibility | Publication effect |
-| --- | --- | --- | --- |
-| v2 workspace submission | Immutable v2 task revision after mapping and preflight | Legacy Task Explorer may show the preferred current revision; not **Review Tasks** or **Results** | Cannot create v3 readiness or membership |
-| v3 canonical Audit draft | Exact canonical task and complete workspace inventory | **Review Tasks** with `GDPX_QC1_EVIDENCE_REQUIRED` | None |
-| v3 legacy-snapshot Audit draft | Exact raw release row, release generation and hash, row index, and unavailable-field list | **Review Tasks** with `GDPX_CANONICAL_TASK_DEFINITION_REQUIRED` | None |
-| v3 task-and-evidence submission | Exact task plus complete QC1 evidence | **Results** only after every publication gate passes | May become a catalog member |
+| Workflow | Purpose | Can enter the active evidence catalog? |
+| --- | --- | --- |
+| `POST /v1/evaluate` | Review one document | No |
+| `POST /api/v2/workspace-submissions` | Create legacy draft revisions | No |
+| `POST /api/v3/gdpx-submissions` | Retain a v3 draft or submit task and evidence | Can create an active evidence-catalog candidate; final benchmark release still requires QC4 |
 
-A v3 Audit-only import deliberately ends in `blocked` with `GDPX_AUDIT_TASK_DRAFT_IMPORTED`. This means Audit retained and read back the exact immutable drafts. It does not mean that QC1, review readiness, or publication succeeded.
+A v2 task shown in a legacy explorer remains a draft. It is not a v3 **Review Tasks** record and it is not a Wilderness **Results** record.
 
-The legacy Wilderness Task Explorer can read Audit's v2 task index and prefer the current revision for each logical task. That UI projection does not migrate the revision into v3, prove that v3 retained the same source bytes, or supply missing rollout logs. Use the v3 draft-list API or **Review Tasks** to verify a v3-native draft.
-
-V2 also has no internal-QA exact-byte attestation path. It cannot authorize retention of credential-like fixture literals or substitute for the v3 attestation, operator statement, grant, and active-head checks.
-
-A successful `/v1/evaluate` response—including `ready_to_submit: true`—does not authorize either workflow. v1 provides document feedback; v2 creates draft revisions; v3 enforces publication readiness.
-
-For benchmark QC3, keep full traces, rewards, and failure analyses under `trajectory/`. Index those root-relative artifacts in `tasks/<task_name>/TASK.json.rollouts`. Audit reads this intake manifest but keeps it out of the agent runtime. Uploaded results are supplied evidence; Audit does not claim to have executed them.
-
-## Configure one API origin and key
+## Discover the v2 contract
 
 ```bash
 export STANDARD_DATA_API_BASE="https://api.standarddata.io"
 export STANDARD_DATA_API_KEY="<your-standard-data-api-key>"
-```
 
-The same key may call `/v1` document feedback and `/api/v2` canonical submission. Workspace submission requires `uploads:write`, `imports:write`, and `tasks:read` in addition to the evaluation scopes.
-
-<Note>
-  Store long-lived customer keys in a managed secret store such as Google Secret Manager, AWS Secrets Manager, Azure Key Vault, or a server-side encrypted credential vault. Inject them at runtime. Never commit them, paste them into task archives, include them in logs, or store them in browser `localStorage`. Wilderness browser sessions use short-lived Firebase credentials instead of customer API keys.
-</Note>
-
-## 1. Check intake readiness
-
-Do this before showing a file picker or attempting a mutation:
-
-```bash
 curl --fail-with-body \
   --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
   "${STANDARD_DATA_API_BASE}/api/v2/intake-capabilities" \
-  --output intake-capabilities.json
+  --output v2-intake-capabilities.json
 ```
 
-The response state is:
+Follow the returned v2 relations and limits. Do not use this response to infer v3 modes, schemas, adapters, or availability.
 
-| State | Meaning |
-| --- | --- |
-| `ready` | The key, v15 policy, upload service, scanner, queue, worker, and storage are ready |
-| `missing_access` | The tenant binding or required scopes are missing |
-| `temporarily_unavailable` | Global submission or required infrastructure is not ready; retry later |
-| `incompatible` | The client or deployed policy contract is incompatible and must be updated |
+## Submit the workspace
 
-The response also returns `reason_code`, effective and missing scopes, ZIP limits, the pinned `protocolrev_dq_v15_15_0_0` policy, component readiness, and same-origin links. Create a submission only when `state` is `ready`.
+The v2 flow uses the legacy workspace contract returned by its capability response:
 
-The v2 capability response may describe its legacy workspace contract. It is not a v3 draft or publication schema. Fetch v3 capabilities, follow `audit_task_draft.schema_endpoint` for Audit-only retention, and fetch `GET /api/v3/gdpx/schemas/review-bundle` for publication candidates. Treat the v3 capability response as authoritative for admission, accepted modes, and adapter availability.
+1. create the workspace submission;
+2. upload the exact ZIP through the returned storage relation;
+3. complete the upload;
+4. review any adapter preview or mapping warnings; and
+5. poll the returned submission relation.
 
-## 2. Create one durable submission
+Keep runnable task files, supplied evidence, and review documents separated according to the v2 contract. Uploaded results remain supplied evidence; v2 does not validate managed execution.
 
-Hash the ZIP with SHA-256, choose a stable idempotency key for this exact operation, and send:
+## Interpret the result
 
-```bash
-curl --fail-with-body \
-  --request POST "${STANDARD_DATA_API_BASE}/api/v2/workspace-submissions" \
-  --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
-  --header "Content-Type: application/json" \
-  --header "Idempotency-Key: workspace-<stable-client-operation-id>" \
-  --data '{
-    "filename": "task-workspace.zip",
-    "content_type": "application/zip",
-    "size_bytes": 12345678,
-    "sha256": "<64-lowercase-hex-characters>",
-    "commit_policy": "automatic_when_eligible"
-  }' \
-  --output workspace-submission.json
-```
+The import may create immutable draft revisions or remain blocked with source-package findings. Neither outcome adds the task to the active evidence catalog or released GDPx benchmark.
 
-A successful creation returns `201`, a `Location` header, `workspace_submission_id`, `state`, the existing upload-session projection under `upload`, and same-origin links for polling and upload controls. The current ZIP limit is `1 GiB`.
+To move a draft task into the current GDPx workflow:
 
-Reusing the same `Idempotency-Key` with the same body returns the same durable workflow. Reusing it with a different body returns `409 IDEMPOTENCY_KEY_REUSED`.
+1. recover the exact runnable task and complete workspace;
+2. prepare the canonical v3 `TASK.json` and evidence files from the live schema;
+3. obtain a qualifying managed QC1 attempt through Standard Data; and
+4. submit through `/api/v3/gdpx-submissions`.
 
-## 3. Upload the ZIP
+Do not copy a v2 intake manifest or partner `TASK.json` into the strict v3 schema. Normalize the task explicitly.
 
-Follow links from the response rather than constructing paths:
+## Immutable revisions
 
-1. Call `links.sign_parts` to register archive part `1`.
-2. Fetch the returned part capability. It contains a short-lived write-only resumable GCS session URI.
-3. Upload the ZIP with resumable `PUT` requests and exact `Content-Range` headers. Do not send the Standard Data API key to GCS.
-4. Call `links.finalize_parts` with part `1`, its exact size, and the final ETag.
-5. Call `links.complete_upload` with an empty JSON object.
-
-Audit binds the declared bytes and SHA-256, inventories ZIP entries, sanitizes paths and retained content, and scans the immutable object generation before mapping begins. Signed upload capabilities are bearer credentials: keep them in memory, never log or persist them, and discard them after upload.
-
-## 4. Poll one workspace resource
-
-Poll `links.self` with the Standard Data API key. Closing the browser does not stop server-side processing.
-
-```bash
-curl --fail-with-body \
-  --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
-  "${STANDARD_DATA_API_BASE}/api/v2/workspace-submissions/workspacesubmission_..."
-```
-
-The durable states are:
-
-```text
-awaiting_upload -> uploading -> sanitizing -> mapping -> preflighting -> importing -> succeeded
-```
-
-`blocked`, `failed`, `expired`, and `cancelled` are terminal. The response progressively adds the sanitized source-bundle ID, adapter preview, public-safe v15 admission attestation, task import, blocking issues, and created task revision IDs.
-
-The workflow imports all mapped draft tasks or none. Warnings do not block. Missing required checks, degraded evaluation, ambiguous mappings, review-required results, or any task blocker produce `blocked` and create no task revisions. Results in the ZIP remain supplied, unvalidated evidence. V2 cannot issue a managed-execution approval. Only the v3 workflow can bind an approved managed run to current-policy readiness.
-
-## Verify reviewer evidence after import
-
-After a submission succeeds, inspect each created revision in Audit’s v2 draft viewer. Confirm that the task bytes and any supplied evidence are mapped as expected. The legacy Wilderness Task Explorer may also project the preferred v2 revision, but that is not a v3 import. If you need immutable v3 draft visibility in Wilderness **Review Tasks**, use the separately advertised `gdpx-audit-task-draft-bundle/1.0.0` contract. Inspecting a rollout in Wilderness **Results** is possible only after a qualifying v3 submission, managed execution approval, current-policy readiness, and active catalog membership.
-
-A visible score with unavailable rollout detail is a source-evidence gap, not a reviewer-permission issue. Do not count that attempt toward QC or difficulty assessment. Recover the exact original execution evidence, rebuild the archive, and submit it as a new immutable revision. Do not substitute a different model run or attach evidence from another task revision.
-
-See [Preserve reviewer-visible rollout evidence](/gdpx/benchmark-task-package#preserve-reviewer-visible-rollout-evidence) for the mandatory delivery contract and permitted omissions.
-
-## Structured errors
-
-Canonical v2 errors use this safe envelope:
-
-```json
-{
-  "error": {
-    "code": "MACHINE_STABLE_CODE",
-    "message": "Safe summary",
-    "request_id": "req_...",
-    "retryable": false,
-    "details": [{ "path": "/field", "code": "INVALID_FIELD" }],
-    "links": {
-      "regenerate_preview": "/api/v2/source-bundles/sourcebundle_.../adapter-previews"
-    }
-  }
-}
-```
-
-`error.links` is optional and contains only bounded, same-origin API paths. When `code` is `PREFLIGHT_POLICY_CHANGED`, discard the stale preview and follow `links.regenerate_preview` with the documented adapter-preview request, or start a new workspace submission with the same corrected ZIP. Never display an API path as an end-user URL, and never follow an unknown relation or a cross-origin value.
-
-| Status | Typical meaning |
-| --- | --- |
-| `401` | Missing, malformed, expired, inactive, or revoked credential |
-| `403` | Missing tenant binding or required scope |
-| `409` | Idempotency reuse, policy change requiring preview regeneration, or immutable mapping conflict |
-| `422` | Invalid archive, blocked mapping, or failed v15 admission |
-| `503` | Global submission mode or required infrastructure is unavailable; honor `Retry-After` |
-| `421` | `/api/v2` was sent to a legacy task-feedback origin; retry against the returned canonical origin |
-
-Do not convert every error to “not found.” Preserve the HTTP status, `error.code`, `request_id`, `retryable`, details, workflow stage, and `Retry-After` when presenting remediation.
-
-## View draft revisions
-
-After `state: "succeeded"`, use the tenant-scoped viewer endpoints:
-
-```text
-GET /api/v2/tasks
-GET /api/v2/tasks/{task_revision_id}
-GET /api/v2/tasks/{task_revision_id}/workspace
-GET /api/v2/tasks/{task_revision_id}/files
-```
-
-An import creates new immutable draft revisions; it never edits an existing revision in place. These records do not appear in the active GDPx catalog until a v3 submission supplies complete current-revision evidence, obtains matching rights and managed-execution approvals, and reaches current-policy `review_ready`.
+An import creates a new draft revision. It does not edit an older revision in place. Keep the source ZIP hash, returned revision IDs, and blocker records so later normalization can cite the exact source.

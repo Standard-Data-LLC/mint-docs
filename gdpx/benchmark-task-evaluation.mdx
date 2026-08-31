@@ -5,11 +5,11 @@ description: "Check task construction, calibrate the verifier, and analyze rollo
 keywords: ["GDPx", "benchmark evaluation", "failure analysis", "reward integrity"]
 ---
 
-Evaluate the exact bytes you plan to deliver. If you change the instruction, environment, rubric, verifier, or source material, rerun the applicable checks on the new revision.
+Evaluate the exact bytes you plan to deliver. Any change to the instruction, environment, rubric, verifier, or source material creates a new revision, so rerun the applicable checks.
 
 ## Authoring checks
 
-These checks happen before the four benchmark QC stages.
+Run these checks before the four benchmark QC stages.
 
 | Check | Expected result | Requirement |
 | --- | --- | --- |
@@ -17,13 +17,13 @@ These checks happen before the four benchmark QC stages.
 | Known-good solution | The reference output receives the intended passing score | Required when a reasonable reference can be supplied; otherwise document the equivalent solvability check |
 | No-op or known-bad output | Empty, irrelevant, or clearly wrong work fails | Required when applicable; otherwise document the equivalent negative control |
 
-Authoring teams may call these G0, G1, and G2. Those labels are checks, not QC0–QC2 or tracker stages.
+Authoring teams may call them G0, G1, and G2. Those are authoring checks, not QC0–QC2 or tracker stages.
 
-For direct GDPx Harbor delivery, the verifier writes `/logs/verifier/reward.json`. A capability-advertised adapter may accept its documented native verifier output and normalize it, but the canonical record must still contain verifier evidence and criterion decisions that reproduce the score.
+For a direct GDPx Harbor delivery, the verifier writes `/logs/verifier/reward.json`. A capability-advertised adapter may accept and normalize its documented native verifier output. The canonical record must still include verifier evidence and criterion decisions that reproduce the score.
 
 ## Calibrate the verifier
 
-Use deterministic checks for facts that code can settle. Use a judge only for criteria that require practitioner judgment.
+Use deterministic checks wherever code can settle the question. Reserve a judge for criteria that require practitioner judgment.
 
 For every rubric criterion:
 
@@ -33,17 +33,17 @@ For every rubric criterion:
 - define dependencies or hard gates explicitly; and
 - make the final numeric score and threshold-derived pass/fail outcome reproducible.
 
-Weights must sum to one only for a weighted aggregation. Unweighted and custom aggregation rules need their own deterministic reconciliation.
+For weighted aggregation, the weights must sum to one. Unweighted and custom aggregation rules need their own deterministic reconciliation.
 
-Calibrate with a known-good output and a known-bad output or equivalent negative control. Add a partial-credit anchor when the task uses partial credit or a judge. Vary wording and formatting without changing substance; the score should remain stable. Add irrelevant detail; the score should not improve.
+Calibrate against a known-good output and a known-bad output or equivalent negative control. If the task uses partial credit or a judge, add a partial-credit anchor. Then vary the wording and formatting without changing the substance: the score should stay stable. Add irrelevant detail: the score should not improve.
 
 ## Calibrate difficulty
 
-Use the written evaluation plan for the target model tiers, harnesses, and attempt counts. GDPx does not apply one universal pass-rate band to every task.
+Follow the written evaluation plan for target model tiers, harnesses, and attempt counts. GDPx does not use one universal pass-rate band for every task.
 
-Core benchmark items should produce useful separation at the intended frontier. Easier items may serve as anchors. A zero-pass task may remain only when it is demonstrably solvable and the criterion-level scores still provide useful signal.
+Core benchmark items should separate performance at the intended frontier. Easier items can serve as anchors. Keep a zero-pass task only when it is demonstrably solvable and its criterion-level scores still provide useful signal.
 
-Before making a difficulty claim, pin:
+Before you make a difficulty claim, pin:
 
 - model and provider revision;
 - harness and harness version;
@@ -56,7 +56,7 @@ QC3 attempt counts are defined on [Partner delivery](/gdpx/benchmark-task-delive
 
 ## Analyze every failed attempt
 
-Every failed attempt used in review needs a readable failure-analysis summary grounded in the retained evidence.
+Every failed attempt used in review needs a readable failure analysis grounded in the retained evidence.
 
 Include:
 
@@ -69,26 +69,26 @@ Include:
 - confidence and any unresolved ambiguity; and
 - the smallest repair and required rerun, if applicable.
 
-Use [Analyze a benchmark rollout](/gdpx/benchmark-rollout-analysis) for an optional structured first pass. Its response is not a QC decision. If you call it, retain the exact request, response, citations, and fingerprints beside the same attempt.
+For an optional structured first pass, use [Analyze a benchmark rollout](/gdpx/benchmark-rollout-analysis). Its response is not a QC decision. If you call it, keep the exact request, response, citations, and fingerprints with the same attempt.
 
 <Warning>
-  Do not request, infer, retain, or expose private chain of thought. Ground the analysis in observable messages, tool activity, state changes, artifacts, and verifier output.
+  Never request, infer, retain, or expose private chain of thought. Base the analysis on observable messages, tool activity, state changes, artifacts, and verifier output.
 </Warning>
 
 ## Use hints only as diagnostic probes
 
-A hint can test whether a suspected failure cause is real. It must not reveal the solution.
+A hint can test a suspected failure cause, but it must not reveal the solution.
 
 1. Identify the first likely failure from observable evidence.
 2. Write a hint that names the dimension to reconsider without naming the answer.
 3. Rerun the same pinned envelope.
 4. Record the hint, rationale, result, and interpretation.
 
-Hinted attempts are diagnostic. They do not count toward the unhinted subject total.
+Hinted attempts are diagnostic only. They do not count toward the unhinted subject total.
 
 ## Review reward integrity
 
-Inspect passing as well as failed attempts. A suspicious pass can reveal:
+Inspect both passing and failed attempts. A suspicious pass may reveal:
 
 - test or verifier modification;
 - hardcoded expected outputs;
@@ -97,11 +97,11 @@ Inspect passing as well as failed attempts. A suspicious pass can reveal:
 - a pass without completing the intended work; or
 - a judge that rewards style instead of substance.
 
-Retain confirmed exploits as evidence, exclude them from reported success rates, repair the verifier, and rerun the new revision.
+Keep confirmed exploits as evidence, exclude them from reported success rates, repair the verifier, and rerun the new revision.
 
 ## Report distributions
 
-At the task or batch level, report:
+For each task or batch, report:
 
 1. the failure taxonomy and review method;
 2. counts by failure origin and model;
@@ -109,13 +109,13 @@ At the task or batch level, report:
 4. reward-integrity findings and exclusions; and
 5. known limits of the evidence.
 
-Do not force ambiguous evidence into a model-failure category.
+Leave ambiguous evidence unresolved rather than forcing it into a model-failure category.
 
 ## Review the correct package
 
 ### Partner source handoff
 
-Confirm that:
+Check that:
 
 - task identities map cleanly to native evidence;
 - every environment is reproducible and resettable;
@@ -126,7 +126,7 @@ Confirm that:
 
 ### Canonical v3 bundle
 
-Confirm that:
+Check that:
 
 - the bundle follows the live capability response and linked schema;
 - canonical `TASK.json` contains no `rollouts` field;

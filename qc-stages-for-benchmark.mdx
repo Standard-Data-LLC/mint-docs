@@ -4,40 +4,40 @@ sidebarTitle: "QC stages"
 description: "Understand the four GDPx review stages, their evidence requirements, and how they relate to API status."
 ---
 
-GDPx uses four program review stages. The stages apply to one exact task revision. Changing the instruction, environment, rubric, verifier, or source material creates a new revision that must be reviewed again.
+GDPx has four program review stages, all tied to one exact task revision. Change the instruction, environment, rubric, verifier, or source material, and the new revision must go through review again.
 
 ## Before QC: runnable readiness
 
-A task can enter QC when its environment builds and resets, its required files and tools are available, its verifier produces interpretable output, and its solvability and verifier-calibration evidence are present.
+A task can enter QC only after its environment builds and resets, its required files and tools are available, its verifier produces interpretable output, and its solvability and verifier-calibration evidence are present.
 
-This readiness check is not QC0 or Stage 0. Authoring teams may call the build check G0, but G0 is not a benchmark stage.
+This readiness check is not QC0 or Stage 0. Authoring teams may call the build check G0; G0 is still not a benchmark stage.
 
 ## Stage definitions
 
 <AccordionGroup>
   <Accordion title="QC1: Construction integrity">
-    Standard Data runs or verifies one qualifying managed smoke attempt on the exact task revision. Failed or rejected construction attempts may precede it and do not count. The environment, tools, source files, reset behavior, verifier, and evidence capture must all work. The qualifying attempt must include complete reviewer-visible evidence.
+    Standard Data runs or verifies one qualifying managed smoke attempt on the exact task revision. Earlier construction attempts may fail or be rejected; they do not count. The environment, tools, source files, reset behavior, verifier, and evidence capture must all work, and the qualifying attempt must include complete reviewer-visible evidence.
 
-    A partner-supplied run can help diagnose the task, but it does not approve itself. QC1 confirms construction, not difficulty.
+    A partner-supplied run can help diagnose the task, but it cannot approve itself. QC1 confirms construction, not difficulty.
   </Accordion>
   <Accordion title="QC2: Difficulty and reward integrity">
-    Standard Data reviews repeated current-revision attempts for useful, non-saturated difficulty and a trustworthy reward signal. Successful attempts must solve the intended task. Failed attempts must be legitimate model failures. The verifier must resist leakage, reward hacking, false positives, and false negatives.
+    Standard Data reviews repeated current-revision attempts for useful, non-saturated difficulty and a trustworthy reward signal. Successful attempts must solve the intended task, and failed attempts must reflect legitimate model failures. The verifier must resist leakage, reward hacking, false positives, and false negatives.
 
-    If the QC1 model repeatedly passes or reaches the score ceiling, keep the task in QC1, harden or remove it, and rerun the new revision. One failure is also insufficient to establish difficulty.
+    If the QC1 model repeatedly passes or reaches the score ceiling, keep the task in QC1, harden or remove it, and rerun the new revision. A single failure is not enough to establish difficulty either.
   </Accordion>
   <Accordion title="QC3: Benchmark evaluation">
-    Run the written model–harness matrix on the frozen revision after QC1 and QC2. The current default is 16 completed subject attempts per task for each required pairing unless Standard Data issues a different campaign plan.
+    After QC1 and QC2, run the written model–harness matrix on the frozen revision. The current default is 16 completed subject attempts per task for each required pairing, unless Standard Data issues a different campaign plan.
 
     Setup failures, provider failures, retries, Oracle runs, hinted runs, and calibration probes do not count toward the subject total.
   </Accordion>
   <Accordion title="QC4: Release review">
-    Standard Data reviews the complete evaluation set, resolves material scoring or evidence issues, normalizes accepted records, and makes an explicit inclusion, rework, or removal decision.
+    Standard Data reviews the complete evaluation set, resolves material scoring or evidence issues, and normalizes accepted records. It then makes an explicit decision to include, rework, or remove the task.
   </Accordion>
 </AccordionGroup>
 
 ## What the API does and does not certify
 
-The current v3 backend enforces canonical task and evidence requirements for the active evidence catalog around managed QC1. QC2, QC3, and QC4 are program review stages recorded separately.
+The current v3 backend enforces the canonical task and evidence requirements for the active evidence catalog around managed QC1. QC2, QC3, and QC4 remain separate program review stages.
 
 | Signal | What it means | What it does not mean |
 | --- | --- | --- |
@@ -46,15 +46,15 @@ The current v3 backend enforces canonical task and evidence requirements for the
 | Active evidence-catalog membership | The v3 catalog selected that immutable task record | The task is included in the released GDPx benchmark |
 | Tracker stage | Standard Data recorded the applicable program review decision | The API contains a native QC2, QC3, or QC4 state |
 
-Use the tracker or written review record for the four-stage status. Use Audit for immutable task, evidence, readiness, and catalog records.
+Use the tracker or written review record for four-stage status. Use Audit for immutable task, evidence, readiness, and catalog records.
 
 <Warning>
-  A blocked task may appear in Wilderness **Review Tasks**. It cannot appear in **Results** merely because it was uploaded or retained. Review Tasks and Results are different surfaces.
+  A blocked task may appear in Wilderness **Review Tasks**, but an upload or retained record alone does not put it in **Results**. Review Tasks and Results are different surfaces.
 </Warning>
 
 ## Evidence required at every stage
 
-Every countable subject or model attempt used in a QC decision must preserve:
+Every countable subject or model attempt behind a QC decision must preserve:
 
 - the exact task revision and agent-visible prompt;
 - environment and setup logs;
@@ -65,26 +65,26 @@ Every countable subject or model attempt used in a QC decision must preserve:
 - score aggregation, threshold, outcome, and reconciliation; and
 - the exact model, harness, configuration, limits, timing, and attempt identity.
 
-Every failed countable attempt also needs an evidence-grounded failure-analysis summary. It must identify the first observable failure, the affected criterion or test, the failure origin, supporting evidence, solvability, and the required repair or rerun. Retain setup, provider, and pre-launch failures separately as diagnostics rather than forcing them into a scored attempt.
+Every failed countable attempt also needs a failure-analysis summary grounded in the evidence. It must identify the first observable failure, the affected criterion or test, the failure origin, supporting evidence, solvability, and the required repair or rerun. Keep setup, provider, and pre-launch failures as separate diagnostics rather than forcing them into a scored attempt.
 
-The [rollout-analysis endpoint](/gdpx/benchmark-rollout-analysis) is optional. If you call it, retain its exact request, response, and fingerprints. Its recommendation supports the reviewer; it never advances a QC stage by itself.
+The [rollout-analysis endpoint](/gdpx/benchmark-rollout-analysis) is optional. If you call it, keep its exact request, response, and fingerprints. Its recommendation can support the reviewer, but it never advances a QC stage by itself.
 
 ## Upload rollout evidence and analysis
 
-Keep source handoffs and canonical submissions separate:
+Source handoffs and canonical submissions are different package types:
 
 1. A partner source handoff may preserve the complete native rollout corpus in an approved layout.
 2. A canonical v3 `task_and_evidence` submission contains one evaluation and one rollout for each unique task in the ZIP.
 3. A canonical v3 `evidence_only` submission contains one rollout candidate for one exact retained task revision.
 4. Standard Data owns QC3 ingestion and campaign mapping. Partners preserve the complete native corpus and submit individual attempts through `evidence_only` only when an operator provides the target revision and admission plan.
 
-An `evidence_only` submission can attach the first QC1 attempt to an exact retained canonical Audit draft. For an already retained revision, it freezes a later attempt candidate that requires separate operator admission and leaves the qualifying QC1 anchor unchanged.
+An `evidence_only` submission can attach the first QC1 attempt to an exact retained canonical Audit draft. For an already retained revision, it freezes a later attempt candidate. That candidate requires separate operator admission and leaves the qualifying QC1 anchor unchanged.
 
 See [Task packaging](/gdpx/benchmark-task-package) for the two layouts and [Evaluation bundle upload](/gdpx/evaluation-bundle-upload) for the v3 API contract.
 
 ## Check capabilities before promising catalog admission
 
-Read the live capability response before upload:
+Read the live capability response before you upload:
 
 ```text
 GET /api/v3/gdpx/capabilities
@@ -97,11 +97,11 @@ Check:
 - the advertised contract, modes, adapters, and schema links; and
 - `managed_execution_trust.managed_qc1_execution.available`.
 
-If managed QC1 is unavailable, the service may still retain an accepted upload, but you cannot promise end-to-end QC1 completion or active evidence-catalog admission. Read the accompanying blocker rather than inferring availability.
+If managed QC1 is unavailable, the service may still retain an accepted upload. You still cannot promise end-to-end QC1 completion or active evidence-catalog admission. Read the accompanying blocker instead of inferring availability.
 
 ## Verify the record
 
-For a task already selected by the active evidence catalog for Wilderness **Results**, verify the exact immutable records:
+For a task already selected by the active evidence catalog for Wilderness **Results**, verify these exact immutable records:
 
 ```text
 GET /api/v3/tasks/{task_revision_id}/review-readiness
@@ -109,4 +109,4 @@ GET /api/v3/tasks/{task_revision_id}/runs/{run_id}/rollouts/{rollout_id}
 GET /api/v3/gdpx/catalog/current
 ```
 
-The external rollout route is not a general pre-admission preview; a retained candidate that is not selected by the active evidence catalog normally returns `404`. Before selection, inspect the submission and its blockers. These reads do not replace the separate QC2–QC4 program review record.
+The external rollout route is not a general pre-admission preview. A retained candidate that is not selected by the active evidence catalog normally returns `404`. Before selection, inspect the submission and its blockers. These reads do not replace the separate QC2–QC4 program review record.

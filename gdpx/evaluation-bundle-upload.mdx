@@ -5,10 +5,10 @@ description: "Submit an Audit draft or a canonical task-and-evidence bundle thro
 keywords: ["GDPx", "v3", "evaluation bundle", "rollout evidence", "Wilderness", "resumable upload"]
 ---
 
-Use `POST /api/v3/gdpx-submissions` for canonical GDPx drafts and active evidence-catalog candidates. Do not send an unconverted partner source handoff to this endpoint unless the live capability response advertises and Standard Data confirms the matching adapter.
+Use `POST /api/v3/gdpx-submissions` for canonical GDPx drafts and active evidence-catalog candidates. Send an unconverted partner source handoff here only when the live capability response advertises the matching adapter and Standard Data confirms it.
 
 <Warning>
-  A successful upload is not a passed QC stage or inclusion in the released GDPx benchmark. Audit may retain a blocked record for diagnosis. Wilderness **Review Tasks** and **Results** represent different states.
+  A successful upload does not mean the task passed a QC stage or entered the released GDPx benchmark. Audit may retain a blocked record for diagnosis. Wilderness **Review Tasks** and **Results** represent different states.
 </Warning>
 
 ## Discover the live contract
@@ -25,7 +25,7 @@ curl --fail-with-body \
   --output gdpx-capabilities.json
 ```
 
-The v3 capability response is the authority for:
+The v3 capability response tells you which contract is live, including:
 
 - `access.can_submit` and `admission.can_submit`;
 - accepted modes and contract versions;
@@ -34,9 +34,9 @@ The v3 capability response is the authority for:
 - upload and archive limits; and
 - `managed_execution_trust.managed_qc1_execution.available` and its blocker.
 
-Do not use `/v1/whoami` or the v2 intake state as a v3 admission gate. Those fields describe the legacy v2 workflow.
+Do not use `/v1/whoami` or the v2 intake state as a v3 admission gate. Both describe the legacy v2 workflow.
 
-Fetch the schema relation returned by capabilities. The static path below is valid only when the response advertises it:
+Fetch the schema relation returned by capabilities. The static path below is valid only if the response advertises it:
 
 ```bash
 curl --fail-with-body \
@@ -45,9 +45,9 @@ curl --fail-with-body \
   --output gdpx-review-bundle.schema.json
 ```
 
-Creating and completing a submission requires the scopes returned by the service, typically `uploads:write` and `imports:write`. Readback typically requires `tasks:read`.
+You need the scopes returned by the service to create and complete a submission, typically `uploads:write` and `imports:write`. Readback typically requires `tasks:read`.
 
-If `managed_qc1_execution.available` is false, the service may still accept and retain a draft or evidence bundle. You cannot promise end-to-end QC1 completion or active evidence-catalog admission until the blocker is resolved.
+If `managed_qc1_execution.available` is false, the service may still accept and retain a draft or evidence bundle. Until the blocker is resolved, you cannot promise end-to-end QC1 completion or admission to the active evidence catalog.
 
 ## Choose a mode
 
@@ -57,13 +57,13 @@ If `managed_qc1_execution.available` is false, the service may still accept and 
 | `task_and_evidence` | You have complete task source and one admission attempt for each task | One evaluation and one rollout per task | Active evidence-catalog candidate; not a final benchmark-release decision |
 | `evidence_only` | You are attaching first QC1 evidence to an exact retained canonical draft, or one later attempt to a retained revision | One evaluation and one rollout for one task revision | Immutable evidence candidate |
 
-An `audit_task_draft` submission is intentionally blocked. A canonical draft can later receive its first QC1 attempt through `evidence_only`. A legacy-snapshot draft must first be replaced by a complete canonical task definition.
+An `audit_task_draft` submission is blocked by design. A canonical draft can later receive its first QC1 attempt through `evidence_only`. A legacy-snapshot draft first needs a complete canonical task definition to replace it.
 
-For the same byte-identical retained canonical revision, `evidence_only` freezes one later attempt candidate without replacing the existing task bytes or qualifying anchor. A separate operator admission is required before that candidate can become current.
+For the same byte-identical retained canonical revision, `evidence_only` freezes one later attempt candidate without replacing the existing task bytes or qualifying anchor. That candidate needs a separate operator admission before it can become current.
 
 ## Canonical ZIP layout
 
-When the service advertises `gdpx-review-bundle/1.1.0`, a canonical review bundle follows this outline:
+When the service advertises `gdpx-review-bundle/1.1.0`, use this canonical review-bundle layout:
 
 ```text
 GDPX_BUNDLE.json
@@ -84,29 +84,29 @@ evaluations/
             └── artifacts/
 ```
 
-Do not wrap this canonical layout in an extra batch directory. `GDPX_BUNDLE.json` belongs at the ZIP root.
+Do not put an extra batch directory around this layout. `GDPX_BUNDLE.json` belongs at the ZIP root.
 
-The live JSON Schema defines every required field. The following rules prevent the most common format errors.
+The live JSON Schema defines every required field. The notes below cover the format errors we see most often.
 
 ### `GDPX_BUNDLE.json`
 
-Inventory every other retained ZIP member. Record the path, byte size, media type, and SHA-256 required by the schema. Bind each task, run, rollout, and artifact to its exact identifier.
+Inventory every other retained ZIP member. For each one, record the path, byte size, media type, and SHA-256 required by the schema. Bind every task, run, rollout, and artifact to its exact identifier.
 
 Do not inventory `GDPX_BUNDLE.json` itself.
 
 ### Canonical `TASK.json`
 
-Describe the immutable task, exact prompt, rubric, verifier, task-content hash, and complete workspace inventory.
+Describe the immutable task, including its exact prompt, rubric, verifier, task-content hash, and complete workspace inventory.
 
-Do not add a `rollouts` field. Canonical `TASK.json` is strict. Runs and rollouts belong under `evaluations/` in `RUN.json` and `ROLLOUT.json`.
+Do not add a `rollouts` field. Canonical `TASK.json` is strict; runs and rollouts belong under `evaluations/` in `RUN.json` and `ROLLOUT.json`.
 
-Every workspace file must use the path, hash, size, media type, artifact kind, and visibility required by the fetched schema. A directory hash, image digest, file count, or path list is not a complete workspace inventory.
+For every workspace file, include the path, hash, size, media type, artifact kind, and visibility required by the fetched schema. A directory hash, image digest, file count, or path list is not a complete workspace inventory.
 
 ### `PUBLICATION_AUTHORITY.json`
 
-Include the source-side rights and publication declaration in every direct canonical review bundle. Bind it to the exact task and source delivery. Keep it outside the agent runtime.
+Every direct canonical review bundle needs the source-side rights and publication declaration. Bind it to the exact task and source delivery, and keep it outside the agent runtime.
 
-A separate Audit-draft or adapter contract may retain a blocked archive without this file when its live schema permits that case. For a direct canonical review bundle, the file is required, hash-bound, and matched to Standard Data's active rights record before catalog membership. It does not approve managed execution or replace Standard Data's QC4 release review.
+A separate Audit-draft or adapter contract may retain a blocked archive without this file if its live schema permits it. In a direct canonical review bundle, the file is required, hash-bound, and matched to Standard Data's active rights record before catalog membership. It neither approves managed execution nor replaces Standard Data's QC4 release review.
 
 ### Evaluation evidence
 
@@ -120,7 +120,7 @@ For every rollout, include:
 - score aggregation, threshold, outcome, and reconciliation; and
 - declared artifacts with matching paths, sizes, media types, and hashes.
 
-Do not include private reasoning, actual credentials, signed URLs, or provider-private payloads.
+Leave out private reasoning, actual credentials, signed URLs, and provider-private payloads.
 
 ## Keep submission and evaluation counts separate
 
@@ -131,13 +131,13 @@ Under `gdpx-review-bundle/1.1.0`:
 - an `evidence_only` ZIP targets one retained task revision with one evaluation and one rollout; and
 - one blocked declared task prevents the active evidence catalog from changing for the admission cohort.
 
-Audit may still retain immutable source, evidence, and blocker records from a blocked cohort. The active evidence-catalog update is cohort-atomic; diagnostic retention is not rolled back.
+Audit may still retain immutable source, evidence, and blocker records from a blocked cohort. The active evidence-catalog update is cohort-atomic, while diagnostic retention is not rolled back.
 
-A QC3 campaign can require many attempts. Standard Data owns QC3 ingestion and campaign mapping. Partners preserve the complete native corpus and submit individual attempts through `evidence_only` only when an operator provides the target revision and admission plan. The current API does not natively label a run as QC3. Do not place the complete QC3 corpus in `TASK.json` or add several attempts for one task to a single v1.1 review bundle.
+A QC3 campaign can require many attempts, but Standard Data owns QC3 ingestion and campaign mapping. Partners preserve the complete native corpus and submit individual attempts through `evidence_only` only after an operator provides the target revision and admission plan. The current API does not natively label a run as QC3. Keep the complete QC3 corpus out of `TASK.json`, and do not add several attempts for one task to a single v1.1 review bundle.
 
 ## Adapter submissions
 
-An adapter is valid only when the live capability response advertises it and Standard Data confirms that it matches the delivered source revision.
+An adapter is valid only if the live capability response advertises it and Standard Data confirms that it matches the delivered source revision.
 
 Adapters may:
 
@@ -154,11 +154,11 @@ Adapters may not:
 - repair a mislabeled model or task silently; or
 - grant QC, readiness, or active evidence-catalog status.
 
-Large native archives may need to be split to satisfy the current capability-advertised compressed, member, and expanded-size limits.
+You may need to split a large native archive to meet the compressed, member, and expanded-size limits in the current capability response.
 
 ## Create the submission
 
-Use only values advertised by the live capability response:
+Build the request with values advertised by the live capability response:
 
 ```bash
 curl --fail-with-body \
@@ -180,9 +180,9 @@ curl --fail-with-body \
   --output gdpx-submission.json
 ```
 
-The values above illustrate a v1.1 `task_and_evidence` request. Replace them with the current advertised contract and your exact ZIP metadata.
+This is an example v1.1 `task_and_evidence` request. Replace its values with the current advertised contract and the exact metadata for your ZIP.
 
-For `evidence_only`, set the exact `target_task_revision_id`. For `audit_task_draft`, use the separately advertised draft contract and policy.
+For `evidence_only`, set the exact `target_task_revision_id`. For `audit_task_draft`, follow the separately advertised draft contract and policy.
 
 ## Upload and poll
 
@@ -193,7 +193,7 @@ Follow the relations in the create response:
 3. complete the upload through the returned API relation; and
 4. poll the returned `self` relation until the submission reaches a terminal state.
 
-Do not construct storage URLs. Do not send the Standard Data bearer key to object storage.
+Do not construct storage URLs or send the Standard Data bearer key to object storage.
 
 Retain:
 
@@ -203,7 +203,7 @@ Retain:
 - terminal state; and
 - every blocker or warning code and JSON pointer.
 
-Correct a blocked source package and create a new immutable submission. Do not claim that the earlier record changed in place.
+If a source package is blocked, correct it and create a new immutable submission. The earlier record does not change in place.
 
 ## Interpret the result
 
@@ -215,11 +215,11 @@ Correct a blocked source package and create a new immutable submission. Do not c
 | Task in active evidence catalog and rollout readable | Audit selected that immutable record; this alone is not inclusion in the released GDPx benchmark |
 | QC2–QC4 complete in tracker | Standard Data completed the remaining program reviews |
 
-The API does not currently expose native QC2, QC3, or QC4 states. Do not infer those stages from `review_ready` or catalog membership.
+The API does not currently expose native QC2, QC3, or QC4 states. Neither `review_ready` nor catalog membership proves that those stages are complete.
 
 ## Verify exact readback
 
-For a record already selected by the active evidence catalog for Wilderness **Results**, check:
+Once the active evidence catalog selects a record for Wilderness **Results**, check:
 
 ```text
 GET /api/v3/tasks/{task_revision_id}/review-readiness
@@ -227,10 +227,10 @@ GET /api/v3/tasks/{task_revision_id}/runs/{run_id}/rollouts/{rollout_id}
 GET /api/v3/gdpx/catalog/current
 ```
 
-The external rollout route is not a general pre-admission preview. A retained candidate that is not selected by the active evidence catalog normally returns `404`; inspect the submission and its blockers instead.
+The external rollout route is not a general pre-admission preview. A retained candidate outside the active evidence catalog normally returns `404`; inspect the submission and its blockers instead.
 
-Confirm that the returned task, run, rollout, score, evidence, and artifact identities match the submitted bytes. Then check the separate benchmark review record for QC2–QC4 completion.
+Confirm that the returned task, run, rollout, score, evidence, and artifact identities match the submitted bytes. Then use the separate benchmark review record to check QC2–QC4 completion.
 
 ## Legacy v2
 
-`POST /api/v2/workspace-submissions` creates legacy draft revisions only. It cannot add a task to the active evidence catalog or certify any QC stage. Use it only when Standard Data explicitly directs you to the [legacy draft import](/gdpx/import-approved-tasks).
+`POST /api/v2/workspace-submissions` creates legacy draft revisions only. It cannot add a task to the active evidence catalog or certify any QC stage. Use the [legacy draft import](/gdpx/import-approved-tasks) only when Standard Data explicitly directs you to it.

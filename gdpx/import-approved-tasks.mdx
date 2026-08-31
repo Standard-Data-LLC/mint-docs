@@ -5,7 +5,7 @@ description: "Use the legacy v2 workspace flow only when Standard Data asks you 
 keywords: ["GDPx", "Audit v2", "draft workspace", "legacy import"]
 ---
 
-`POST /api/v2/workspace-submissions` is a legacy draft-import workflow. It can retain draft task revisions for review. It cannot create a canonical v3 catalog candidate, pass a QC stage, or add a task to the active evidence catalog.
+`POST /api/v2/workspace-submissions` is the legacy draft-import workflow. It retains draft task revisions for review, but it cannot create a canonical v3 catalog candidate, pass a QC stage, or add a task to the active evidence catalog.
 
 <Warning>
   Do not use v2 when your goal is entry into the active evidence catalog. Use [v3 evaluation bundle upload](/gdpx/evaluation-bundle-upload).
@@ -13,7 +13,7 @@ keywords: ["GDPx", "Audit v2", "draft workspace", "legacy import"]
 
 ## When to use v2
 
-Use this flow only when Standard Data explicitly directs you to create a legacy draft workspace.
+Use this flow only when Standard Data explicitly asks you to create a legacy draft workspace.
 
 | Workflow | Purpose | Can enter the active evidence catalog? |
 | --- | --- | --- |
@@ -21,7 +21,7 @@ Use this flow only when Standard Data explicitly directs you to create a legacy 
 | `POST /api/v2/workspace-submissions` | Create legacy draft revisions | No |
 | `POST /api/v3/gdpx-submissions` | Retain a v3 draft or submit task and evidence | Can create an active evidence-catalog candidate; final benchmark release still requires QC4 |
 
-A v2 task shown in a legacy explorer remains a draft. It is not a v3 **Review Tasks** record and it is not a Wilderness **Results** record.
+A v2 task shown in a legacy explorer is still a draft. It is neither a v3 **Review Tasks** record nor a Wilderness **Results** record.
 
 ## Discover the v2 contract
 
@@ -35,11 +35,11 @@ curl --fail-with-body \
   --output v2-intake-capabilities.json
 ```
 
-Follow the returned v2 relations and limits. Do not use this response to infer v3 modes, schemas, adapters, or availability.
+Follow the v2 relations and limits in the response. They tell you nothing about v3 modes, schemas, adapters, or availability.
 
 ## Submit the workspace
 
-The v2 flow uses the legacy workspace contract returned by its capability response:
+The v2 flow uses the legacy workspace contract in its capability response:
 
 1. create the workspace submission;
 2. upload the exact ZIP through the returned storage relation;
@@ -47,11 +47,11 @@ The v2 flow uses the legacy workspace contract returned by its capability respon
 4. review any adapter preview or mapping warnings; and
 5. poll the returned submission relation.
 
-Keep runnable task files, supplied evidence, and review documents separated according to the v2 contract. Uploaded results remain supplied evidence; v2 does not validate managed execution.
+Keep runnable task files, supplied evidence, and review documents separate as the v2 contract requires. Uploaded results remain supplied evidence; v2 does not validate managed execution.
 
 ## Interpret the result
 
-The import may create immutable draft revisions or remain blocked with source-package findings. Neither outcome adds the task to the active evidence catalog or released GDPx benchmark.
+An import may create immutable draft revisions or stay blocked with source-package findings. Neither outcome puts the task in the active evidence catalog or the released GDPx benchmark.
 
 To move a draft task into the current GDPx workflow:
 
@@ -60,8 +60,8 @@ To move a draft task into the current GDPx workflow:
 3. obtain a qualifying managed QC1 attempt through Standard Data; and
 4. submit through `/api/v3/gdpx-submissions`.
 
-Do not copy a v2 intake manifest or partner `TASK.json` into the strict v3 schema. Normalize the task explicitly.
+Do not drop a v2 intake manifest or partner `TASK.json` into the strict v3 schema. Normalize the task explicitly.
 
 ## Immutable revisions
 
-An import creates a new draft revision. It does not edit an older revision in place. Keep the source ZIP hash, returned revision IDs, and blocker records so later normalization can cite the exact source.
+Every import creates a new draft revision; it never edits an older revision in place. Keep the source ZIP hash, returned revision IDs, and blocker records so later normalization can cite the exact source.

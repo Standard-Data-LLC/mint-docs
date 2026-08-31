@@ -5,25 +5,25 @@ description: "Classify one observable rollout and determine whether a failure is
 keywords: ["GDPx", "rollout analysis", "failure analysis", "Luna", "QC"]
 ---
 
-`POST /v1/benchmark-rollout-analyses` analyzes one normalized, observable attempt. Use it when you need a structured first pass on the failure origin or legitimacy.
+`POST /v1/benchmark-rollout-analyses` examines one normalized, observable attempt. Use it for a structured first pass on where a failure started and whether it is legitimate.
 
 <Warning>
-  This endpoint is optional and analysis-only. It does not store the rollout, create canonical evidence, pass a QC stage, or add evidence to the active evidence catalog. Retain the exact request and response if you use them.
+  This endpoint is optional and analysis-only. It does not store the rollout, create canonical evidence, pass a QC stage, or add evidence to the active evidence catalog. If you use it, retain the exact request and response.
 </Warning>
 
 ## What the analysis answers
 
-The service separates three questions:
+The analysis keeps three questions separate:
 
 1. What did the verifier report?
 2. What first went wrong in the observable attempt?
 3. Is the result valid benchmark evidence, or did the task, verifier, runtime, provider, or orchestration fail?
 
-One classification never replaces the repeated-run evidence required for QC2 or the evaluation plan required for QC3.
+A classification cannot replace the repeated-run evidence required for QC2 or the evaluation plan required for QC3.
 
 ## Prepare the request
 
-Bind the request to one exact task revision, source run, and rollout. Include:
+Bind the request to one exact task revision, source run, and rollout. Give the endpoint:
 
 - the task instruction and relevant agent-visible context;
 - atomic rubric criteria and known-good evidence;
@@ -33,9 +33,9 @@ Bind the request to one exact task revision, source run, and rollout. Include:
 - model, harness, budgets, usage, timeout, and stop reason; and
 - stable evidence IDs for every quoted item.
 
-Do not include private chain of thought, actual credentials, signed URLs, or provider-private payloads.
+Leave out private chain of thought, actual credentials, signed URLs, and provider-private payloads.
 
-If the full retained evidence is larger than the endpoint's request limit, create a faithful analysis projection that preserves the first failure and every failed test. Keep the complete source evidence in the canonical bundle. Reducing the analysis request does not authorize truncating retained rollout evidence.
+If the full retained evidence exceeds the endpoint's request limit, make a faithful analysis projection that preserves the first failure and every failed test. The complete source evidence still belongs in the canonical bundle. A smaller analysis request does not authorize truncated rollout evidence.
 
 ## Call the endpoint
 
@@ -51,11 +51,11 @@ curl --fail-with-body \
   --output rollout-analysis-response.json
 ```
 
-The request is synchronous. Use the request contract returned by the service rather than copying a cached example.
+The request is synchronous. Follow the request contract returned by the service, not a cached example.
 
 ## Read the response
 
-The response includes the exact task and rollout identities plus:
+Along with the exact task and rollout identities, the response includes:
 
 | Field | Meaning |
 | --- | --- |
@@ -72,11 +72,11 @@ The response includes the exact task and rollout identities plus:
 | `missing_inputs` | Evidence required before the result can be resolved |
 | `input_fingerprint` / `output_fingerprint` | Hashes used to retain the analysis with the attempt |
 
-`analysis_status: complete` means the endpoint completed its classification. It does not mean the task passed QC.
+`analysis_status: complete` means the endpoint finished its classification. It does not mean the task passed QC.
 
 ## Understand failure legitimacy
 
-A failed attempt can qualify as a legitimate model failure only when:
+A failed attempt can count as a legitimate model failure only when:
 
 - the task is solvable and sufficiently clear with the supplied context and tools;
 - the instruction, rubric, tests, and verifier agree;
@@ -93,11 +93,11 @@ Common non-model origins include:
 - provider or controller failures; and
 - reward leakage or a cheated pass.
 
-A category label alone does not establish legitimacy.
+The category label alone is not enough to establish legitimacy.
 
 ## Apply the saturation rule
 
-The analysis endpoint does not override GDPx difficulty review.
+This analysis does not override GDPx difficulty review.
 
 - A passing QC1 attempt proves construction, not difficulty.
 - One failed attempt does not prove difficulty.
@@ -108,13 +108,13 @@ See [QC2: Difficulty and reward integrity](/gdpx/benchmark-task-delivery#qc2-dif
 
 ## Handle human review
 
-When the evidence cannot establish the first failure, solvability, verifier alignment, or runtime health, the service returns `needs_human_review` and lists missing inputs.
+If the evidence cannot establish the first failure, solvability, verifier alignment, or runtime health, the service returns `needs_human_review` and names the missing inputs.
 
-Add the missing observable evidence or record a qualified human review. Do not rewrite an unresolved result as a legitimate model failure.
+Add the missing observable evidence or record a qualified human review. An unresolved result cannot be recast as a legitimate model failure.
 
 ## Retain the analysis correctly
 
-If you call the endpoint, store these files beside the same rollout:
+If you call the endpoint, keep these files beside the rollout:
 
 ```text
 rollout-analysis-request.json
@@ -132,7 +132,7 @@ Bind each file to the task, run, and rollout with its path, media type, byte siz
 - the request and response fingerprints; and
 - unresolved inputs or required reruns.
 
-These are supporting artifacts. They do not replace `trajectory.atif.json`, `verifier.json`, `criterion-decisions.json`, native work products, or the reviewer-visible sections.
+These files are supporting artifacts. They do not replace `trajectory.atif.json`, `verifier.json`, `criterion-decisions.json`, native work products, or the reviewer-visible sections.
 
 See [Canonical ZIP layout](/gdpx/evaluation-bundle-upload#canonical-zip-layout) and [Rollout viewer evidence](/gdpx/rollout-viewer-evidence).
 

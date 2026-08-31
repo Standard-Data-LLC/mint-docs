@@ -5,10 +5,10 @@ description: "Review one task or methodology document before packaging the compl
 keywords: ["GDPx", "document feedback", "preflight endpoint", "API", "task specification"]
 ---
 
-`POST /v1/evaluate` reviews one task specification or benchmark methodology document. It returns structured feedback about missing evidence, internal contradictions, and suggested fixes.
+`POST /v1/evaluate` reviews a single task specification or benchmark methodology document. It flags missing evidence and internal contradictions, then suggests fixes.
 
 <Warning>
-  This endpoint evaluates the document you send. It does not inspect a workspace ZIP, create a task revision, retain rollout evidence, pass a QC stage, or add a task to the active evidence catalog.
+  This endpoint evaluates only the document you send. It does not inspect a workspace ZIP, create a task revision, retain rollout evidence, pass a QC stage, or add a task to the active evidence catalog.
 </Warning>
 
 ## Choose the right endpoint
@@ -21,7 +21,7 @@ keywords: ["GDPx", "document feedback", "preflight endpoint", "API", "task speci
 | Submit a canonical draft or active evidence-catalog candidate | `POST /api/v3/gdpx-submissions` |
 | Import a legacy workspace draft | `POST /api/v2/workspace-submissions` |
 
-The v1 services return feedback only. V2 creates legacy drafts only. V3 is the canonical task-and-evidence workflow.
+The v1 services return feedback only, and v2 creates legacy drafts only. V3 is the canonical task-and-evidence workflow.
 
 ## Configure one API origin and key
 
@@ -30,7 +30,7 @@ export STANDARD_DATA_API_BASE="https://api.standarddata.io"
 export STANDARD_DATA_API_KEY="<your-standard-data-api-key>"
 ```
 
-Use the same API origin for the v1 request and any subsequent v3 discovery. Do not infer v3 availability from `/v1/whoami` or a v2 capability response.
+Keep the same API origin for the v1 request and any later v3 discovery. Neither `/v1/whoami` nor a v2 capability response tells you whether v3 is available.
 
 ## Submit a document
 
@@ -44,7 +44,7 @@ curl --fail-with-body \
   --output task-feedback.json
 ```
 
-Use PDF, DOCX, Markdown, or JSON only when the endpoint advertises that media type. Do not send the complete task or evidence ZIP to this route.
+Send PDF, DOCX, Markdown, or JSON only when the endpoint advertises that media type. A complete task or evidence ZIP does not belong on this route.
 
 ## Interpret the response
 
@@ -56,9 +56,9 @@ The response may include:
 - evidence citations into the submitted document; and
 - suggested corrections.
 
-Treat `ready_to_submit`, when present, as a verdict about the document only. It does not authorize a ZIP, prove the environment runs, validate rollout evidence, or add a task to the active evidence catalog.
+If the response includes `ready_to_submit`, read it as a verdict on the document alone. It does not authorize a ZIP, prove the environment runs, validate rollout evidence, or add a task to the active evidence catalog.
 
-Resolve each blocker in the source document. Then rerun the document review if useful.
+Fix each blocker in the source document, then rerun the review if you need another pass.
 
 ## Continue to the real submission
 
@@ -69,7 +69,7 @@ After document review:
 3. follow the advertised schema, mode, adapter, and size limits; and
 4. use the [v3 evaluation bundle flow](/gdpx/evaluation-bundle-upload) for canonical submission.
 
-If you only need a legacy draft import, use the [v2 workspace flow](/gdpx/import-approved-tasks) when Standard Data explicitly directs you to it.
+If Standard Data explicitly asks for a legacy draft import, use the [v2 workspace flow](/gdpx/import-approved-tasks).
 
 ## Common errors
 

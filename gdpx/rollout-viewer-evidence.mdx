@@ -5,15 +5,15 @@ description: "Understand the evidence required to review a GDPx rollout in Wilde
 keywords: ["Wilderness", "rollout viewer", "rubric decisions", "observable trajectory", "GDPx"]
 ---
 
-Wilderness **Results** presents retained evidence selected for the active evidence catalog. A reviewer should be able to explain what the agent saw, what it did, what it produced, how it was graded, and why the final score is correct. This catalog state is separate from inclusion in the released GDPx benchmark.
+Wilderness **Results** shows retained evidence selected for the active evidence catalog. From that record, a reviewer should be able to explain what the agent saw, did, and produced, how the verifier graded it, and why the final score is correct. This catalog state is separate from inclusion in the released GDPx benchmark.
 
 <Note>
-  **Review Tasks** is different. It may show a retained, blocked draft without a rollout or complete evidence. Draft visibility does not mean the task passed QC1 or entered Results.
+  **Review Tasks** is a separate surface. It may show a retained, blocked draft without a rollout or complete evidence. Seeing a draft there does not mean the task passed QC1 or entered Results.
 </Note>
 
 ## What the reviewer sees
 
-The default review view presents:
+The default review view includes:
 
 1. run configuration and execution outcome;
 2. the exact task prompt and relevant agent-visible context;
@@ -22,11 +22,11 @@ The default review view presents:
 5. the observable trajectory; and
 6. artifacts, provenance, and completeness.
 
-Unavailable optional metrics should appear as **Not supplied**, not as zero.
+Show an unavailable optional metric as **Not supplied**, never zero.
 
 ## Required source sections
 
-Every countable rollout needs all six sections:
+A countable rollout needs all six sections:
 
 | Section | Required content |
 | --- | --- |
@@ -37,13 +37,13 @@ Every countable rollout needs all six sections:
 | **Test Logs** | Raw verifier and per-test output with criterion bindings |
 | **Grading** | Criterion decisions, rationale, evidence references, and score reconciliation |
 
-Use `not_applicable` only when a section genuinely cannot apply and include a source-grounded reason. Missing evidence is not `not_applicable`.
+Use `not_applicable` only when a section genuinely cannot apply, and give a source-grounded reason. Missing evidence does not qualify.
 
 ## Prompt and work products
 
-Show the exact prompt before the model response. Preserve native artifacts such as spreadsheets, documents, drawings, images, and code. A rendered preview is helpful, but the hash-bound native download remains authoritative.
+Put the exact prompt before the model response. Preserve native artifacts such as spreadsheets, documents, drawings, images, and code. A rendered preview can help, but the hash-bound native download remains authoritative.
 
-The result must include every work product the verifier graded. A text summary cannot replace a missing workbook, document, patch, or other deliverable.
+Include every work product the verifier graded. A text summary cannot stand in for a missing workbook, document, patch, or other deliverable.
 
 ## Rubric scorecard
 
@@ -55,19 +55,19 @@ Each criterion must show:
 - the verifier rationale; and
 - direct references to the event, test, output, or artifact used as evidence.
 
-The summary must show the reported score, recalculated score, aggregation rule, threshold, hard gates, and reconciliation status. A score that does not reconcile blocks acceptance.
+The summary must show the reported score, recalculated score, aggregation rule, threshold, hard gates, and reconciliation status. If the score does not reconcile, acceptance is blocked.
 
 ## Observable trajectory
 
-Retain observable messages, assistant responses, tool calls, tool results, relevant state transitions, produced artifacts, errors, and the final stop condition in order.
+Keep observable messages, assistant responses, tool calls, tool results, relevant state transitions, produced artifacts, errors, and the final stop condition in order.
 
-Do not call this chain of thought. GDPx does not require or display private model reasoning. Remove actual credentials, signed URLs, and provider-private fields. Preserve the remaining observable content rather than replacing it with a blanket redaction or summary.
+Do not call this chain of thought. GDPx neither requires nor displays private model reasoning. Remove actual credentials, signed URLs, and provider-private fields, but preserve the rest of the observable content instead of replacing it with a blanket redaction or summary.
 
-If a trajectory is too large to render inline, retain the complete artifact and provide a bounded preview. A preview is not a substitute for the full retained evidence.
+If a trajectory is too large to render inline, retain the complete artifact and show a bounded preview. The preview does not replace the full retained evidence.
 
 ## Run metadata
 
-Retain the values emitted by the harness, including:
+Retain the values the harness emits, including:
 
 - model, provider, and immutable model revision when available;
 - harness and harness version;
@@ -77,25 +77,25 @@ Retain the values emitted by the harness, including:
 - budgets, timeout, retry policy, and stop reason; and
 - task, run, rollout, and artifact identities.
 
-Do not fabricate missing metrics. Record them as not supplied.
+Never fabricate missing metrics. Record them as not supplied.
 
 ## Failure analysis
 
-Every failed attempt used in review needs a readable failure-analysis summary tied to the same task, run, and rollout. It must identify the first observable failure, affected tests or criteria, failure origin, evidence references, solvability, and any required repair.
+Every failed attempt used in review needs a readable failure-analysis summary tied to the same task, run, and rollout. The summary must identify the first observable failure, affected tests or criteria, failure origin, evidence references, solvability, and any required repair.
 
-The optional [rollout-analysis endpoint](/gdpx/benchmark-rollout-analysis) returns supporting analysis. If used, keep its request and response beside the rollout. That response does not replace the trajectory, verifier output, criterion ledger, or human QC decision.
+The optional [rollout-analysis endpoint](/gdpx/benchmark-rollout-analysis) returns supporting analysis. If you use it, keep the request and response beside the rollout. Its response does not replace the trajectory, verifier output, criterion ledger, or human QC decision.
 
 ## Evidence completeness
 
-A rollout is incomplete when any required evidence body is absent, truncated at the source, attached to another attempt, or represented only by an ID or aggregate.
+A rollout is incomplete if any required evidence body is missing, truncated at the source, attached to another attempt, or represented only by an ID or aggregate.
 
-An adapter may map and preserve existing evidence. It cannot reconstruct content that the source never retained.
+An adapter may map and preserve existing evidence. It cannot reconstruct content the source never retained.
 
 ## API readback
 
 The canonical bundle format is documented under [Evaluation bundle upload](/gdpx/evaluation-bundle-upload#canonical-zip-layout).
 
-For a rollout already selected by the active evidence catalog, retrieve the exact retained evidence with:
+Once the active evidence catalog selects a rollout, retrieve the exact retained evidence with:
 
 ```text
 GET /api/v3/tasks/{task_revision_id}/runs/{run_id}/rollouts/{rollout_id}
@@ -105,4 +105,4 @@ This route is not a general pre-admission preview. A retained candidate outside 
 
 Confirm that every returned artifact matches its declared path, size, media type, and SHA-256.
 
-Backend readback confirms the retained evidence record. The separate benchmark tracker records QC2–QC4 program review.
+Backend readback confirms the retained evidence record; the separate benchmark tracker records QC2–QC4 program review.

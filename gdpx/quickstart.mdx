@@ -1,15 +1,15 @@
 ---
 title: "GDPx task format"
-description: "Understand the runnable task, partner handoff, rollout evidence, and GDPx submission layers."
+description: "See how runnable tasks, partner handoffs, rollout evidence, and GDPx submissions fit together."
 sidebarTitle: "Task format"
 keywords: ["Harbor", "GDPx", "benchmark tasks", "task format", "rollout evidence"]
 ---
 
-GDPx measures whether an agent can complete realistic, economically useful work. A task includes the job, source material, tools, expected work product, and a verifier that can explain the score.
+GDPx asks a practical question: can an agent finish realistic, economically useful work? Each task packages the job, source material, tools, expected work product, and a verifier that can explain the score.
 
-## Start with the two delivery layers
+## Know which package you are building
 
-GDPx uses two related formats. They are not interchangeable.
+GDPx has two delivery layers. They serve different purposes and are not interchangeable.
 
 | Layer | Purpose | Format authority |
 | --- | --- | --- |
@@ -17,17 +17,17 @@ GDPx uses two related formats. They are not interchangeable.
 | Canonical GDPx submission | Creates immutable task and evidence records through the GDPx API | The live v3 capability response and linked JSON Schema |
 
 <Warning>
-  A partner handoff is not a canonical v3 review bundle. Standard Data may normalize an approved source layout, but an adapter cannot invent missing task files, trajectories, verifier evidence, work products, or identity bindings.
+  A partner handoff is not a canonical v3 review bundle. Standard Data may normalize an approved source layout, but no adapter can invent missing task files, trajectories, verifier evidence, work products, or identity bindings.
 </Warning>
 
-If you submit through the API, fetch the live contract before building the ZIP:
+Before you build a ZIP for API submission, fetch the live contract:
 
 ```text
 GET /api/v3/gdpx/capabilities
 GET /api/v3/gdpx/schemas/review-bundle
 ```
 
-The live response wins if an example in these docs differs from the deployed schema.
+If an example here differs from the deployed schema, follow the live response.
 
 ## The runnable task
 
@@ -49,36 +49,38 @@ Harbor's [task documentation](https://www.harborframework.com/docs/tasks) is the
 
 ### `task.toml`
 
-Define the runtime, resources, timeouts, and verifier entry point. Pin every dependency that can affect behavior.
+Set the runtime, resources, timeouts, and verifier entry point. Pin every dependency that could change the task's behavior.
 
 ### `instruction.md`
 
-Write the instruction shown to the agent. Describe the outcome and constraints without exposing the solution or hidden grading material.
+Write the instruction the agent will see. Describe the outcome and constraints without exposing the solution or hidden grading material.
 
 ### `environment/`
 
-Include the complete starting state and every agent-visible source file. The environment must build from delivered files and reset cleanly between attempts.
+Include the complete starting state and every source file the agent can see. The environment must build from the delivered files and reset cleanly between attempts.
 
 ### `tests/test.sh`
 
-Run the verifier after the agent finishes. A direct GDPx Harbor delivery writes `/logs/verifier/reward.json` and preserves enough per-test evidence to explain that reward. A capability-advertised adapter may accept its documented native verifier output and normalize it into canonical evidence.
+Run the verifier after the agent finishes. A direct GDPx Harbor delivery writes `/logs/verifier/reward.json` and keeps enough per-test evidence to explain the reward. An adapter advertised in the capability response may accept its documented native verifier output and normalize it into canonical evidence.
 
 ### `solution/solve.sh`
 
-Provide a known-good path when a reference solution is reasonable. A native reference artifact may replace a shell script when that better matches the work.
+Provide a known-good path when a reference solution makes sense. A native reference artifact can replace the shell script when that better matches the work.
 
 The agent must not be able to read the solution, hidden tests, or verifier-only material during the attempt.
 
 ## Scoring terms
 
-- **Verifier:** the complete scoring system for the task.
-- **Deterministic checks:** code-based components of the verifier.
-- **Judge:** an optional model-based verifier component for criteria that require practitioner judgment.
-- **Rubric:** the set of observable criteria and aggregation rules used by the verifier.
+| Term | Meaning |
+| --- | --- |
+| Verifier | The complete scoring system for the task |
+| Deterministic checks | Code-based components of the verifier |
+| Judge | An optional model-based verifier component for criteria that require practitioner judgment |
+| Rubric | The observable criteria and aggregation rules used by the verifier |
 
 ## Evidence around the task
 
-A runnable task is necessary but not sufficient for a benchmark. Every rollout used for QC or reported results must preserve:
+A runnable task is only the starting point. Every rollout used for QC or reported results must preserve:
 
 - the exact task revision and agent-visible context;
 - the ordered observable trajectory, including tool calls and results;
@@ -88,7 +90,7 @@ A runnable task is necessary but not sufficient for a benchmark. Every rollout u
 - the model, harness, configuration, limits, timing, and outcome; and
 - stable task, run, rollout, and artifact identities.
 
-Do not collect or submit private chain of thought. Remove credentials, signed URLs, and provider-private fields while retaining the rest of the observable evidence.
+Do not collect or submit private chain of thought. Remove credentials, signed URLs, and provider-private fields, but keep the rest of the observable evidence intact.
 
 See [Rollout viewer evidence](/gdpx/rollout-viewer-evidence) for the review surface.
 
@@ -96,15 +98,15 @@ See [Rollout viewer evidence](/gdpx/rollout-viewer-evidence) for the review surf
 
 ### Send a source handoff
 
-Use the [partner handoff layout](/gdpx/benchmark-task-package#partner-source-handoff) when Standard Data will normalize the delivery. Send it through the delivery channel named in your onboarding agreement. Keep complete native evidence in its original structure and include a file inventory or crosswalk. Do not reorganize an existing export until Standard Data confirms the expected adapter.
+Use the [partner handoff layout](/gdpx/benchmark-task-package#partner-source-handoff) when Standard Data will normalize your delivery. Send it through the channel named in your onboarding agreement. Keep the complete native evidence in its original structure and include a file inventory or crosswalk. Before reorganizing an existing export, confirm the expected adapter with Standard Data.
 
 Adapter acceptance means the source can be read. It does not mean the task passed QC or entered the benchmark.
 
 ### Submit a canonical v3 bundle
 
-Use the [evaluation bundle contract](/gdpx/evaluation-bundle-upload) when you are submitting directly through the GDPx API. The canonical `TASK.json` is strict. Rollout records live under `evaluations/`; they do not belong in a `rollouts` field inside `TASK.json`.
+Use the [evaluation bundle contract](/gdpx/evaluation-bundle-upload) when you submit directly through the GDPx API. The canonical `TASK.json` is strict: rollout records live under `evaluations/`, not in a `rollouts` field inside `TASK.json`.
 
-A `task_and_evidence` bundle carries one admission attempt for each included task. An `evidence_only` submission can attach the first QC1 attempt to an exact retained canonical Audit draft or retain a later attempt candidate for an already retained revision. A later candidate requires separate operator admission and leaves the qualifying QC1 anchor unchanged. A QC3 campaign can contain many attempts, but those attempts do not all go into one canonical task record or one v3 bundle.
+A `task_and_evidence` bundle carries one admission attempt for each included task. An `evidence_only` submission can attach the first QC1 attempt to an exact retained canonical Audit draft or retain a later attempt candidate for an already retained revision. That later candidate still needs separate operator admission and does not change the qualifying QC1 anchor. A QC3 campaign can contain many attempts, but they do not all belong in one canonical task record or one v3 bundle.
 
 ## The review sequence
 
@@ -115,11 +117,11 @@ GDPx uses four program review stages:
 3. **QC3 — Benchmark evaluation:** the approved model–harness matrix is run on the frozen revision.
 4. **QC4 — Release review:** Standard Data reviews results, normalizes accepted evidence, and decides final inclusion.
 
-The v3 backend currently enforces the QC1 requirements for the active evidence catalog. QC2 through QC4 are separate program review gates. A record in the active evidence catalog is not part of the released GDPx benchmark until QC4 approves it.
+The v3 backend currently enforces QC1 requirements for the active evidence catalog. QC2 through QC4 remain separate program review gates. A record in the active evidence catalog does not enter the released GDPx benchmark until QC4 approves it.
 
 See [QC stages](/qc-stages-for-benchmark) for definitions and [Partner delivery](/gdpx/benchmark-task-delivery) for responsibilities.
 
-## Next steps
+## Where to go next
 
 <CardGroup cols={2}>
   <Card title="Design and grade" href="/gdpx/benchmark-task-design">

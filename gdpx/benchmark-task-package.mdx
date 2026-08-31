@@ -5,7 +5,7 @@ description: "Prepare a partner source handoff or a canonical GDPx v3 submission
 keywords: ["GDPx", "Harbor", "task package", "TASK.json", "workspace ZIP"]
 ---
 
-GDPx separates the files a partner delivers from the immutable bundle accepted by the v3 review API. Keep that boundary explicit.
+GDPx keeps a partner's source delivery separate from the immutable bundle accepted by the v3 review API. Decide which one you are preparing before you arrange the files.
 
 | Term | Meaning |
 | --- | --- |
@@ -13,11 +13,11 @@ GDPx separates the files a partner delivers from the immutable bundle accepted b
 | Partner source handoff | The partner's task, native evidence, and review material sent to Standard Data |
 | Canonical v3 bundle | The strict ZIP accepted by `POST /api/v3/gdpx-submissions` |
 
-Only the third format is a canonical v3 review bundle.
+Only the canonical v3 bundle goes to the v3 review API.
 
 ## Package the runnable task
 
-Each task must contain the exact agent-visible instruction and starting state, a reproducible environment, a verifier, and a reset path. Use [the Harbor task structure](/gdpx/quickstart#the-runnable-task) unless Standard Data approves another runtime.
+Each task must include the exact instruction and starting state shown to the agent, a reproducible environment, a verifier, and a reset path. Use [the Harbor task structure](/gdpx/quickstart#the-runnable-task) unless Standard Data approves another runtime.
 
 Keep these visibility boundaries:
 
@@ -28,26 +28,26 @@ Keep these visibility boundaries:
 | Reference solution and known-good or known-bad calibration artifacts | Verifier-only |
 | Review notes, failure analysis, and rollout summaries | Intake-only |
 
-Do not rely on prose labels alone. Enforce these boundaries in the runtime.
+Labels are not an access boundary. Enforce these rules in the runtime.
 
 ### Select one runtime prompt
 
-For authoring review, supply an unstructured kickoff and a structured brief. Before execution, select the exact prompt shown to the agent. Retain the other version as supporting material rather than treating both as runtime instructions.
+For authoring review, supply both an unstructured kickoff and a structured brief. Before execution, choose the exact prompt the agent will see. Keep the other version as supporting material, not as a second runtime instruction.
 
 ### Include calibration evidence
 
-Every task needs evidence that it is solvable and that the verifier recognizes correct and incorrect work. The representation depends on the task:
+Every task must show that it is solvable and that the verifier can tell correct work from incorrect work. Choose evidence that fits the task:
 
 - use `solution/solve.sh` when a scripted Oracle fits;
 - use a native reference artifact when the output is a workbook, document, drawing, or another structured file;
 - include a known-bad output or equivalent negative control; and
 - include a partial-credit anchor when the task uses partial credit or a judge.
 
-The evidence is required. A particular `gold/` directory or shell script is not.
+The evidence is required; a specific `gold/` directory or shell script is not.
 
 ## Partner source handoff
 
-Use this path when Standard Data will normalize your delivery. Send the completed package through the delivery channel named in your onboarding agreement.
+Use a partner source handoff when Standard Data will normalize your delivery. Send the finished package through the channel named in your onboarding agreement.
 
 ### Recommended layout
 
@@ -72,7 +72,7 @@ Use this path when Standard Data will normalize your delivery. Send the complete
     └── <task_id>/
 ```
 
-Use `handoff-manifest.json` for partner taxonomy, task-to-evidence mappings, and source provenance. Do not call that file `TASK.json`: the canonical v3 `TASK.json` has a different, strict schema.
+Use `handoff-manifest.json` for partner taxonomy, task-to-evidence mappings, and source provenance. Do not name it `TASK.json`; the canonical v3 file has a different, strict schema.
 
 The manifest should identify:
 
@@ -85,17 +85,17 @@ The manifest should identify:
 
 ### Existing native exports
 
-You may deliver an approved native Harbor or provider export in its original layout when the live capability response advertises a matching adapter and Standard Data confirms that adapter for your batch.
+You may keep an approved native Harbor or provider export in its original layout when the live capability response advertises a matching adapter and Standard Data confirms it for your batch.
 
-Include a complete file inventory and a crosswalk from each task and attempt to its evidence. Preserve source paths and bytes. Do not rename, flatten, or truncate evidence merely to resemble the recommended layout.
+Include a complete file inventory and a crosswalk from every task and attempt to its evidence. Preserve the source paths and bytes. Do not rename, flatten, or truncate evidence just to make it resemble the recommended layout.
 
 <Warning>
-  Adapter acceptance means Audit can read and map the source. It does not create missing evidence, grant QC credit, add the task to the active evidence catalog, or approve it for the released GDPx benchmark. Missing manifests, observable trajectory bodies, verifier results, criterion decisions, native work products, failure analyses, or immutable identity bindings must still be supplied or regenerated.
+  Adapter acceptance only means Audit can read and map the source. It does not create missing evidence, grant QC credit, add a task to the active evidence catalog, or approve it for the released GDPx benchmark. You must still supply or regenerate any missing manifests, observable trajectory bodies, verifier results, criterion decisions, native work products, failure analyses, or immutable identity bindings.
 </Warning>
 
 ## Reviewer-visible rollout evidence
 
-Every attempt used for QC, difficulty assessment, or benchmark results must be independently reviewable from delivered bytes. An ID, score, provider link, or aggregate summary is not enough.
+Reviewers must be able to inspect every attempt used for QC, difficulty assessment, or benchmark results from the delivered bytes alone. An ID, score, provider link, or aggregate summary is not enough.
 
 For each attempt, retain:
 
@@ -109,13 +109,13 @@ For each attempt, retain:
 - model, provider, harness, versions, configuration, budgets, timing, and stop reason; and
 - stable task, run, rollout, and artifact references.
 
-Every failed attempt also needs an evidence-grounded failure-analysis summary. The `/v1/benchmark-rollout-analyses` service is optional; if you use it, retain its request, response, and fingerprints beside the same attempt.
+For every failed attempt, add a failure-analysis summary grounded in the evidence. The `/v1/benchmark-rollout-analyses` service is optional. If you use it, keep its request, response, and fingerprints beside the same attempt.
 
-Do not submit private chain of thought, actual credentials, signed URLs, or provider-private payloads. Redact only those values. Do not replace an otherwise observable log with a blanket summary.
+Do not submit private chain of thought, actual credentials, signed URLs, or provider-private payloads. Redact those values without replacing the rest of an observable log with a blanket summary.
 
 ## Canonical v3 submission
 
-Use this path only when you are building the ZIP submitted directly to the GDPx API.
+Build a canonical v3 submission only for a ZIP that will go directly to the GDPx API.
 
 First fetch:
 
@@ -124,7 +124,7 @@ GET /api/v3/gdpx/capabilities
 GET /api/v3/gdpx/schemas/review-bundle
 ```
 
-The fetched schema is authoritative. The outline below is illustrative:
+The fetched schema is authoritative. This outline is only a guide:
 
 ```text
 GDPX_BUNDLE.json
@@ -145,11 +145,11 @@ evaluations/
             └── artifacts/
 ```
 
-`GDPX_BUNDLE.json` inventories every other ZIP member and binds the task, run, rollout, and artifact identities.
+`GDPX_BUNDLE.json` inventories every other file in the ZIP and binds the task, run, rollout, and artifact identities.
 
-The canonical `TASK.json` describes the immutable task, prompt, rubric, verifier, task-content hash, and complete workspace inventory. It does **not** contain a `rollouts` field. Runs and rollouts belong under `evaluations/`.
+The canonical `TASK.json` describes the immutable task, prompt, rubric, verifier, task-content hash, and complete workspace inventory. It has no `rollouts` field. Runs and rollouts belong under `evaluations/`.
 
-`PUBLICATION_AUTHORITY.json` is required in a direct canonical review bundle. It provides the source-side rights and publication declaration used for active evidence-catalog eligibility and must match Standard Data's active rights record before catalog membership. A separate draft or adapter contract may retain a blocked archive without this file when its live schema permits that case. The declaration is not agent-visible and does not replace the QC4 release decision.
+A direct canonical review bundle requires `PUBLICATION_AUTHORITY.json`. This file provides the source-side rights and publication declaration used for active evidence-catalog eligibility. It must match Standard Data's active rights record before catalog membership. A separate draft or adapter contract may retain a blocked archive without the file when its live schema allows that case. The declaration is not agent-visible and does not replace the QC4 release decision.
 
 ### Keep the counts straight
 
@@ -160,7 +160,7 @@ When the live service advertises `gdpx-review-bundle/1.1.0`:
 - one blocked declared task prevents the active evidence catalog from changing for the cohort, although Audit may retain immutable diagnostic records; and
 - `evidence_only` attaches the first QC1 attempt to an exact retained canonical Audit draft or retains one later run and rollout candidate for an already retained, byte-identical task revision. A later candidate requires separate operator admission and does not replace the qualifying QC1 anchor.
 
-QC3 may require many attempts per model–harness pairing. Standard Data owns QC3 ingestion and campaign mapping. Partners should preserve the complete native corpus and should not submit individual QC3 attempts through `evidence_only` unless a Standard Data operator provides the target revision and admission plan. The current API does not natively label a run as QC3. Never place all QC3 attempts inside canonical `TASK.json`, and never put multiple attempts for one task in a single v1.1 review bundle.
+QC3 may require many attempts per model–harness pairing. Standard Data owns QC3 ingestion and campaign mapping. Partners should preserve the complete native corpus and should not submit individual QC3 attempts through `evidence_only` unless a Standard Data operator provides the target revision and admission plan. The current API does not natively label a run as QC3. Never place all QC3 attempts inside canonical `TASK.json` or put multiple attempts for one task in a single v1.1 review bundle.
 
 ## Prepare the source handoff
 

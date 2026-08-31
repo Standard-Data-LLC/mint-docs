@@ -7,7 +7,7 @@ keywords: ["GDPx", "benchmark", "task design", "rubrics", "environment"]
 
 ## Define the work
 
-Start with the capability, not the file type. Name the practitioner, the decision or state change, and the errors that matter.
+Start with the capability, not the file type. Name the practitioner, the decision or state change they own, and the errors that matter.
 
 | Weak | Better |
 | --- | --- |
@@ -15,24 +15,24 @@ Start with the capability, not the file type. Name the practitioner, the decisio
 | Summarize the documents | Triage an escalation across product, contract, and account history, then recommend the next action under policy |
 | Use the tools correctly | Update a live operating artifact without breaking formulas or downstream dependencies |
 
-Each task family should state who does the work, what outcome matters, and what a strong practitioner notices. Renaming companies or changing numbers does not create a new task family.
+A task family should make clear who does the work, what outcome matters, and what a strong practitioner would notice. Renaming companies or changing numbers does not create a new family.
 
 ## Draft the kickoff
 
-For authoring review, write two versions of the same job:
+During authoring, write the same job two ways:
 
 1. `kickoff.md`: the unstructured message a manager, client, or colleague would actually send.
 2. `kickoff_structured.md`: the role, objective, constraints, and deliverable stated directly.
 
-Use both drafts to check whether the task preserves realism without becoming underspecified. Before execution, select one exact agent-visible prompt. Retain the other draft as supporting material rather than mounting two competing instructions in the runtime.
+Compare the drafts to see whether the task stays realistic without becoming underspecified. Before execution, choose one exact prompt for the agent. Keep the other as supporting material rather than mounting two competing instructions in the runtime.
 
-The real-world version can rely on normal practitioner judgment, but every private policy, definition, and source fact must be discoverable in the environment.
+The real-world version can rely on ordinary practitioner judgment. Every private policy, definition, and source fact must still be discoverable in the environment.
 
 Good ambiguity makes the model recover context. Bad ambiguity makes the task unsolvable.
 
 ## Build the environment
 
-Use native files and realistic state. Do not replace a workbook, document, codebase, CAD file, or system record with a prose description of it.
+Give the agent native files and realistic state. A prose description is not a substitute for the workbook, document, codebase, CAD file, or system record the job actually uses.
 
 For stateful or editable work, ship:
 
@@ -41,11 +41,11 @@ For stateful or editable work, ship:
 - reset behavior between rollouts; and
 - reopen, render, formula, executable, or diff checks that match the artifact.
 
-The action space is a coding agent with provisioned CLI tools. List each tool and include its definition and skill documentation. Convert computer-use workflows into tool calls before submission.
+The action space is a coding agent with provisioned CLI tools. List every tool and include its definition and skill documentation. Convert computer-use workflows into tool calls before submission.
 
 ## Grade observable work
 
-Use deterministic checks for facts code can settle: values, schemas, formulas, compilation, geometry, state transitions, reconciliations, and artifact integrity. Use a judge for evidence-based recommendations, prioritization, material contradictions, and caveats that require practitioner judgment.
+Use deterministic checks where code can settle the answer: values, schemas, formulas, compilation, geometry, state transitions, reconciliations, and artifact integrity. Use a judge for evidence-based recommendations, prioritization, material contradictions, and caveats that require practitioner judgment.
 
 Each rubric criterion needs:
 
@@ -54,23 +54,23 @@ Each rubric criterion needs:
 - the observable evidence required to pass; and
 - one aggregation rule for the task.
 
-Report one reproducible numeric score and the pass/fail outcome derived from its declared threshold. Keep deterministic and judge contributions separate in the reward ledger.
+Report one reproducible numeric score and derive the pass/fail outcome from the declared threshold. Keep deterministic and judge contributions separate in the reward ledger.
 
 Do not grade private reasoning or one preferred workflow. Alternate valid methods should pass.
 
 ## Calibrate the verifier
 
-Before cross-model runs, include a practitioner reference output and a known-bad output or equivalent negative control. Add a partial-credit anchor when the task uses partial credit or a judge. State the expected per-criterion result for each anchor.
+Before cross-model runs, include a practitioner reference output and a known-bad output or equivalent negative control. If the task uses partial credit or a judge, add a partial-credit anchor. State the expected per-criterion result for every anchor.
 
-Change response length, order, and formatting without changing substance. The score should remain stable. Add plausible but irrelevant detail. The score should not improve.
+Try to fool the verifier. Change the response length, order, and formatting without changing the substance; the score should stay stable. Add plausible but irrelevant detail; the score should not improve.
 
-False positives are more damaging than false negatives because they inflate measured capability. A benchmark item is not ready when the verifier merely agrees with its author.
+False positives inflate measured capability, so they are more damaging than false negatives. A benchmark item is not ready just because its verifier agrees with the author.
 
 ## Recommended: calibrate difficulty
 
-For benchmark difficulty claims, prefer at least three model tiers and enough independent rollouts to estimate pass@1 and criterion-level behavior. Regardless of the calibration envelope, pin the model, harness, prompts, tools, sampling settings, turn budget, timeout, judge version, context policy, and retry policy for every supplied rollout.
+When you make a difficulty claim, prefer at least three model tiers and enough independent rollouts to estimate pass@1 and criterion-level behavior. Whatever calibration envelope you use, pin the model, harness, prompts, tools, sampling settings, turn budget, timeout, judge version, context policy, and retry policy for every supplied rollout.
 
-Review mean rubric score and per-criterion pass rates alongside pass@1. Treat a zero-pass item as unsolved at current capability, not as automatically difficult or broken. Before claiming that it is non-broken or suitable for the intended use, gather the following evidence when practical:
+Read mean rubric score and per-criterion pass rates alongside pass@1. A zero-pass item is unsolved at current capability; that alone does not prove it is difficult or broken. Before calling it non-broken or suitable for its intended use, gather this evidence when practical:
 
 - a qualified practitioner can solve it with the exact context and tools;
 - the practitioner output passes every applicable verifier component;

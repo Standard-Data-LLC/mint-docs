@@ -1,206 +1,188 @@
 ---
 title: "Package a benchmark task"
-sidebarTitle: "Task Packaging"
-description: "Assemble the Harbor task, task taxonomy, ZIP, and self-contained environment."
+sidebarTitle: "Task packaging"
+description: "Prepare a partner source handoff or a canonical GDPx v3 submission without mixing the two formats."
 keywords: ["GDPx", "Harbor", "task package", "TASK.json", "workspace ZIP"]
 ---
 
-## GDPx standardized task bundle
+GDPx separates the files a partner delivers from the immutable bundle accepted by the v3 review API. Keep that boundary explicit.
 
-The [Harbor task](/gdpx/quickstart#the-runnable-task) is the portable runtime core. GDPx adds a canonical per-task layer so we can isolate the grader, reproduce a score, and normalize the task into the `gdpx-review-bundle/1.1.0` contract. This is the publication target: you may author it directly or provide the batch evidence package below for reviewed adaptation.
+| Term | Meaning |
+| --- | --- |
+| Runnable task | The Harbor task that the agent and verifier execute |
+| Partner source handoff | The partner's task, native evidence, and review material sent to Standard Data |
+| Canonical v3 bundle | The strict ZIP accepted by `POST /api/v3/gdpx-submissions` |
 
-If the task definition is ready but complete QC1 evidence is not, use the separate `gdpx-audit-task-draft-bundle/1.0.0` contract only when v3 capabilities advertise `audit_task_draft`. Audit retains the exact canonical task and workspace as a blocked draft, and Wilderness may show it in **Review Tasks**. Do not add placeholder evaluations or fabricated logs to satisfy the publication bundle. Later evidence must bind the same immutable task revision exactly.
+Only the third format is a canonical v3 review bundle.
 
-```text
-<TASK_ID>/
-├── TASK.json
-├── agent/
-│   ├── kickoff.md
-│   ├── kickoff_structured.md
-│   ├── env/
-│   └── tools/
-├── grader/
-│   ├── deterministic/
-│   ├── rubric.json
-│   └── validation.py        # or validation.ipynb
-├── gold/
-│   ├── reference_solution.*
-│   └── adversarial/
-└── samples/
-    ├── rollouts/
-    ├── RUN_MANIFEST.json
-    └── reward_ledger.json
-```
+## Package the runnable task
 
-<Warning>
-  Everything the model can access belongs under `agent/`. Nothing under `grader/` or `gold/` may be readable from the agent runtime. If grading needs a value, keep it in `grader/`, not in the environment the model explores.
-</Warning>
+Each task must contain the exact agent-visible instruction and starting state, a reproducible environment, a verifier, and a reset path. Use [the Harbor task structure](/gdpx/quickstart#the-runnable-task) unless Standard Data approves another runtime.
 
-### What each folder owns
+Keep these visibility boundaries:
 
-| Path | Requirement | Contents |
-| --- | --- | --- |
-| `TASK.json` | Required | One machine-readable manifest for the task |
-| `agent/` | Required | Both kickoffs, the native data room or environment, and docs for each provisioned tool |
-| `grader/` | Required | Deterministic checks where applicable, the atomic rubric, and a script or notebook proving the signal exists in the data |
-| `gold/` | Required | A strong-practitioner reference output and 1–3 known-bad responses that must fail |
-| `samples/` | Required | A few full, untruncated rollouts, their run envelope, and the per-criterion reward ledger |
+| Material | Runtime visibility |
+| --- | --- |
+| Instruction, source files, and provisioned tool documentation | Agent-visible |
+| Hidden tests, rubric internals, judge configuration, and verifier secrets | Verifier-only |
+| Reference solution and known-good or known-bad calibration artifacts | Verifier-only |
+| Review notes, failure analysis, and rollout summaries | Intake-only |
 
-`RUN_MANIFEST.json` records the model and harness envelope plus token, tool, cost, and wall-clock data for each rollout. `reward_ledger.json` keeps deterministic output, judge output, and the final criterion contribution separate.
+Do not rely on prose labels alone. Enforce these boundaries in the runtime.
 
-### `TASK.json`
+### Select one runtime prompt
 
-Keep the manifest to the partner-supplied fields below. Standard Data adds revision IDs, hashes, bindings, and other canonical metadata during normalization.
+For authoring review, supply an unstructured kickoff and a structured brief. Before execution, select the exact prompt shown to the agent. Retain the other version as supporting material rather than treating both as runtime instructions.
 
-| Group | Fields | Rules |
-| --- | --- | --- |
-| Identity | `task_id`, `partner`, `domain`, `family` | Folder name and `task_id` must match |
-| Construct | `construct`, `turns`, `stateful`, `value_tier` | `turns` is `single` or `multi`; value tier is `high-judgment`, `mixed`, or `commodity` |
-| Runtime | `action_space`, `tools`, `input_format`, `output_format` | `action_space` is `coding-agent`; every declared tool needs agent-visible docs |
-| Scoring | `verifier_mix`, `scoring`, `difficulty` | Verifier weights sum to 1; record criterion count, full-pass threshold, calibration model, and target pass@1 |
-| Horizon | `horizon`, `dual_paradigm_tested` | Record expected wall time and output tokens; test both modes when a direct-versus-tool choice exists |
-| Evidence | `artifacts`, `provenance` | List agent, grader, and gold artifacts; state source, sanitization, rights, and overlap risk |
+### Include calibration evidence
 
-Numeric examples in templates are illustrative. Set criterion count, verifier mix, horizon, and threshold from the task. Use the GDPx difficulty band above.
+Every task needs evidence that it is solvable and that the verifier recognizes correct and incorrect work. The representation depends on the task:
 
-### Five format rules
+- use `solution/solve.sh` when a scripted Oracle fits;
+- use a native reference artifact when the output is a workbook, document, drawing, or another structured file;
+- include a known-bad output or equivalent negative control; and
+- include a partial-credit anchor when the task uses partial credit or a judge.
 
-1. Ship both kickoff variants. A task with one is incomplete.
-2. Use a coding agent with provisioned CLI tools. Do not submit a computer-use task.
-3. Ship and grade native artifacts. Stateful work also needs pre-state, post-state, intended deltas, and forbidden side effects.
-4. Keep the rubric atomic. Each criterion has one claim, a weight, a failure tag, and one declared aggregation rule.
-5. Maintain one reward ledger. Record deterministic output, judge output, and final contribution per criterion.
+The evidence is required. A particular `gold/` directory or shell script is not.
 
-## Package a delivery batch for upload
+## Partner source handoff
 
-The task directory above is the canonical normalized task unit. A publishable v1.1 `task_and_evidence` delivery contains 1–100 unique task directories in the layout documented in [Upload an evaluation bundle](/gdpx/evaluation-bundle-upload), with exactly one QC1 run and one rollout for each task. The whole bundle imports atomically. Use a separate bundle for another attempt of the same task. `GDPX_BUNDLE.json` must inventory every other file in the ZIP and bind every exact task, run, and rollout identity. It does not inventory or hash itself.
+Use this path when Standard Data will normalize your delivery. Send the completed package through the delivery channel named in your onboarding agreement.
 
-The canonical task directory also contains `PUBLICATION_AUTHORITY.json`. This is the uploaded publication declaration, not agent-visible task material and not an operator grant. It binds the exact task revision, task-content hash, full workspace-inventory hash, source delivery, rights basis, agreement state, owner intent, and source mappings. Audit publishes only when that declaration also matches an immutable grant and active head in Standard Data's operator-controlled registry. Do not place it in the runtime workspace, copy it between task revisions, or infer it from a successful upload.
-
-An internal-QA review bundle may also include root-level `INTERNAL_QA_CREDENTIAL_ATTESTATION.json`, inventoried by `GDPX_BUNDLE.json` with role `internal_qa_credential_attestation`. This bundle type is singleton-only: include exactly one task, one run, and one rollout. Use it only for exact synthetic fixture literals in an isolated offline world. Every detected occurrence needs exactly one source-bound classification, and every projected Master occurrence must bind the identical bytes. A blanket internal, trusted, or sanitized flag is invalid. This review-only authority can never authorize external-catalog membership; see [Internal-QA exact-byte fixture retention](/gdpx/evaluation-bundle-upload#internal-qa-exact-byte-fixture-retention).
-
-`TASK.json` must inventory every workspace file by normalized path, SHA-256, byte size, media type, artifact kind, and visibility. The sorted inventory determines `environment.workspace_inventory_sha256`. `task_content_sha256` binds the complete canonical task graph. `RUN.json` and Master must repeat the exact workspace-inventory binding. Audit also retains the original canonical ZIP as an immutable storage object and binds its exact object name, generation, media type, byte size, tenant/upload session, and SHA-256 to the canonical task record. A missing or changed source ZIP makes the task ineligible even when its projected fields still exist. Audit rejects an omitted path or any hash, size, media-type, kind, visibility, archive-generation, or archive-byte mismatch.
-
-Execution evidence cannot approve itself. Partner-uploaded run records and receipts remain `not_execution_validated` until Audit verifies the exact managed run and creates a separate operator-authenticated managed-execution approval. Unapproved evidence stays archive-only and does not appear in Wilderness **Results**.
-
-The older batch envelope below remains useful as an authoring and partner-handoff format. Submit it with `adapter_mode: "terra_compatibility"` only when you cannot emit the canonical v3 layout. Adaptation may map and cite existing facts, but it may not invent missing evidence or change the task or rubric.
-
-Do not copy the whole authoring bundle into the runtime directory. Export the approved task and its intake-only `TASK.json` under `tasks/`. Keep trajectories under `trajectory/` and supporting material under `docs/`.
-
-<Info>
-  The batch handoff uses `trajectory/` in the singular. Every task name must match exactly across `tasks/`, `trajectory/`, and `docs/`.
-</Info>
-
-### Batch archive layout
-
-Create one top-level directory named `<dataset>-<batch>-<num>/` and package that directory as a ZIP.
+### Recommended layout
 
 ```text
 <dataset>-<batch>-<num>/
-├── tasks/                                      # required: task-local package
-│   └── <task_name>/
-│       ├── TASK.json                            # intake metadata; never agent-visible
+├── handoff-manifest.json
+├── tasks/
+│   └── <task_id>/
 │       ├── task.toml
 │       ├── instruction.md
-│       ├── environment/                        # Dockerfile and workspace
+│       ├── environment/
 │       ├── tests/
-│       │   └── test.sh                         # writes /logs/verifier/reward.json
 │       └── solution/
-│           └── solve.sh                        # optional when the Oracle has another form
-├── trajectory/                                 # required: full rollout evidence
-│   └── <task_name>/
-│       └── <model_name>/
-│           └── rollout_<harness@version>_<n>/
-│               ├── trajectory.json             # ATIF-format full trace
-│               ├── reward.json
-│               └── failure_analysis/
-│                   └── failure_analysis.md      # required for every failed rollout
-├── environment/                                # required only for private images
-│   ├── README.md                                # image-to-task map
-│   └── <image_name>/
-│       ├── <loadable image or full build context>
-│       └── manifest.md                          # name:tag, digest, and load/build steps
-└── docs/                                        # required: never part of the agent runtime
-    ├── failure_analysis_metadata.md             # required
-    ├── README.md                                # recommended batch summary
-    ├── reward_hacking.md                        # recommended reward-integrity review
-    └── <task_name>/
-        └── report.md                            # recommended task report
+├── trajectory/
+│   └── <task_id>/<model_or_run>/<attempt>/
+│       ├── trajectory.json
+│       ├── verifier-or-reward.json
+│       ├── artifacts/
+│       └── failure-analysis.md
+└── docs/
+    ├── README.md
+    └── <task_id>/
 ```
 
-The archive may contain more evidence under `trajectory/` and `docs/`, but `tasks/` must stay harness-ready. Do not place reports, review notes, hidden grading values, or rollout analysis inside a runnable task.
+Use `handoff-manifest.json` for partner taxonomy, task-to-evidence mappings, and source provenance. Do not call that file `TASK.json`: the canonical v3 `TASK.json` has a different, strict schema.
 
-Keep the authoring artifacts from the standardized task bundle:
+The manifest should identify:
 
-| Authoring artifact | Batch destination |
-| --- | --- |
-| Approved unstructured kickoff | `tasks/<task_name>/instruction.md` |
-| `TASK.json` rollout index | `tasks/<task_name>/TASK.json`; intake-only and excluded from the runtime |
-| Structured kickoff, provenance, and rubric rationale | `docs/<task_name>/` or its documented subdirectories |
-| Agent environment and tool definitions | `tasks/<task_name>/environment/` |
-| Deterministic grader | `tasks/<task_name>/tests/` with verifier-only runtime visibility |
-| Oracle or reference solution | `tasks/<task_name>/solution/` or an equivalent verifier-only reference |
-| Rollouts, run envelope, rewards, and failure analyses | `trajectory/<task_name>/...` |
-| Known-good and known-bad calibration artifacts | `docs/<task_name>/` as grader-only evidence |
+- the partner, domain, task family, and stable source task ID;
+- the exact task files and runtime version;
+- every supplied run and attempt;
+- each trajectory, verifier result, work product, and failure analysis;
+- source, rights, sanitization, and overlap-risk notes; and
+- any private image or external dependency required to reproduce the task.
 
-Keep the complete rollout corpus in the batch archive. A normalized per-task `samples/` directory may contain a representative subset, but `RUN_MANIFEST.json` and `reward_ledger.json` must reconcile to the complete delivered evidence.
+### Existing native exports
 
-### Preserve reviewer-visible rollout evidence
+You may deliver an approved native Harbor or provider export in its original layout when the live capability response advertises a matching adapter and Standard Data confirms that adapter for your batch.
 
-Every rollout that counts toward QC, difficulty assessment, or benchmark results must be independently reviewable from the delivered bytes. A rollout ID, score, cost, token count, provider link, or aggregate summary does not satisfy this requirement.
-
-For every countable attempt, retain:
-
-- the exact task revision and all agent-visible instructions and source materials;
-- the complete ordered observable trajectory, including visible messages, tool calls, sanitized tool inputs, tool results, relevant state transitions, and the final response;
-- the produced work products themselves, such as the completed workbook, document, code patch, or other native artifact, with stable artifact references and hashes;
-- the final reward, pass threshold, outcome, per-test results, and criterion-level grading decisions;
-- the model, provider, harness, prompt and tool configuration, budgets, timeout, stop reason, timing, and usage envelope; and
-- immutable task, run, rollout, and artifact bindings so the evidence cannot be attached to a different execution.
-
-Route the evidence into the canonical rollout sections. Do not bury a transcript or test log inside a generic result summary.
-
-| Section | Required reviewer-visible content |
-| --- | --- |
-| `problem` | Exact task instruction, problem identity, and task-revision binding |
-| `setup_logs` | Environment build and startup, dependency resolution, reset state, and tool-handshake evidence |
-| `agent_logs` | Ordered visible messages, tool calls, sanitized inputs, tool outputs, observations, errors, and relevant state transitions |
-| `results` | Final response, output summary, completion status, stop reason, and references to every produced work product |
-| `test_logs` | Per-test execution output, passed and total counts, errors, skips, and verifier-runtime diagnostics |
-| `grading` | Final reward, pass threshold, outcome, criterion-level decisions, weights or contributions, hard-gate results, and grader version |
-
-Also retain run-level model, provider, harness, harness version, compute, infrastructure, start and completion times, duration, turn count, token usage, cost, retry lineage, and structured stop reason. Use `null` only when the source genuinely did not emit a value; a required section with a null body makes the rollout diagnostic-only.
-
-Keep generated work products beside the attempt under `trajectory/<task_name>/<model_name>/rollout_<harness@version>_<n>/artifacts/`. Reference them from the trajectory or its attempt manifest. Preserve native formats so reviewers can inspect formulas, cell values, document content, and other task-specific details directly.
-
-Omit hidden or private reasoning, actual or live credentials, signed URLs, secret values, and raw provider-private payloads. Record each omission explicitly. Do not replace observable content with the word `restricted`, an empty event list, or a provider identifier.
-
-Sanitize those excluded fields before upload, then preserve and display every remaining observable byte. An approved internal-QA synthetic fixture literal is retained verbatim under its exact corpus, source, fixture, Master, scanner, runtime, grant, and authority-head bindings. A sanitized prompt, model message, tool input or output, test log, grading rationale, or final result must not be replaced by a blanket redaction marker. Structural event metadata without the corresponding retained observable body is incomplete evidence.
+Include a complete file inventory and a crosswalk from each task and attempt to its evidence. Preserve source paths and bytes. Do not rename, flatten, or truncate evidence merely to resemble the recommended layout.
 
 <Warning>
-  `TASK.json` indexes rollout evidence; it does not replace the evidence. Audit does not reconstruct missing bodies from Harbor, Prime Intellect, or another provider. A metadata-only rollout is diagnostic evidence only. It cannot count toward QC1, QC2, QC3, reviewer acceptance, or a published difficulty claim. Reviewer permissions cannot recover evidence that was never uploaded.
+  Adapter acceptance means Audit can read and map the source. It does not create missing evidence, grant QC credit, add the task to the active evidence catalog, or approve it for the released GDPx benchmark. Missing manifests, observable trajectory bodies, verifier results, criterion decisions, native work products, failure analyses, or immutable identity bindings must still be supplied or regenerated.
 </Warning>
 
-### Prepare the ZIP
+## Reviewer-visible rollout evidence
 
-1. Verify that every task has matching entries under `tasks/`, `trajectory/`, and `docs/`, and that each one-task canonical publication bundle contains an exact, task-bound `PUBLICATION_AUTHORITY.json`.
-2. Remove `.git/`, `.DS_Store`, `__MACOSX/`, symbolic links, actual secrets, temporary files, and unrelated build output. Do not rewrite an attested internal-QA fixture value; byte changes require a new attestation and operator grant.
-3. Confirm that each environment builds from the delivered files alone. Pin or include every base image, dependency, workspace asset, tool definition, and skill document.
-4. Put exactly one batch root in the archive. Do not upload several unrelated roots or a directory-only ZIP.
-5. Record the final filename, byte size, media type `application/zip`, and SHA-256 of the exact bytes you will upload.
-6. Open at least one packaged attempt for every task and model pairing. Confirm that the prompt, observable transcript, tool I/O, output artifacts, tests, and grading evidence are present and readable from the archive alone.
-7. Test the methodology document with the [audit endpoint](/gdpx/audit-endpoint). Then build the canonical review bundle and [submit it through v3](/gdpx/evaluation-bundle-upload). The exact archive must obtain managed-execution approval and current-policy `review_ready` status before publication.
+Every attempt used for QC, difficulty assessment, or benchmark results must be independently reviewable from delivered bytes. An ID, score, provider link, or aggregate summary is not enough.
 
-<Warning>
-  The document preflight endpoint accepts one PDF, DOCX, Markdown, or JSON document. It does not accept this ZIP. The canonical flow performs the resumable upload, quarantine, scanning, and adapter preview. A successful byte upload is not task acceptance: stop if the preview is blocked, incomplete, or does not map every task and visibility boundary exactly.
-</Warning>
+For each attempt, retain:
 
-Raw preference pairs, pure trajectory collections, catalogs, and other data that cannot be represented as verifiable runnable tasks use a separate intake path. Do not force them into this archive shape.
+- the exact task revision and agent-visible context;
+- the complete ordered observable trajectory;
+- visible model messages, tool calls, sanitized tool inputs, and tool results;
+- the final response and every produced native artifact;
+- raw verifier and per-test output;
+- one decision for each rubric criterion;
+- the reported score, calculated score, threshold, outcome, and reconciliation;
+- model, provider, harness, versions, configuration, budgets, timing, and stop reason; and
+- stable task, run, rollout, and artifact references.
 
-### Make environments self-contained
+Every failed attempt also needs an evidence-grounded failure-analysis summary. The `/v1/benchmark-rollout-analyses` service is optional; if you use it, retain its request, response, and fingerprints beside the same attempt.
 
-Every task environment must build from the delivered files without access to an undisclosed registry or local workstation state. Pin dependencies and include the complete workspace and build context.
+Do not submit private chain of thought, actual credentials, signed URLs, or provider-private payloads. Redact only those values. Do not replace an otherwise observable log with a blanket summary.
 
-If a task uses a private image, add the root-level `environment/` package. Supply a loadable or reproducible artifact such as an exported image, OCI layout, or Dockerfile with its full build context. Its manifest must record the exact `name:tag`, digest, registry when applicable, and load or build instructions. The root `environment/README.md` maps each image to every dependent task.
+## Canonical v3 submission
 
-Public images should be pinned by digest. Do not submit a task that depends on an image the reviewer or execution worker cannot retrieve or reconstruct.
+Use this path only when you are building the ZIP submitted directly to the GDPx API.
+
+First fetch:
+
+```text
+GET /api/v3/gdpx/capabilities
+GET /api/v3/gdpx/schemas/review-bundle
+```
+
+The fetched schema is authoritative. The outline below is illustrative:
+
+```text
+GDPX_BUNDLE.json
+tasks/
+└── <task_id>/
+    ├── TASK.json
+    ├── PUBLICATION_AUTHORITY.json
+    └── <inventoried task and workspace files>
+evaluations/
+└── <task_id>/
+    └── <run_id>/
+        ├── RUN.json
+        └── <rollout_id>/
+            ├── ROLLOUT.json
+            ├── trajectory.atif.json
+            ├── verifier.json
+            ├── criterion-decisions.json
+            └── artifacts/
+```
+
+`GDPX_BUNDLE.json` inventories every other ZIP member and binds the task, run, rollout, and artifact identities.
+
+The canonical `TASK.json` describes the immutable task, prompt, rubric, verifier, task-content hash, and complete workspace inventory. It does **not** contain a `rollouts` field. Runs and rollouts belong under `evaluations/`.
+
+`PUBLICATION_AUTHORITY.json` is required in a direct canonical review bundle. It provides the source-side rights and publication declaration used for active evidence-catalog eligibility and must match Standard Data's active rights record before catalog membership. A separate draft or adapter contract may retain a blocked archive without this file when its live schema permits that case. The declaration is not agent-visible and does not replace the QC4 release decision.
+
+### Keep the counts straight
+
+When the live service advertises `gdpx-review-bundle/1.1.0`:
+
+- `task_and_evidence` accepts 1–100 unique tasks;
+- each task has exactly one evaluation and one rollout in that ZIP;
+- one blocked declared task prevents the active evidence catalog from changing for the cohort, although Audit may retain immutable diagnostic records; and
+- `evidence_only` attaches the first QC1 attempt to an exact retained canonical Audit draft or retains one later run and rollout candidate for an already retained, byte-identical task revision. A later candidate requires separate operator admission and does not replace the qualifying QC1 anchor.
+
+QC3 may require many attempts per model–harness pairing. Standard Data owns QC3 ingestion and campaign mapping. Partners should preserve the complete native corpus and should not submit individual QC3 attempts through `evidence_only` unless a Standard Data operator provides the target revision and admission plan. The current API does not natively label a run as QC3. Never place all QC3 attempts inside canonical `TASK.json`, and never put multiple attempts for one task in a single v1.1 review bundle.
+
+## Prepare the source handoff
+
+1. Freeze the task revision and generate a complete file inventory.
+2. Confirm that every environment builds and resets from delivered files.
+3. Run the applicable build, reference-solution, and no-op checks.
+4. Verify that every supplied attempt includes readable trajectory, result, verifier, grading, and native artifact evidence.
+5. Add a failure-analysis summary for each failed attempt.
+6. Remove repository metadata, temporary files, unrelated build output, and secrets.
+7. Record the final ZIP filename, size, media type, and SHA-256.
+8. Ask Standard Data to confirm the adapter before changing an existing native export.
+
+## Prepare a canonical bundle
+
+1. Fetch the live capabilities and linked schema.
+2. Use only an advertised contract version, mode, adapter, and publication policy.
+3. Validate every strict JSON document against the fetched schema.
+4. Inventory every workspace and evidence file with its required path, hash, size, media type, kind, and visibility.
+5. Confirm that the ZIP contains one permitted attempt per task.
+6. Recompute all hashes from the final bytes.
+7. Submit through the [v3 evaluation bundle flow](/gdpx/evaluation-bundle-upload).
+
+<Info>
+  `/v1/evaluate` reviews one document. It does not validate this ZIP, create a task revision, add a record to the active evidence catalog, or approve a released benchmark result.
+</Info>

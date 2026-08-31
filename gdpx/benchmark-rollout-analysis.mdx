@@ -2,437 +2,149 @@
 title: "Analyze a benchmark rollout"
 sidebarTitle: "Rollout analysis"
 description: "Classify one observable rollout and determine whether a failure is a legitimate model failure."
-keywords: ["GDPx", "rollout analysis", "failure analysis", "DeepSWE", "Luna", "QC"]
+keywords: ["GDPx", "rollout analysis", "failure analysis", "Luna", "QC"]
 ---
 
-`POST /v1/benchmark-rollout-analyses` sends one normalized, reviewer-observable rollout to a pinned internal model judge. It classifies the verifier result and separately determines whether a failed rollout is a legitimate model failure.
+`POST /v1/benchmark-rollout-analyses` analyzes one normalized, observable attempt. Use it when you need a structured first pass on the failure origin or legitimacy.
 
 <Warning>
-  This endpoint returns judge-assisted QC evidence. It does not retain or publish the submitted rollout, advance a task through QC, create or update a canonical task or rollout, authorize workspace import, or issue a certificate. A reviewer must resolve `needs_human_review` results and apply the [QC stage rules](/qc-stages-for-benchmark).
-
-  It also does not create a managed runtime receipt or managed-execution approval. Keep the analysis response, then include the underlying trajectory, reward, grading evidence, and produced artifacts in the canonical bundle described by the [rollout evidence contract](/gdpx/rollout-viewer-evidence).
+  This endpoint is optional and analysis-only. It does not store the rollout, create canonical evidence, pass a QC stage, or add evidence to the active evidence catalog. Retain the exact request and response if you use them.
 </Warning>
 
-<Info>
-  `PASS_LEGITIMATE` means that the rollout legitimately passed. It never means that a failure was legitimate. Read `failure_legitimacy` or `is_legitimate_model_failure` for the failure decision.
-</Info>
+## What the analysis answers
 
-<Info>
-  Follow [Upload rollout evidence and analysis](/qc-stages-for-benchmark#upload-rollout-evidence-and-analysis)
-  to retain the endpoint request and response with the exact run, upload all
-  primary evidence, and verify the resulting Wilderness readback.
-</Info>
+The service separates three questions:
 
-## Prepare the evidence
+1. What did the verifier report?
+2. What first went wrong in the observable attempt?
+3. Is the result valid benchmark evidence, or did the task, verifier, runtime, provider, or orchestration fail?
 
-Submit the exact task revision and rollout that you want to review. Include enough observable evidence to establish task solvability, verifier alignment, and runtime health.
+One classification never replaces the repeated-run evidence required for QC2 or the evaluation plan required for QC3.
 
-Before sending the request:
+## Prepare the request
 
-- preserve the task instruction, rubric, verifier result, and ordered observable trajectory;
-- include a known-good reference when you are authorized to share it and it is needed to test alignment;
-- include per-test verifier output and runtime evidence for environment, provider, and orchestration health;
-- assign one unique `evidence_id` to every evidence item; and
-- remove private reasoning, credentials, raw provider payloads, and raw cloud-storage paths.
+Bind the request to one exact task revision, source run, and rollout. Include:
 
-Set `rollout.private_reasoning_omitted` to `true`. The endpoint rejects any other value. Uploaded text is treated as untrusted evidence rather than instructions to the judge.
+- the task instruction and relevant agent-visible context;
+- atomic rubric criteria and known-good evidence;
+- the ordered observable trajectory and final output;
+- verifier outcome, reward, threshold, per-test output, and verifier identity;
+- environment, provider, and orchestration status;
+- model, harness, budgets, usage, timeout, and stop reason; and
+- stable evidence IDs for every quoted item.
 
-The service scans every request string, including mapping keys and values inside action input and output schemas. It rejects raw `gs://`, `s3://`, `az://`, `abfs://`, `abfss://`, `wasb://`, and `wasbs://` references; GCS, AWS, and generic signed-storage query credentials; and common Anthropic, generic secret-key, AWS, bearer, Google, GitHub, and Slack credential signatures.
+Do not include private chain of thought, actual credentials, signed URLs, or provider-private payloads.
 
-This v1 analysis endpoint has no internal-QA fixture exception and does not preserve an exact-byte attestation. Submit attested synthetic fixture evidence only through the v3 [evaluation bundle workflow](/gdpx/evaluation-bundle-upload#internal-qa-exact-byte-fixture-retention). Do not rewrite fixture values merely to make a v1 analysis request pass; use other non-sensitive evidence for the optional analysis or omit the v1 call.
+If the full retained evidence is larger than the endpoint's request limit, create a faithful analysis projection that preserves the first failure and every failed test. Keep the complete source evidence in the canonical bundle. Reducing the analysis request does not authorize truncating retained rollout evidence.
 
-## Authenticate
-
-Use the shared Standard Data API origin and a key with `evaluations:write`:
+## Call the endpoint
 
 ```bash
 export STANDARD_DATA_API_BASE="https://api.standarddata.io"
 export STANDARD_DATA_API_KEY="<your-standard-data-api-key>"
-```
 
-Check your effective scopes with `GET /v1/whoami`. See [Test with the audit endpoint](/gdpx/audit-endpoint#configure-one-api-origin-and-key) for API-key setup.
-
-## Submit one rollout
-
-The endpoint accepts `application/json` only. Each call accepts exactly one task revision and one rollout.
-
-```bash
 curl --fail-with-body \
   --request POST "${STANDARD_DATA_API_BASE}/v1/benchmark-rollout-analyses" \
   --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
   --header "Content-Type: application/json" \
   --data-binary @rollout-analysis-request.json \
-  --max-time 200 \
   --output rollout-analysis-response.json
 ```
 
-### Request shape
-
-| Field | Required | Description |
-| --- | --- | --- |
-| `schema_version` | Yes | Must be `1.0.0` for this analysis endpoint |
-| `task` | Yes | Exact task identity, instruction, rubric, and optional known-good evidence |
-| `rollout` | Yes | One model identity and one ordered observable trajectory |
-| `verifier` | Yes | Outcome, reward data, summary, and optional per-test results |
-| `runtime` | Yes | Environment, provider, orchestration, Oracle, and optional action-space evidence |
-| `custom_evidence` | No | Additional bounded evidence with an explicit source and locator |
-
-This request schema is independent of `gdpx-review-bundle/1.1.0`. The analysis endpoint schema is strict: unknown fields and implicit type coercions are rejected. Nested fields use these contracts:
-
-| Object | Fields |
-| --- | --- |
-| `task` | `task_id`, `task_revision_id`, `task_content_hash`, `title`, `instruction`, `rubric[]`, and optional `known_good_reference` |
-| `task.rubric[]` | `criterion_id`, `evidence`, optional `weight` from `0` through `1`, and optional `verification_method` |
-| `rollout` | `rollout_id`, `source_run_id`, `model`, `private_reasoning_omitted`, `trajectory_schema`, `events[]`, optional `final_output`, optional `patch_or_artifact_summary`, `is_truncated`, optional `stop_reason`, and optional `resource_limits` and `resource_usage` (both default to empty objects) |
-| `rollout.model` | `provider`, `model_id`, optional `revision_id`, and optional `configuration_hash` |
-| `rollout.events[]` | `evidence`, unique ascending `sequence`, `actor`, `event_type`, optional `tool_name`, optional `step_index`, optional `call_id`, optional `related_call_ids[]` (defaults to an empty list), optional `available_action_names[]`, and optional UTC `timestamp` |
-| `rollout.resource_limits` | Optional `max_steps`, `max_context_tokens`, and `timeout_seconds` |
-| `rollout.resource_usage` | Optional `steps_used`, `peak_context_tokens`, `elapsed_seconds`, and `limit_triggered` (defaults to `unknown`) |
-| `verifier` | `outcome`, optional `reward`, optional `pass_threshold`, `summary`, optional `tests[]` (defaults to an empty list), optional `verifier_revision_id`, and optional `verifier_content_hash` |
-| `verifier.tests[]` | Unique `test_id`, `evidence`, `status`, and optional `criterion_ids[]` (defaults to an empty list); every listed criterion must exist in `task.rubric` |
-| `runtime` | `evidence`, `environment_integrity`, `provider_health`, `orchestration_integrity`, `oracle_smoke`, optional `environment_revision_id`, optional `container_image_digest`, optional `action_space[]` and `action_definitions[]` (both default to empty lists), and optional `agent_system_prompt` |
-| `runtime.action_definitions[]` | Unique `name` plus optional `description`, optional JSON-object `input_schema`, and optional JSON-object `output_schema` |
-| `custom_evidence[]` | `evidence`, `source`, and `locator` |
-
-Use only these enum values:
-
-| Field | Accepted values |
-| --- | --- |
-| `rollout.events[].actor` | `system`, `user`, `assistant`, `tool`, `environment`, `orchestrator` |
-| `rollout.events[].event_type` | `message`, `tool_call`, `tool_result`, `state_transition`, `artifact`, `patch`, `error`, `final_output` |
-| `verifier.tests[].status` | `passed`, `failed`, `error`, `skipped` |
-| `rollout.resource_usage.limit_triggered` | `max_steps`, `max_context_tokens`, `timeout`, `none`, `unknown` |
-| `runtime.oracle_smoke` | `passed`, `failed`, `not_run`, `unknown` |
-| `custom_evidence[].source` | `task`, `trajectory`, `verifier`, `reference`, `environment`, `provider`, `orchestration`, `operator_note` |
-
-Use the event-linkage fields to preserve the observable tool graph:
-
-- supply structured `runtime.action_definitions` whenever any tool-call event exists, and give each definition a unique name;
-- give every `tool_call` a unique `call_id`, a `tool_name` present in those definitions, and `available_action_names` containing only defined action names and including the called tool;
-- give every `tool_result` at least one `related_call_ids` value, and make every related-call reference on any event point to a `call_id` declared by a tool-call event in the same rollout;
-- place every tool-result event after each call that it references; when a result supplies `tool_name`, every related call must use that same name, otherwise omit the result's tool name; and
-- whenever a non-call event supplies `available_action_names`, list only defined action names; and
-- use `step_index` for an optional non-negative harness step index. It does not replace the unique ascending `sequence`.
-
-Every evidence value uses this shape:
-
-```json
-{
-  "evidence_id": "evidence_task_instruction",
-  "content": "Complete the requested analysis and save the required artifact."
-}
-```
-
-An `evidence_id` must match `evidence_<identifier>` and be unique across the entire request. The judge can cite only these identifiers. The service rejects invented identifiers. A quote must be a literal contiguous substring of the original evidence `content`; the service does not decode JSON, collapse whitespace, or substitute typographic quotes or dashes during validation.
-
-If a quote fails this check and its evidence item is at most 512 characters, the service deterministically substitutes the exact full uploaded `content` as that citation's quote. This correction changes no other analysis value and does not call the judge again. Invalid quotes tied to longer evidence may receive at most one bounded provider repair. Any quote that remains invalid after its applicable repair fails closed.
-
-### Complete request example
-
-```json
-{
-  "schema_version": "1.0.0",
-  "task": {
-    "task_id": "example-task",
-    "task_revision_id": "taskrev_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "task_content_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-    "title": "Build the requested analysis",
-    "instruction": {
-      "evidence_id": "evidence_task_instruction",
-      "content": "Build the requested analysis and save it to output.json."
-    },
-    "rubric": [
-      {
-        "criterion_id": "criterion_output",
-        "evidence": {
-          "evidence_id": "evidence_rubric_output",
-          "content": "output.json must contain every required field."
-        },
-        "weight": 1.0,
-        "verification_method": "Parse output.json and check the required fields."
-      }
-    ],
-    "known_good_reference": {
-      "evidence_id": "evidence_known_good",
-      "content": "The known-good artifact contains every required field and receives reward 1.0."
-    }
-  },
-  "rollout": {
-    "rollout_id": "rollout_example_01",
-    "source_run_id": "run_example_01",
-    "model": {
-      "provider": "openai",
-      "model_id": "gpt-5.6-luna",
-      "revision_id": "pinned-revision",
-      "configuration_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
-    },
-    "private_reasoning_omitted": true,
-    "trajectory_schema": "harbor-observable-v1",
-    "events": [
-      {
-        "evidence": {
-          "evidence_id": "evidence_turn_1",
-          "content": "I will return only a summary and will not create output.json."
-        },
-        "sequence": 1,
-        "actor": "assistant",
-        "event_type": "message",
-        "timestamp": "2026-08-17T20:00:00Z"
-      }
-    ],
-    "final_output": {
-      "evidence_id": "evidence_final_output",
-      "content": "Analysis complete."
-    },
-    "is_truncated": false,
-    "stop_reason": "completed",
-    "resource_limits": {
-      "max_steps": 100,
-      "max_context_tokens": 200000,
-      "timeout_seconds": 3600
-    },
-    "resource_usage": {
-      "steps_used": 1,
-      "peak_context_tokens": 1200,
-      "elapsed_seconds": 12.5,
-      "limit_triggered": "none"
-    }
-  },
-  "verifier": {
-    "outcome": "failed",
-    "reward": 0,
-    "pass_threshold": 1,
-    "summary": {
-      "evidence_id": "evidence_verifier_summary",
-      "content": "Verification failed because output.json was not created."
-    },
-    "tests": [
-      {
-        "test_id": "test_output_exists",
-        "evidence": {
-          "evidence_id": "evidence_test_output_exists",
-          "content": "FAIL: output.json does not exist."
-        },
-        "status": "failed",
-        "criterion_ids": ["criterion_output"]
-      }
-    ],
-    "verifier_revision_id": "verifier-revision-1",
-    "verifier_content_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
-  },
-  "runtime": {
-    "evidence": {
-      "evidence_id": "evidence_runtime",
-      "content": "The environment started cleanly, tools remained available, and the verifier completed."
-    },
-    "environment_integrity": "clean",
-    "provider_health": "healthy",
-    "orchestration_integrity": "clean",
-    "oracle_smoke": "passed",
-    "environment_revision_id": "environment-revision-1",
-    "container_image_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-    "action_space": ["terminal", "filesystem"]
-  },
-  "custom_evidence": []
-}
-```
-
-`verifier.outcome` is `passed`, `failed`, `error`, or `not_run`. A passed verifier cannot contain a failed or error test. A failed verifier with test detail must contain at least one failed test, and an error verifier with test detail must contain at least one error test. A not-run verifier can contain only skipped tests. Error and not-run outcomes cannot report a reward. When both `reward` and `pass_threshold` are present, a passed reward must meet or exceed the threshold and a failed reward must remain below it.
-
-Every verifier-test `test_id` must be unique within the request. The service rejects duplicates because root-cause reconciliation is keyed by `test_id`.
-
-When normalizing a verifier infrastructure error, use `outcome: "error"`, omit `reward`, and, when test detail is available, include an `error` test. Do not convert it to a failed verifier with reward `0`.
-
-A non-truncated rollout can use only `none` or `unknown` for `limit_triggered`. A `max_steps`, `max_context_tokens`, or `timeout` trigger must include its corresponding declared limit and observed usage value.
-
-Runtime integrity values are `clean`, `suspected_issue`, `confirmed_issue`, or `unknown`. `provider_health` uses `healthy`, `suspected_issue`, `confirmed_issue`, or `unknown`.
+The request is synchronous. Use the request contract returned by the service rather than copying a cached example.
 
 ## Read the response
 
-The response separates what happened at the verifier from whether the failure is valid benchmark evidence.
+The response includes the exact task and rollout identities plus:
 
 | Field | Meaning |
 | --- | --- |
-| `schema_version` | Response contract version, currently `1.0.0` |
-| `analysis_id` | Stable identifier for this analysis result |
-| `task_id` / `task_revision_id` | Task identity copied from the request |
-| `rollout_id` / `source_run_id` | Rollout identity copied from the request |
 | `analysis_status` | `complete` or `needs_human_review` |
-| `observed_verifier_outcome` | Outcome copied from the normalized verifier evidence |
-| `deep_swe_tag` | One category from the closed rollout taxonomy, or `null` for human review |
-| `confusion_class` | `TP`, `TN`, `FN`, or `FP`; describes the verifier disposition, not QC legitimacy |
-| `failure_legitimacy` | `legitimate_model_failure`, `non_model_failure`, `passing_rollout`, `cheated_or_invalid_pass`, or `needs_human_review` |
-| `is_legitimate_model_failure` | Convenience boolean derived from the stricter integrity gate |
-| `solvable_with_supplied_context_and_tools` | Whether the submitted task could be solved with its supplied context and action space; `null` when evidence is insufficient |
-| `declared_limits_adequate_for_task` | Judge assessment of whether the declared limits were adequate for this task; must be `true` for a legitimate `FAIL_TRIAL_INCOMPLETE` and may otherwise be `false` or `null` |
-| `failure_origin` | `model`, `prompt`, `verifier`, `environment`, `provider`, `orchestration`, `training_data`, `triangulation`, or `unknown` |
-| `confidence` | Judge confidence from `0` through `1` |
-| `summary` | Grounded explanation of the classification and legitimacy decision |
-| `first_failure_locator` | First grounded divergence; for every complete result other than `PASS_LEGITIMATE`, it must point to an uploaded evidence item that also appears in `evidence` |
-| `evidence` | Verbatim quotes tied to uploaded evidence identifiers and locators |
-| `failing_tests` | Per-test root cause and supporting evidence identifiers; a complete result has exactly one entry for each `test_id` in the submitted failed-or-error set |
-| `benchmark_fix` | Smallest benchmark-side repair and rerun acceptance test; `null` for a legitimate model failure |
-| `model_behavior_fix` | Description of the failed model behavior without disclosing a gold answer; required for a legitimate model failure |
-| `qc_recommendation` | `accept_as_legitimate_failure`, `repair_and_rerun`, `harden_and_rerun`, or `human_review` |
-| `missing_inputs` | Observable evidence required before the analysis can be completed |
-| `judge` | Pinned provider, model revision, analysis and citation-repair prompt hashes, schema hash, temperature, and retry-policy hash |
-| `input_fingerprint` / `output_fingerprint` | Canonical hashes for provenance and comparison |
-| `analyzed_at` | UTC completion timestamp |
+| `observed_verifier_outcome` | The verifier outcome from the request |
+| `deep_swe_tag` | The closed failure category when the evidence supports one |
+| `confusion_class` | The verifier disposition: TP, TN, FP, or FN |
+| `failure_legitimacy` | Whether this was a valid model failure, non-model failure, invalid pass, passing rollout, or unresolved case |
+| `failure_origin` | Model, prompt, verifier, environment, provider, orchestration, training data, triangulation, or unknown |
+| `first_failure_locator` | The first grounded divergence |
+| `evidence` | Citations to submitted observable evidence |
+| `failing_tests` | Per-test root causes |
+| `qc_recommendation` | Accept as evidence, repair and rerun, harden and rerun, or human review |
+| `missing_inputs` | Evidence required before the result can be resolved |
+| `input_fingerprint` / `output_fingerprint` | Hashes used to retain the analysis with the attempt |
 
-When `benchmark_fix` is not `null`, it contains `owner`, `target`, `action`, `acceptance_test`, and `rerun_required`. `owner` is `task_author`, `verifier_author`, `environment_owner`, `orchestration_owner`, `provider_operator`, or `benchmark_owner`. A `repair_and_rerun` or `harden_and_rerun` recommendation requires `rerun_required: true`.
+`analysis_status: complete` means the endpoint completed its classification. It does not mean the task passed QC.
 
-The first-failure item may come from any grounded source. For example, an omission may first become observable in verifier evidence, while an environment or provider defect may first appear in its corresponding runtime evidence. A direct model-failure analysis must still cite at least one observable trajectory item in `evidence`, but `first_failure_locator` does not have to point to that trajectory citation.
+## Understand failure legitimacy
 
-```json
-{
-  "schema_version": "1.0.0",
-  "analysis_id": "analysis_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-  "task_id": "example-task",
-  "task_revision_id": "taskrev_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-  "rollout_id": "rollout_example_01",
-  "source_run_id": "run_example_01",
-  "analysis_status": "complete",
-  "observed_verifier_outcome": "failed",
-  "deep_swe_tag": "FAIL_MISSED_REQUIREMENT",
-  "confusion_class": "TN",
-  "failure_legitimacy": "legitimate_model_failure",
-  "is_legitimate_model_failure": true,
-  "solvable_with_supplied_context_and_tools": true,
-  "declared_limits_adequate_for_task": null,
-  "failure_origin": "model",
-  "confidence": 0.97,
-  "summary": "The model omitted the explicitly required output artifact while the task, verifier, and runtime evidence were aligned and healthy.",
-  "first_failure_locator": {
-    "evidence_id": "evidence_turn_1",
-    "source": "trajectory",
-    "locator": "rollout.events[1]:assistant:message"
-  },
-  "evidence": [
-    {
-      "evidence_id": "evidence_turn_1",
-      "source": "trajectory",
-      "locator": "rollout.events[1]:assistant:message",
-      "quote": "I will return only a summary and will not create output.json.",
-      "supports": "The model explicitly declined an unambiguous required output."
-    }
-  ],
-  "failing_tests": [
-    {
-      "test_id": "test_output_exists",
-      "root_cause": "The model did not create the required artifact.",
-      "evidence_ids": ["evidence_turn_1", "evidence_test_output_exists"]
-    }
-  ],
-  "benchmark_fix": null,
-  "model_behavior_fix": "Create the explicitly requested artifact and verify its required fields before finishing.",
-  "qc_recommendation": "accept_as_legitimate_failure",
-  "missing_inputs": [],
-  "judge": {
-    "provider_id": "anthropic",
-    "model_id": "claude-sonnet-4-6",
-    "revision_id": "claude-sonnet-4-6",
-    "prompt_version": "deep-swe-model-failure-v1",
-    "prompt_hash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-    "citation_repair_prompt_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
-    "output_schema_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
-    "temperature": 0.0,
-    "retry_policy_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
-  },
-  "input_fingerprint": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
-  "output_fingerprint": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
-  "analyzed_at": "2026-08-17T20:01:00.000Z"
-}
-```
+A failed attempt can qualify as a legitimate model failure only when:
 
-## Understand the taxonomy
+- the task is solvable and sufficiently clear with the supplied context and tools;
+- the instruction, rubric, tests, and verifier agree;
+- the environment, provider, and orchestration are healthy;
+- the model behavior caused the failure; and
+- the evidence is complete enough to support the conclusion.
 
-The confusion class evaluates the verifier decision. Failure legitimacy applies the stricter GDPx QC gate.
+Common non-model origins include:
 
-| Confusion class | Tag | Meaning | Can qualify as a legitimate model failure? |
-| --- | --- | --- | --- |
-| `TP` | `PASS_LEGITIMATE` | Correct behavior legitimately passed | No; this is a passing rollout |
-| `FP` | `PASS_CHEATED` | Leakage, hardcoding, stubbing, test edits, or another shortcut produced a pass | No |
-| `TN` | `FAIL_MISSED_REQUIREMENT` | The attempt skipped an explicit requirement | Yes, after every integrity gate passes |
-| `TN` | `FAIL_INTEGRATION_ERROR` | Types, signatures, structure, or interfaces conflict | Yes, after every integrity gate passes |
-| `TN` | `FAIL_REGRESSION` | The attempt broke previously valid behavior | Yes, after every integrity gate passes |
-| `TN` | `FAIL_WRONG_LOGIC` | The substantive logic is wrong | Yes, after every integrity gate passes |
-| `TN` | `FAIL_SYNTAX_ERROR` | The output does not parse, compile, or load | Yes, after every integrity gate passes |
-| `TN` | `FAIL_WRONG_FILE` | The change or artifact is in the wrong location | Yes, after every integrity gate passes |
-| `TN` | `FAIL_UNVERIFIED_ASSUMPTION` | An unsupported assumption caused the failure | Yes, after every integrity gate passes |
-| `TN` | `FAIL_KNOWLEDGE_GAP` | The attempt misused a standard API or language feature | Yes, after every integrity gate passes |
-| `TN` | `FAIL_MISUNDERSTOOD_TASK` | The attempt solved a materially different task | Yes, after every integrity gate passes |
-| `TN` | `FAIL_TRIAL_INCOMPLETE` | The model exhausted the allowed steps or context before a complete submission | Only when `is_truncated` and adequacy are true, all three limits are declared, and observed step or context usage reaches its limit |
-| `TN` | `FAIL_API_FAILURE` | The model provider failed during the rollout | No |
-| `FN` | `FAIL_TEST_MISMATCH` | A reasonable solution failed an unstated hidden expectation | No |
-| `FN` | `FAIL_TEST_BROKEN` | A test, fixture, or verifier setup was faulty | No |
-| `FN` | `FAIL_AMBIGUOUS_TASK` | Multiple reasonable readings existed and one was rejected | No |
-| `FN` | `FAIL_EXECUTION_ERROR_EXTERNAL` | A sandbox, dependency, tool, or environment failure prevented completion | No |
+- broken or mismatched tests;
+- hidden expectations not stated or discoverable;
+- ambiguous instructions;
+- unavailable tools or dependencies;
+- provider or controller failures; and
+- reward leakage or a cheated pass.
 
-A failure qualifies only when the task is solvable and unambiguous with the supplied context, the prompt and verifier are aligned, the environment, provider, and orchestration are clean, and model behavior caused the failure. A category alone cannot establish legitimacy.
+A category label alone does not establish legitimacy.
 
-The request metadata is authoritative. A legitimate failure also requires `verifier.outcome: "failed"`, clean runtime statuses, and either `oracle_smoke: "passed"` or, when Oracle is `not_run` or `unknown`, an authorized `known_good_reference`. An `oracle_smoke: "failed"` result cannot be overridden by a reference. An `error` or `not_run` verifier cannot establish a direct model-failure category.
+## Apply the saturation rule
 
-A model-caused `FAIL_TRIAL_INCOMPLETE` requires all of the following:
+The analysis endpoint does not override GDPx difficulty review.
 
-- `rollout.is_truncated: true`;
-- non-null `max_steps`, `max_context_tokens`, and `timeout_seconds`;
-- `declared_limits_adequate_for_task: true`; and
-- either `limit_triggered: "max_steps"` with `steps_used >= max_steps`, or `limit_triggered: "max_context_tokens"` with `peak_context_tokens >= max_context_tokens`.
+- A passing QC1 attempt proves construction, not difficulty.
+- One failed attempt does not prove difficulty.
+- If the QC1 model repeatedly passes or reaches the score ceiling, keep the task in QC1, harden or remove it, and rerun the new revision.
+- Do not count a saturated smoke result as QC2 evidence.
 
-A timeout trigger does not qualify as `FAIL_TRIAL_INCOMPLETE`. A truncated rollout cannot be relabeled as another direct capability failure.
-
-## Apply the saturation policy
-
-The endpoint does not override the Luna saturation rule.
-
-- If Luna legitimately passes, `failure_legitimacy` is `passing_rollout` and the recommendation is `harden_and_rerun`; that run is not a legitimate-failure result.
-- One pass does not by itself prove repeated-run saturation. When the current-revision Luna rollouts pass nearly every time or score at the ceiling, keep the saturated task in QC1. Harden or drop it, then rerun the exact new revision.
-- Do not count the saturated smoke result as QC2 evidence.
-- Do not advance a task because one failed rollout returns `legitimate_model_failure`. Apply the full QC1 and QC2 evidence requirements across the current revision.
-
-See [Partner delivery and review](/gdpx/benchmark-task-delivery#qc2-difficulty-and-reward-integrity) for the stage gate.
+See [QC2: Difficulty and reward integrity](/gdpx/benchmark-task-delivery#qc2-difficulty-and-reward-integrity).
 
 ## Handle human review
 
-When the evidence cannot establish the first failure, solvability, verifier alignment, or runtime health, the service returns:
+When the evidence cannot establish the first failure, solvability, verifier alignment, or runtime health, the service returns `needs_human_review` and lists missing inputs.
 
-- `analysis_status: "needs_human_review"`;
-- `deep_swe_tag: null` and `confusion_class: null`;
-- `failure_legitimacy: "needs_human_review"`;
-- `qc_recommendation: "human_review"`; and
-- one or more `missing_inputs`.
+Add the missing observable evidence or record a qualified human review. Do not rewrite an unresolved result as a legitimate model failure.
 
-Add the missing observable evidence and submit a new call, or record a qualified human review. Do not convert an ambiguous result into a model failure.
+## Retain the analysis correctly
 
-A passed verifier does not force a PASS category when the evidence is insufficient. The service may return a tagless `needs_human_review` result with `observed_verifier_outcome: "passed"`.
+If you call the endpoint, store these files beside the same rollout:
 
-## Limits and errors
+```text
+rollout-analysis-request.json
+rollout-analysis-response.json
+failure-analysis.md
+```
 
-| Limit | Value |
-| --- | --- |
-| Request body | `2 MiB` of UTF-8 JSON |
-| Total evidence text | `1.5 MiB` |
-| One evidence item | `64 KiB` |
-| Rubric criteria | `256` |
-| Observable events | `512` |
-| Verifier tests | `512` |
-| Runtime action definitions | `256` |
-| Custom evidence items | `128` |
-| Default server deadline | `180 seconds` |
-| Judge output budget | `16,384 tokens` |
+Bind each file to the task, run, and rollout with its path, media type, byte size, and SHA-256. The readable summary should identify:
 
-The service charges the rate limit only after the JSON and evidence contract validate. Read the limit from `/v1/whoami`. Short invalid citations use the deterministic full-item substitution described above. For invalid citations attached to evidence longer than 512 characters, the service permits at most one same-model, prompt-hashed provider repair. That repair may change only the `quote` strings attached to the reported invalid evidence identifiers; already-grounded quotes and every other analysis value must remain unchanged. The service then revalidates every citation without normalizing whitespace or typography and rejects any remaining invalid quote. No provider fallback is allowed.
+- the verifier outcome and score;
+- the first observable failure;
+- every affected criterion or test;
+- the failure origin and evidence references;
+- the endpoint's status, category, legitimacy decision, and recommendation;
+- the request and response fingerprints; and
+- unresolved inputs or required reruns.
+
+These are supporting artifacts. They do not replace `trajectory.atif.json`, `verifier.json`, `criterion-decisions.json`, native work products, or the reviewer-visible sections.
+
+See [Canonical ZIP layout](/gdpx/evaluation-bundle-upload#canonical-zip-layout) and [Rollout viewer evidence](/gdpx/rollout-viewer-evidence).
+
+## Errors
 
 | Status | Meaning | Action |
 | --- | --- | --- |
-| `400` | Wrong content type, invalid JSON, or invalid UTF-8 | Send one `application/json` object |
-| `401` | Missing, malformed, inactive, or revoked API key | Supply a valid bearer key |
-| `403` | Key lacks `evaluations:write` | Request the required scope |
-| `413` | Request exceeds `2 MiB` | Reduce the normalized evidence projection |
-| `422` | Strict schema, evidence binding, or cross-field validation failed | Correct the listed request errors |
-| `429` | Per-key rate limit was exceeded | Honor `Retry-After` |
-| `502` | Judge output was invalid, inconsistent, or cited ungrounded evidence | Retry once only when appropriate; escalate repeated failures |
-| `503` | The pinned judge is unavailable | Retry after service recovery |
-| `504` | Analysis exceeded the bounded deadline | Confirm service state before retrying |
-
-The call is synchronous and does not create a retrievable canonical analysis record. Retain the response with its input, output, prompt, schema, and judge fingerprints in your review evidence. To publish the underlying attempt, submit a one-task, one-run, one-rollout v1.1 bundle and complete the managed execution and approval workflow.
+| `400` | Invalid content type or JSON | Send one valid JSON object |
+| `401` | Missing or invalid API key | Supply a valid bearer key |
+| `403` | Key lacks the analysis scope | Request the correct scope |
+| `413` | Request exceeds the current limit | Create a faithful bounded projection; do not truncate canonical evidence |
+| `422` | Schema or evidence binding failed | Correct the reported request errors |
+| `429` | Rate limit exceeded | Follow `Retry-After` |
+| `502` | Judge response failed validation | Retry once when appropriate, then escalate |
+| `503` or `504` | Service unavailable or timed out | Retry after service recovery |

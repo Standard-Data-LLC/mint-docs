@@ -1,142 +1,115 @@
 ---
 title: "GDPx workflow"
 sidebarTitle: "Workflow and responsibilities"
-description: "Understand GDPx, run the supported intake flow, and know where partner and operator responsibilities differ."
+description: "Choose the correct GDPx path, discover the live contract, and understand partner and Standard Data responsibilities."
 keywords: ["GDPx", "Audit", "Wilderness", "managed QC1", "publication"]
 ---
 
-GDPx measures whether an agent can complete realistic, economically useful
-knowledge work. A result binds the exact Harbor task and workspace to the
-observable trajectory, verifier decisions, native work products, runtime
-configuration, usage, and immutable evidence hashes.
+GDPx binds one exact runnable task to its observable execution, work products, verifier decisions, and provenance. Audit stores the canonical records. Wilderness displays records that Audit makes available.
 
-<Warning>
-  **Audit is the authority; Wilderness is a reader.** Never publish by editing
-  Firestore, object storage, a fixture, or a Wilderness snapshot.
-</Warning>
+## Choose the correct interface
 
-## What “the v3 fixture” means
+| Goal | Interface | Result |
+| --- | --- | --- |
+| Review a task or methodology document | `POST /v1/evaluate` | Feedback only |
+| Analyze one observable rollout | `POST /v1/benchmark-rollout-analyses` | Analysis response only |
+| Send a native partner package to Standard Data | Approved source handoff and adapter | Source retained or normalized after review |
+| Retain an exact v3 draft | `POST /api/v3/gdpx-submissions` with `audit_task_draft` | Blocked Audit draft; may appear in **Review Tasks** |
+| Submit an active evidence-catalog candidate | `POST /api/v3/gdpx-submissions` with `task_and_evidence` | Immutable task and admission evidence |
+| Add evidence to a retained canonical revision | `POST /api/v3/gdpx-submissions` with `evidence_only` | One immutable rollout candidate |
+| Import a legacy workspace draft | `POST /api/v2/workspace-submissions` | Legacy draft only |
 
-Teams sometimes call the data currently shown by Wilderness “the v3 fixture.”
-That phrase means the **v3-native retained task, evidence, readiness, membership,
-and catalog records served by Audit**. It does not mean a checked-in JSON file,
-a frontend fixture, or a data snapshot tied to one Wilderness deployment.
-
-Upload through `POST /api/v3/gdpx-submissions` using the contract and relations
-advertised by the live capabilities response. A compatible Wilderness build
-reads the resulting backend records; adding or replacing a task does not require
-editing or redeploying a Wilderness fixture.
-
-An updated task is an immutable successor, not an in-place overwrite:
-
-- keep the existing `logical_task_id`;
-- assign the changed bytes a new content-bound `task_revision_id`;
-- submit the exact new task with its same-attempt rollout evidence and analysis;
-- use `evidence_only` only to append another immutable run and rollout to an
-  already retained, byte-identical task revision; and
-- verify the new revision at the submission, rollout, readiness, and current
-  catalog endpoints before saying it replaced the prior visible version.
-
-A task found only in **Review Tasks** is retained but not published. A successor
-replaces the prior Wilderness **Results** entry only when the active catalog head
-selects the new revision. Historical revisions and rollouts remain immutable.
+Neither v1 endpoint stores a canonical task, adds a result to the active evidence catalog, or advances QC. The legacy v2 route also creates drafts only.
 
 ## Who does what
 
 | Actor | Responsibility |
 | --- | --- |
-| Partner or coding agent | Discover the live contract, submit an Audit-only task draft or an exact task-and-evidence bundle when admission is open, poll the submission, and correct source-package blockers. |
-| Standard Data operator | Launch or verify managed QC1, issue the separate execution approval, establish review readiness, and advance benchmark membership and the active catalog. |
-| Wilderness | Read blocked v3 drafts into **Review Tasks** and read the active Audit catalog into **Results**. It creates no publication authority. |
+| Partner | Deliver the runnable task, source material, rights and provenance, verifier logic, and any complete native evidence |
+| Standard Data | Confirm the adapter, normalize accepted source, run or verify managed QC1, conduct QC2–QC4 review, and decide final inclusion |
+| Audit | Validate and retain canonical v3 records, readiness, and catalog state |
+| Wilderness | Display blocked drafts in **Review Tasks** and selected catalog evidence in **Results** |
 
-Submission credentials cannot launch or approve managed execution. Direct
-Firestore and object-storage access is not a supported partner interface.
-Partners and coding agents must use the tenant-scoped API.
+There is no public endpoint for launching or approving managed QC1. A local Harbor run, provider export, or partner-created receipt remains supplied evidence until Standard Data validates the applicable managed attempt.
 
-## End-to-end path
+## Separate the active evidence catalog from benchmark release
 
 ```text
-discover live capabilities and schemas
-  ├─ task definition or exact legacy snapshot
-  │    → v3 audit_task_draft
-  │    → immutable blocked Audit record
-  │    → Wilderness Review Tasks
-  └─ exact task and complete QC1 evidence
-       → v3 task_and_evidence
-       → Standard Data managed QC1 and independent approval
-       → current-policy review readiness
-       → immutable benchmark membership
-       → active GDPx catalog
-       → Wilderness Results
+Active evidence catalog
+  task and evidence → managed QC1 → v3 readiness → active evidence catalog / Results
+
+Benchmark release
+  runnable readiness → QC1 → QC2 → QC3 → QC4 inclusion decision
 ```
 
-### 1. Discover the deployed contract
+The current API can select a technically ready record after its QC1 catalog-admission requirements pass. Active evidence-catalog status does not certify QC2–QC4 or inclusion in the released GDPx benchmark. Use the tracker and written QC4 decision for benchmark-release claims.
+
+## 1. Discover the deployed contract
+
+Use one Standard Data API origin for capabilities, upload, polling, and readback:
 
 ```bash
 export STANDARD_DATA_API_BASE="https://api.standarddata.io"
+export STANDARD_DATA_API_KEY="<your-standard-data-api-key>"
 
 curl --fail-with-body \
   --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
   "${STANDARD_DATA_API_BASE}/api/v3/gdpx/capabilities" \
   --output gdpx-capabilities.json
-
-curl --fail-with-body \
-  --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
-  "${STANDARD_DATA_API_BASE}/api/v3/gdpx/schemas/review-bundle" \
-  --output gdpx-review-bundle.schema.json
 ```
 
-The capability response and linked schema are authoritative. Documentation may
-describe a newer contract before it is activated. Do not submit that version,
-guess unavailable fields, or bypass a disabled or allowlisted admission state.
+The response controls:
 
-### 2. Build and submit
+- whether your key can submit through `access.can_submit`;
+- whether admission is open through `admission.can_submit`;
+- accepted contracts, modes, adapters, size limits, and schema links; and
+- managed QC1 availability through `managed_execution_trust.managed_qc1_execution.available`.
 
-Follow [Package a benchmark task](/gdpx/benchmark-task-package), then
-[upload an evaluation bundle](/gdpx/evaluation-bundle-upload). Only
-`POST /api/v3/gdpx-submissions` can lead to GDPx publication. The legacy v2
-workspace flow creates draft Audit revisions only.
+If managed QC1 is unavailable, upload or draft retention may still work. Do not promise end-to-end QC1 completion or active evidence-catalog admission. Read the capability blocker.
 
-Offer an upload only when capabilities report both `access.can_submit: true`
-and `admission.can_submit: true`. A successful upload is archive retention, not
-publication.
+Fetch the schema linked by the response. Do not infer a route, field, adapter, or version from an old example.
 
-When capabilities advertise `audit_task_draft`, you may submit the separate
-`gdpx-audit-task-draft-bundle/1.0.0` contract with `publication_policy: "audit_only"`.
-Canonical drafts retain an exact task and workspace but require
-QC1 evidence. Legacy-snapshot drafts retain exact release rows and source
-bindings but require a canonical task definition. Both are intentionally
-blocked and may appear in Wilderness **Review Tasks**.
+## 2. Choose a package path
 
-### 3. Inspect an Audit-only draft
+### Partner source handoff
 
-An Audit-only import ends in `blocked` with
-`GDPX_AUDIT_TASK_DRAFT_IMPORTED`. That code confirms immutable retention and
-readback; it does not indicate a failed upload or successful publication.
+Use the [source handoff](/gdpx/benchmark-task-package#partner-source-handoff) when Standard Data will normalize the delivery. Preserve the native layout and complete evidence. An adapter must be advertised and confirmed for the batch.
 
-```text
-GET /api/v3/gdpx/audit-task-drafts
-GET /api/v3/gdpx/audit-task-drafts/{gdpx_submission_id}/{task_revision_id}
-```
+Adapter acceptance does not grant QC credit or active evidence-catalog admission. Missing evidence cannot be inferred.
 
-These routes require `tasks:read` and return tenant-scoped content hashes,
-source provenance, and the exact publication blocker. Wilderness **Review
-Tasks** renders the same records. The active catalog remains unchanged.
+### Canonical v3 submission
 
-### 4. Hand off managed QC1
+Use the [evaluation bundle flow](/gdpx/evaluation-bundle-upload) for direct API submission. The strict v3 `TASK.json` contains the task definition and workspace inventory. Runs and rollouts belong under `evaluations/`.
 
-There is no public managed-rollout launch endpoint. Give the Standard Data
-operator the submission ID, exact task revision, run and rollout IDs, task
-content hash, workspace-inventory hash, and required model/harness envelope.
-The operator runs or verifies the exact revision through the approved managed
-path and independently approves the committed evidence bytes.
+The currently documented v1.1 submission shape permits one rollout per task in a ZIP. Use the live schema if the deployed version differs.
 
-A local Harbor run, provider-console result, Prime evaluation, or
-uploader-created receipt remains supplied evidence. It cannot approve itself.
+## 3. Choose a v3 mode
 
-### 5. Verify publication
+| Mode | Use it when | Outcome |
+| --- | --- | --- |
+| `audit_task_draft` | You have an exact task definition or supported legacy snapshot but no complete QC1 evidence | Immutable blocked draft |
+| `task_and_evidence` | You have the complete task and one admission attempt for each included task | Active evidence-catalog candidate subject to Standard Data review |
+| `evidence_only` | You are attaching first QC1 evidence to an exact retained canonical draft, or retaining one later attempt for a retained revision | One immutable evidence candidate; a later attempt requires separate operator admission |
 
-Check all three layers:
+An Audit draft is expected to remain blocked until the missing task definition or evidence is supplied in a new immutable submission. It may appear in Wilderness **Review Tasks**. It does not appear in **Results** merely because the upload succeeded.
+
+## 4. Follow returned relations
+
+Create the submission, upload the exact ZIP through the returned storage relation, complete the upload, and poll the returned `self` relation.
+
+Do not construct storage URLs or send the Standard Data API key to object storage. Retain the submission ID, source ZIP hash, terminal state, and issue codes.
+
+The submission is evaluated as one catalog-admission cohort. If one declared task is blocked, the active evidence catalog does not change for that cohort. Audit may still retain immutable source, evidence, and blocker records for diagnosis.
+
+## 5. Complete managed and program review
+
+Give Standard Data the submission ID and exact task revision when managed QC1 is required. Standard Data runs or verifies the attempt and records the review.
+
+QC2, QC3, and QC4 are program stages tracked outside the current API state model. A task may have an active evidence-catalog record before those stages finish. Do not describe it as included in the released GDPx benchmark until QC4 says so. See [QC stages](/qc-stages-for-benchmark) for the definitions.
+
+## 6. Verify the intended surface
+
+Use exact IDs after the active evidence catalog selects the rollout for **Results**:
 
 ```text
 GET /api/v3/tasks/{task_revision_id}/review-readiness
@@ -144,22 +117,12 @@ GET /api/v3/tasks/{task_revision_id}/runs/{run_id}/rollouts/{rollout_id}
 GET /api/v3/gdpx/catalog/current
 ```
 
-The task is published only when current readiness is eligible, the exact
-rollout is retrievable, and the active catalog contains the task revision.
-Seeing a blocked record in **Review Tasks** is not publication and does not
-make any of these three checks optional.
+The external rollout route is not a general pre-admission preview. A retained candidate that is not in the active evidence catalog normally returns `404`; inspect its submission and blockers instead.
 
-## Stop conditions
+Interpret the surfaces separately:
 
-Stop before a publication-candidate upload, rollout, or publication claim when:
+- **Review Tasks** may show a retained, blocked draft.
+- **Results** shows evidence selected for the active evidence catalog.
+- the benchmark tracker records the four program review stages.
 
-- capabilities advertise another contract version or disabled admission;
-- the exact workspace inventory or required evidence is incomplete; use the
-  advertised Audit-only draft contract if you only need immutable draft
-  retention;
-- managed execution or its independent approval is unavailable;
-- readiness is blocked or stale; or
-- the active catalog does not contain the exact task revision.
-
-For evidence requirements, see [Rollout evidence in Wilderness](/gdpx/rollout-viewer-evidence).
-Standard Data operators use the separate internal backend and rollout runbook.
+Do not infer one state from another.

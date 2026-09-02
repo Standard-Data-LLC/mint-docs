@@ -1,14 +1,14 @@
 ---
-title: "Test with the audit endpoint"
-sidebarTitle: "Audit endpoint"
+title: "Use the Task Feedback API"
+sidebarTitle: "Task Feedback API"
 description: "Review one task or methodology document before packaging the complete workspace."
-keywords: ["GDPx", "document feedback", "preflight endpoint", "API", "task specification"]
+keywords: ["GDPx", "document feedback", "Task Feedback API", "API", "task specification"]
 ---
 
-`POST /v1/evaluate` reviews a single task specification or benchmark methodology document. It flags missing evidence and internal contradictions, then suggests fixes.
+`POST /v1/evaluate` reviews one task specification or benchmark methodology document. It flags missing evidence and internal contradictions, then suggests fixes.
 
 <Warning>
-  This endpoint evaluates only the document you send. It does not inspect a workspace ZIP, create a task revision, retain rollout evidence, pass a QC stage, or add a task to the active evidence catalog.
+  This is legacy v14 document feedback. It does not inspect a workspace ZIP, run the task, retain rollout evidence, pass a QC stage, or add a task to the active evidence catalog.
 </Warning>
 
 ## Choose the right endpoint
@@ -16,71 +16,146 @@ keywords: ["GDPx", "document feedback", "preflight endpoint", "API", "task speci
 | Goal | Endpoint |
 | --- | --- |
 | Review one document | `POST /v1/evaluate` |
+| Retrieve your stored document result | `GET /v1/evaluations/{evaluation_id}` |
 | Analyze one observable rollout | `POST /v1/benchmark-rollout-analyses` |
 | Discover the canonical GDPx contract | `GET /api/v3/gdpx/capabilities` |
-| Submit a canonical draft or active evidence-catalog candidate | `POST /api/v3/gdpx-submissions` |
+| Submit a canonical draft or evidence candidate | `POST /api/v3/gdpx-submissions` |
 | Import a legacy workspace draft | `POST /api/v2/workspace-submissions` |
 
-The v1 services return feedback only, and v2 creates legacy drafts only. V3 is the canonical task-and-evidence workflow.
+The v1 services return feedback only. V2 creates legacy drafts. V3 is the canonical task-and-evidence workflow.
 
-## Configure one API origin and key
+## Configure access
+
+Use one API origin and a key with `evaluations:write`:
 
 ```bash
 export STANDARD_DATA_API_BASE="https://api.standarddata.io"
 export STANDARD_DATA_API_KEY="<your-standard-data-api-key>"
+
+curl --fail-with-body \
+  --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
+  "${STANDARD_DATA_API_BASE}/v1/whoami"
 ```
 
-Keep the same API origin for the v1 request and any later v3 discovery. Neither `/v1/whoami` nor a v2 capability response tells you whether v3 is available.
+Check `scopes` in the response before submitting. A successful `/v1/whoami` call confirms the key, not document quality or v3 admission.
 
-## Submit a document
+## Prepare one document
 
-Send one supported document as multipart form data:
+The endpoint accepts PDF, DOCX, Markdown, or JSON. The decoded file must be 10 MB or smaller.
+
+Send one document per request. Do not send a ZIP, Harbor directory, raw rollout archive, or full evidence workspace. Use multipart for files. Use the JSON transport when your integration already holds Markdown or JSON as text.
+
+Set `options.declared_mode` when you know the task mode. The request declaration controls mode-specific review, but a conflicting mode inside the document remains a blocker.
+
+Common options:
+
+| Option | Values | Use |
+| --- | --- | --- |
+| `declared_mode` | `benchmark`, `rl`, `sft`, `rlvr`, `rlhf`, `dpo`, `sdft`, `agentic`, or `both` | Select the intended task review mode |
+| `verbosity` | `summary` or `full` | Control response detail |
+| `checks_to_run` | `all` or named checks | Limit review to specific checks |
+| `include_suggested_fixes` | `true` or `false` | Include proposed corrections |
+| `end_target` | Profile slug | Record downstream intent; v1 does not enforce that profile |
+
+`guidelines_version` is fixed to `v14`. The authoritative v15/GDPx gate belongs to the canonical submission workflow.
+
+## Submit with multipart
 
 ```bash
 curl --fail-with-body \
   --request POST "${STANDARD_DATA_API_BASE}/v1/evaluate" \
   --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
   --form "file=@task-specification.md" \
+  --form 'options={"declared_mode":"benchmark","verbosity":"summary"}' \
   --output task-feedback.json
 ```
 
-Send PDF, DOCX, Markdown, or JSON only when the endpoint advertises that media type. A complete task or evidence ZIP does not belong on this route.
+Multipart input supports `.pdf`, `.docx`, `.md`, `.markdown`, and `.json` filenames.
 
-## Interpret the response
+## Submit Markdown or JSON as JSON
 
-The response may include:
+Build the request with a JSON encoder instead of manually escaping document text:
 
-- an aggregate document verdict;
-- blocking findings;
-- warnings;
-- evidence citations into the submitted document; and
-- suggested corrections.
+```bash
+jq --rawfile content task-specification.md '{
+  task_input: {
+    format: "markdown",
+    filename: "task-specification.md",
+    content: $content
+  },
+  options: {
+    declared_mode: "benchmark",
+    verbosity: "summary"
+  }
+}' > task-feedback-request.json
 
-If the response includes `ready_to_submit`, read it as a verdict on the document alone. It does not authorize a ZIP, prove the environment runs, validate rollout evidence, or add a task to the active evidence catalog.
+curl --fail-with-body \
+  --request POST "${STANDARD_DATA_API_BASE}/v1/evaluate" \
+  --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
+  --header "Content-Type: application/json" \
+  --data-binary @task-feedback-request.json \
+  --output task-feedback.json
+```
 
-Fix each blocker in the source document, then rerun the review if you need another pass.
+For JSON transport, Markdown and JSON use raw UTF-8 text in `task_input.content`. PDF and DOCX use base64-encoded bytes; multipart is simpler for those formats.
 
-## Continue to the real submission
+## Read the response
+
+Check `kind` first:
+
+- `task_spec` contains `task_summary`, per-step feedback, metadata findings, and `priority_findings`.
+- `benchmark_paper` contains `paper_summary`, methodology-item evaluations, stage evaluations, and `findings`.
+
+Both response kinds include:
+
+- `evaluation_id` for later retrieval;
+- `aggregate_verdict` with blocker, warning, and informational counts;
+- `guidelines_version_applied`, model versions, latency, and timestamp;
+- `canonical_submission`, which reports capability context but never authorizes submission; and
+- actionable findings grounded in the submitted document.
+
+For task specifications, summary mode retains up to ten `priority_findings`. `audit_intent` records the declared, extracted, and effective modes. Fix a `MODE_DECLARATION_CONFLICT` in the document or request before relying on the review.
+
+If `aggregate_verdict.ready_to_submit` is present, it applies only to the submitted document. It does not prove that the environment runs, validate a ZIP or rollout, or add anything to the active evidence catalog.
+
+## Retrieve the result
+
+Use the same tenant-scoped key that created the evaluation:
+
+```bash
+EVALUATION_ID="$(jq -r '.evaluation_id' task-feedback.json)"
+
+curl --fail-with-body \
+  --header "Authorization: Bearer ${STANDARD_DATA_API_KEY}" \
+  "${STANDARD_DATA_API_BASE}/v1/evaluations/${EVALUATION_ID}" \
+  --output task-feedback-retrieved.json
+```
+
+## Handle errors
+
+| Status | Meaning | Action |
+| --- | --- | --- |
+| `400` | Invalid transport, JSON body, encoding, extension, or options | Correct the request shape |
+| `401` | Missing, malformed, inactive, or revoked key | Supply an active bearer key |
+| `403` | Key lacks `evaluations:write` | Request the required scope |
+| `413` | Decoded document exceeds 10 MB | Reduce or split the document without removing required evidence |
+| `422` | Document or canonical report structure is invalid | Correct the reported fields or structure |
+| `429` | Per-key rate limit exceeded | Follow `Retry-After` |
+| `500` | Protocol loading or service failure | Retain the request ID and escalate |
+| `502` | Retryable upstream schema extraction failed | Retry once, then send canonical JSON or escalate with the request ID |
+| `503` | Schema extraction is temporarily unavailable | Retry after service recovery |
+
+Pipeline errors include a stable code, request ID, retryability, stage, details, and remediation. Do not discard that envelope or replace it with a generic “Bad Gateway” message.
+
+Never treat an endpoint error as a task score. A degraded grader also blocks the document review rather than producing a clean result.
+
+## Continue to canonical submission
 
 After document review:
 
 1. prepare the [partner source handoff or canonical bundle](/gdpx/benchmark-task-package);
-2. fetch `GET /api/v3/gdpx/capabilities`;
-3. follow the advertised schema, mode, adapter, and size limits; and
+2. fetch `GET /api/v3/gdpx/capabilities` with the same API key;
+3. follow the returned contract, mode, adapter, and size limits; and
 4. use the [v3 evaluation bundle flow](/gdpx/evaluation-bundle-upload) for canonical submission.
 
-If Standard Data explicitly asks for a legacy draft import, use the [v2 workspace flow](/gdpx/import-approved-tasks).
-
-## Common errors
-
-| Status | Meaning | Action |
-| --- | --- | --- |
-| `400` | Invalid request or unsupported document | Send one supported document |
-| `401` | Missing or invalid API key | Supply a valid bearer key |
-| `403` | Key lacks the required evaluation scope | Request the correct scope |
-| `413` | Document exceeds the advertised limit | Reduce the document without removing required evidence |
-| `422` | Document could not be evaluated under the request contract | Correct the reported field or file issue |
-| `429` | Rate limit exceeded | Follow `Retry-After` |
-| `5xx` | Service unavailable or evaluation failed | Retry only after checking service status |
-
-Never treat an endpoint error as a task score.
+Use the [v2 workspace flow](/gdpx/import-approved-tasks) only when Standard Data explicitly asks for a legacy draft import.

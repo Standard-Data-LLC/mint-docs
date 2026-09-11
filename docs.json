@@ -10,31 +10,31 @@
   "navigation": {
     "groups": [
       {
-        "group": "Task formats",
+        "group": "Task guide",
         "pages": [
-          "gdpx/quickstart"
-        ]
-      },
-      {
-        "group": "GDPx",
-        "pages": [
+          "gdpx/quickstart",
           "gdpx/workflow",
           "gdpx/benchmark-task-rubric-best-practices",
           "gdpx/benchmark-task-design",
           "gdpx/benchmark-task-package",
-          "gdpx/benchmark-task-evaluation",
-          "gdpx/benchmark-rollout-analysis",
-          "gdpx/evaluation-bundle-upload",
-          "gdpx/rollout-viewer-evidence",
-          "gdpx/benchmark-task-delivery",
-          "gdpx/audit-endpoint",
-          "gdpx/import-approved-tasks"
+          "gdpx/benchmark-task-delivery"
         ]
       },
       {
-        "group": "Quality control",
+        "group": "Evaluation and QC",
         "pages": [
+          "gdpx/benchmark-task-evaluation",
+          "gdpx/rollout-viewer-evidence",
           "qc-stages-for-benchmark"
+        ]
+      },
+      {
+        "group": "API",
+        "pages": [
+          "gdpx/audit-endpoint",
+          "gdpx/benchmark-rollout-analysis",
+          "gdpx/evaluation-bundle-upload",
+          "gdpx/import-approved-tasks"
         ]
       },
       {
@@ -46,7 +46,7 @@
       }
     ]
   },
-  "description": "Task formats and developer references for Standard Data benchmark submissions.",
+  "description": "GDPx task structure, evaluation evidence, quality control, and API submission guides.",
   "redirects": [
     {
       "source": "/",

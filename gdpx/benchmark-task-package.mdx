@@ -1,188 +1,73 @@
 ---
-title: "Package a benchmark task"
+title: "Package a GDPx task"
 sidebarTitle: "Task packaging"
-description: "Prepare a partner source handoff or a canonical GDPx v3 submission without mixing the two formats."
-keywords: ["GDPx", "Harbor", "task package", "TASK.json", "workspace ZIP"]
+description: "Keep the runnable task, provenance, and current-revision evidence together."
 ---
 
-GDPx keeps a partner's source delivery separate from the immutable bundle accepted by the v3 review API. Decide which one you are preparing before you arrange the files.
+Use the [repository layout](/gdpx/quickstart#repository-layout): one task folder under its domain. Keep the task's own filenames and supporting directories; do not flatten them into a separate batch-wide trajectory folder.
 
-| Term | Meaning |
+## Runtime files
+
+| File or directory | Requirement |
 | --- | --- |
-| Runnable task | The Harbor task that the agent and verifier execute |
-| Partner source handoff | The partner's task, native evidence, and review material sent to Standard Data |
-| Canonical v3 bundle | The strict ZIP accepted by `POST /api/v3/gdpx-submissions` |
+| `task.toml` | Declare the runtime, resources, timeouts, network policy, and task metadata |
+| `instruction.md` | State the agent's job, constraints, and deliverables |
+| `environment/` | Preserve the build recipe or pinned image configuration, tools, and starting data |
+| `tests/test.sh` | Run the verifier and retain its reward and explanatory output |
+| `solution/` | Preserve the reference implementation, artifacts, or documented reference path |
+| `steps/` | Preserve step instructions, workdir inputs, tests, and reference files when declared in `task.toml` |
 
-Only the canonical v3 bundle goes to the v3 review API.
+Use one runtime instruction for a single-step task. For a multi-step task, preserve the declared order, state handoff, per-step overrides, and reward aggregation. Do not merge its prompts or grade every step as an independent task.
 
-## Package the runnable task
+Harbor Oracle execution uses `solution/solve.sh`. Some retained packages document a different reference entry point; follow the task's own instructions. A reference artifact alone does not make the Oracle agent runnable, and a structure-only placeholder does not prove solvability.
 
-Each task must include the exact instruction and starting state shown to the agent, a reproducible environment, a verifier, and a reset path. Use [the Harbor task structure](/gdpx/quickstart#the-runnable-task) unless Standard Data approves another runtime.
+## Keep protected material out of the agent environment
 
-Keep these visibility boundaries:
+Mount only the instruction, starting files, and permitted tools for the model attempt. Keep hidden tests, Oracle material, prior answers, `rollouts/`, and `qc/` out of that environment.
 
-| Material | Runtime visibility |
-| --- | --- |
-| Instruction, source files, and provisioned tool documentation | Agent-visible |
-| Hidden tests, rubric internals, judge configuration, and verifier secrets | Verifier-only |
-| Reference solution and known-good or known-bad calibration artifacts | Verifier-only |
-| Review notes, failure analysis, and rollout summaries | Intake-only |
+A repository clone is for authoring and review, not an agent-visible mount. Enforce separation through the container, filesystem permissions, and verifier configuration. Keep verifier credentials server-side.
 
-Labels are not an access boundary. Enforce these rules in the runtime.
+## Preserve task identity
 
-### Select one runtime prompt
+Repository `TASK.json` records the exported task, not a new authoring schema:
 
-For authoring review, supply both an unstructured kickoff and a structured brief. Before execution, choose the exact prompt the agent will see. Keep the other version as supporting material, not as a second runtime instruction.
+- `org`, `org_id`, `task_id`, `name`, and `domain`;
+- `revision_id`, revision metadata, and `format_version`;
+- source upload/package references and `package_root`;
+- `runs.qc` and `runs.rollouts`; and
+- `exported_at`.
 
-### Include calibration evidence
+Preserve IDs issued by the source system. Match each `run.json.task_revision_id` to `TASK.json.revision_id`. A domain folder can differ from the metadata domain; a display name can differ from the internal task ID.
 
-Every task must show that it is solvable and that the verifier can tell correct work from incorrect work. Choose evidence that fits the task:
+For a new task, provide its source, rights, task family, and intended scoring in the task metadata and review notes. Do not fabricate server IDs or copy another task's provenance.
 
-- use `solution/solve.sh` when a scripted Oracle fits;
-- use a native reference artifact when the output is a workbook, document, drawing, or another structured file;
-- include a known-bad output or equivalent negative control; and
-- include a partial-credit anchor when the task uses partial credit or a judge.
+## Preserve runs and trials
 
-The evidence is required; a specific `gold/` directory or shell script is not.
-
-## Partner source handoff
-
-Use a partner source handoff when Standard Data will normalize your delivery. Send the finished package through the channel named in your onboarding agreement.
-
-### Recommended layout
+Use lowercase `run.json` under:
 
 ```text
-<dataset>-<batch>-<num>/
-├── handoff-manifest.json
-├── tasks/
-│   └── <task_id>/
-│       ├── task.toml
-│       ├── instruction.md
-│       ├── environment/
-│       ├── tests/
-│       └── solution/
-├── trajectory/
-│   └── <task_id>/<model_or_run>/<attempt>/
-│       ├── trajectory.json
-│       ├── verifier-or-reward.json
-│       ├── artifacts/
-│       └── failure-analysis.md
-└── docs/
-    ├── README.md
-    └── <task_id>/
+rollouts/<model-harness>/<run-id>/
+qc/<run-id>/
 ```
 
-Use `handoff-manifest.json` for partner taxonomy, task-to-evidence mappings, and source provenance. Do not name it `TASK.json`; the canonical v3 file has a different, strict schema.
+Keep `traces/` and `artifacts/` beside that record. A run can contain multiple result rows and traces. Match them by run ID, attempt, role, and trial name—not just filename or folder position.
 
-The manifest should identify:
+Trace filenames may include a generated suffix. Follow the recorded trace reference rather than assuming every file is `attempt-1.json`. Keep native artifact subdirectories and the failure analysis with the attempt they describe.
 
-- the partner, domain, task family, and stable source task ID;
-- the exact task files and runtime version;
-- every supplied run and attempt;
-- each trajectory, verifier result, work product, and failure analysis;
-- source, rights, sanitization, and overlap-risk notes; and
-- any private image or external dependency required to reproduce the task.
+## Check completeness before handoff
 
-### Existing native exports
+1. Pin the repository commit and exact task revision.
+2. Resolve Git LFS pointers and any authorized external data or image dependencies.
+3. Retrieve required artifacts marked as skipped; record anything still unavailable.
+4. Verify that the environment builds, the reference check passes, and the negative control fails.
+5. Preserve native work products, verifier output, and complete observable evidence.
+6. Remove secrets, private reasoning, repository metadata, and unrelated temporary files from the delivery.
+7. Record the delivered file inventory and hashes.
 
-You may keep an approved native Harbor or provider export in its original layout when the live capability response advertises a matching adapter and Standard Data confirms it for your batch.
+Do not convert graded workbooks, CAD files, or other native deliverables to PDF just to reduce size. See [Large evidence files](/guides/large-folder-uploads).
 
-Include a complete file inventory and a crosswalk from every task and attempt to its evidence. Preserve the source paths and bytes. Do not rename, flatten, or truncate evidence just to make it resemble the recommended layout.
+## Direct API submission
 
-<Warning>
-  Adapter acceptance only means Audit can read and map the source. It does not create missing evidence, grant QC credit, add a task to the active evidence catalog, or approve it for the released GDPx benchmark. You must still supply or regenerate any missing manifests, observable trajectory bodies, verifier results, criterion decisions, native work products, failure analyses, or immutable identity bindings.
-</Warning>
+The repository's `TASK.json`, `run.json`, and traces are source records, not the API's `TASK.json`, `RUN.json`, and `ROLLOUT.json`.
 
-## Reviewer-visible rollout evidence
-
-Reviewers must be able to inspect every attempt used for QC, difficulty assessment, or benchmark results from the delivered bytes alone. An ID, score, provider link, or aggregate summary is not enough.
-
-For each attempt, retain:
-
-- the exact task revision and agent-visible context;
-- the complete ordered observable trajectory;
-- visible model messages, tool calls, sanitized tool inputs, and tool results;
-- the final response and every produced native artifact;
-- raw verifier and per-test output;
-- one decision for each rubric criterion;
-- the reported score, calculated score, threshold, outcome, and reconciliation;
-- model, provider, harness, versions, configuration, budgets, timing, and stop reason; and
-- stable task, run, rollout, and artifact references.
-
-For every failed attempt, add a failure-analysis summary grounded in the evidence. The `/v1/benchmark-rollout-analyses` service is optional. If you use it, keep its request, response, and fingerprints beside the same attempt.
-
-Do not submit private chain of thought, actual credentials, signed URLs, or provider-private payloads. Redact those values without replacing the rest of an observable log with a blanket summary.
-
-## Canonical v3 submission
-
-Build a canonical v3 submission only for a ZIP that will go directly to the GDPx API.
-
-First fetch:
-
-```text
-GET /api/v3/gdpx/capabilities
-GET /api/v3/gdpx/schemas/review-bundle
-```
-
-The fetched schema is authoritative. This outline is only a guide:
-
-```text
-GDPX_BUNDLE.json
-tasks/
-└── <task_id>/
-    ├── TASK.json
-    ├── PUBLICATION_AUTHORITY.json
-    └── <inventoried task and workspace files>
-evaluations/
-└── <task_id>/
-    └── <run_id>/
-        ├── RUN.json
-        └── <rollout_id>/
-            ├── ROLLOUT.json
-            ├── trajectory.atif.json
-            ├── verifier.json
-            ├── criterion-decisions.json
-            └── artifacts/
-```
-
-`GDPX_BUNDLE.json` inventories every other file in the ZIP and binds the task, run, rollout, and artifact identities.
-
-The canonical `TASK.json` describes the immutable task, prompt, rubric, verifier, task-content hash, and complete workspace inventory. It has no `rollouts` field. Runs and rollouts belong under `evaluations/`.
-
-A direct canonical review bundle requires `PUBLICATION_AUTHORITY.json`. This file provides the source-side rights and publication declaration used for active evidence-catalog eligibility. It must match Standard Data's active rights record before catalog membership. A separate draft or adapter contract may retain a blocked archive without the file when its live schema allows that case. The declaration is not agent-visible and does not replace the QC4 release decision.
-
-### Keep the counts straight
-
-When the live service advertises `gdpx-review-bundle/1.1.0`:
-
-- `task_and_evidence` accepts 1–100 unique tasks;
-- each task has exactly one evaluation and one rollout in that ZIP;
-- one blocked declared task prevents the active evidence catalog from changing for the cohort, although Audit may retain immutable diagnostic records; and
-- `evidence_only` attaches the first QC1 attempt to an exact retained canonical Audit draft or retains one later run and rollout candidate for an already retained, byte-identical task revision. A later candidate requires separate operator admission and does not replace the qualifying QC1 anchor.
-
-QC3 may require many attempts per model–harness pairing. Standard Data owns QC3 ingestion and campaign mapping. Partners should preserve the complete native corpus and should not submit individual QC3 attempts through `evidence_only` unless a Standard Data operator provides the target revision and admission plan. The current API does not natively label a run as QC3. Never place all QC3 attempts inside canonical `TASK.json` or put multiple attempts for one task in a single v1.1 review bundle.
-
-## Prepare the source handoff
-
-1. Freeze the task revision and generate a complete file inventory.
-2. Confirm that every environment builds and resets from delivered files.
-3. Run the applicable build, reference-solution, and no-op checks.
-4. Verify that every supplied attempt includes readable trajectory, result, verifier, grading, and native artifact evidence.
-5. Add a failure-analysis summary for each failed attempt.
-6. Remove repository metadata, temporary files, unrelated build output, and secrets.
-7. Record the final ZIP filename, size, media type, and SHA-256.
-8. Ask Standard Data to confirm the adapter before changing an existing native export.
-
-## Prepare a canonical bundle
-
-1. Fetch the live capabilities and linked schema.
-2. Use only an advertised contract version, mode, adapter, and publication policy.
-3. Validate every strict JSON document against the fetched schema.
-4. Inventory every workspace and evidence file with its required path, hash, size, media type, kind, and visibility.
-5. Confirm that the ZIP contains one permitted attempt per task.
-6. Recompute all hashes from the final bytes.
-7. Submit through the [v3 evaluation bundle flow](/gdpx/evaluation-bundle-upload).
-
-<Info>
-  `/v1/evaluate` reviews one document. It does not validate this ZIP, create a task revision, add a record to the active evidence catalog, or approve a released benchmark result.
-</Info>
+Only a bundle built against the live API contract goes to `POST /api/v3/gdpx-submissions`. Follow [API bundle upload](/gdpx/evaluation-bundle-upload) for that separate layout, mapping, and validation. Do not rename source files to imitate it.

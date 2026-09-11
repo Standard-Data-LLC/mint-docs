@@ -1,81 +1,50 @@
 ---
 title: "Design and grade benchmark tasks"
-sidebarTitle: "Verifiers and Graders"
-description: "Define the work, build the environment, and make the rubric observable."
-keywords: ["GDPx", "benchmark", "task design", "rubrics", "environment"]
+sidebarTitle: "Design and grading"
+description: "Define the work, provision its context, and grade observable outcomes."
 ---
 
-## Define the work
+## Define the job
 
-Start with the capability, not the file type. Name the practitioner, the decision or state change they own, and the errors that matter.
+Name the practitioner, the decision or state change they own, and the errors that matter. “Produce a spreadsheet” is a file request; “reconcile conflicting operating data and leave a forecast with traceable assumptions” is a task.
 
-| Weak | Better |
-| --- | --- |
-| Produce a spreadsheet | Reconcile conflicting operating data and leave a decision-ready forecast with traceable assumptions |
-| Summarize the documents | Triage an escalation across product, contract, and account history, then recommend the next action under policy |
-| Use the tools correctly | Update a live operating artifact without breaking formulas or downstream dependencies |
+A new company name or different numbers do not create a new task family.
 
-A task family should make clear who does the work, what outcome matters, and what a strong practitioner would notice. Renaming companies or changing numbers does not create a new family.
+## Write the instruction
 
-## Draft the kickoff
+Put the runtime brief in `instruction.md`: the outcome, constraints, available context, and deliverables. Use the voice of a manager, client, or colleague.
 
-During authoring, write the same job two ways:
+Draft alternatives can help during authoring, but they are not extra required runtime files. For a multi-step task, keep the step-specific briefs and order declared in `task.toml`.
 
-1. `kickoff.md`: the unstructured message a manager, client, or colleague would actually send.
-2. `kickoff_structured.md`: the role, objective, constraints, and deliverable stated directly.
+Let the agent exercise practitioner judgment. Make every private policy, definition, and source fact needed to solve the task discoverable. Do not hide required behavior only in the verifier.
 
-Compare the drafts to see whether the task stays realistic without becoming underspecified. Before execution, choose one exact prompt for the agent. Keep the other as supporting material rather than mounting two competing instructions in the runtime.
+## Build realistic starting state
 
-The real-world version can rely on ordinary practitioner judgment. Every private policy, definition, and source fact must still be discoverable in the environment.
+Provide native files and tools, not prose descriptions of them. Declare resource limits, network policy, dependencies, reset behavior, and artifact capture in the runtime configuration.
 
-Good ambiguity makes the model recover context. Bad ambiguity makes the task unsolvable.
+For editable or stateful work, specify the intended changes and forbidden side effects. Check that work products reopen, render, calculate, compile, or execute as appropriate.
 
-## Build the environment
-
-Give the agent native files and realistic state. A prose description is not a substitute for the workbook, document, codebase, CAD file, or system record the job actually uses.
-
-For stateful or editable work, ship:
-
-- the starting state and expected final state;
-- intended changes and forbidden side effects;
-- reset behavior between rollouts; and
-- reopen, render, formula, executable, or diff checks that match the artifact.
-
-The action space is a coding agent with provisioned CLI tools. List every tool and include its definition and skill documentation. Convert computer-use workflows into tool calls before submission.
+Keep the Oracle, hidden tests, grading credentials, and previous attempts outside the agent's access. Document any external service or data dependency needed to reproduce the run.
 
 ## Grade observable work
 
-Use deterministic checks where code can settle the answer: values, schemas, formulas, compilation, geometry, state transitions, reconciliations, and artifact integrity. Use a judge for evidence-based recommendations, prioritization, material contradictions, and caveats that require practitioner judgment.
+Use deterministic checks for values, schemas, formulas, compilation, geometry, state transitions, and artifact integrity. Use a judge only where practitioner judgment is needed.
 
-Each rubric criterion needs:
+Each criterion needs:
 
 - a stable ID and one independently gradable claim;
-- an aggregation role, a weight when the aggregation uses weights, and a failure-mode tag;
-- the observable evidence required to pass; and
-- one aggregation rule for the task.
+- an aggregation role and weight when applicable;
+- observable passing evidence and an explainable failure condition; and
+- any dependency, threshold, or hard gate.
 
-Report one reproducible numeric score and derive the pass/fail outcome from the declared threshold. Keep deterministic and judge contributions separate in the reward ledger.
+Reconcile the final score to the declared rule. Keep judge and deterministic contributions distinguishable. Raw weights need not sum to one if the verifier explicitly normalizes them; use its actual formula.
 
-Do not grade private reasoning or one preferred workflow. Alternate valid methods should pass.
+Accept alternative valid methods. Do not grade private reasoning, response length, or a preferred workflow instead of the requested outcome.
 
-## Calibrate the verifier
+## Calibrate before claiming difficulty
 
-Before cross-model runs, include a practitioner reference output and a known-bad output or equivalent negative control. If the task uses partial credit or a judge, add a partial-credit anchor. State the expected per-criterion result for every anchor.
+Require a passing known-good check and a failing no-op or known-bad control. Add partial-credit anchors when partial credit or a judge is used. A file named “Oracle” is not proof that it passes.
 
-Try to fool the verifier. Change the response length, order, and formatting without changing the substance; the score should stay stable. Add plausible but irrelevant detail; the score should not improve.
+Test irrelevant detail, reordered content, alternate valid answers, and plausible shortcuts. The verifier should stay stable when substance is unchanged and reject reward hacking.
 
-False positives inflate measured capability, so they are more damaging than false negatives. A benchmark item is not ready just because its verifier agrees with the author.
-
-## Recommended: calibrate difficulty
-
-When you make a difficulty claim, prefer at least three model tiers and enough independent rollouts to estimate pass@1 and criterion-level behavior. Whatever calibration envelope you use, pin the model, harness, prompts, tools, sampling settings, turn budget, timeout, judge version, context policy, and retry policy for every supplied rollout.
-
-Read mean rubric score and per-criterion pass rates alongside pass@1. A zero-pass item is unsolved at current capability; that alone does not prove it is difficult or broken. Before calling it non-broken or suitable for its intended use, gather this evidence when practical:
-
-- a qualified practitioner can solve it with the exact context and tools;
-- the practitioner output passes every applicable verifier component;
-- the environment is reliable;
-- at least one model shows meaningful partial progress, or the task is explicitly beyond frontier; and
-- the verifier handles the known-good and negative controls correctly, plus partial-credit anchors when applicable.
-
-If every model earns zero or near-zero partial credit, consider splitting or reworking the task. Items above roughly 50% pass@1 can serve as anchors, but they generally should not dominate the benchmark.
+Use the campaign's pinned model–harness plan for difficulty claims. Inspect criterion-level progress as well as pass rates. Retain zero-pass tasks only when solvability and verifier reliability are established. Separate easier calibration anchors from core items.

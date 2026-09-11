@@ -1,132 +1,45 @@
 ---
-title: "Partner delivery and review"
+title: "Deliver a GDPx task"
 sidebarTitle: "Partner delivery"
-description: "Understand partner responsibilities, the four GDPx review stages, and the final handoff."
-keywords: ["GDPx", "partner delivery", "rollouts", "quality control", "QC"]
+description: "Hand over the exact runnable package and the evidence behind its results."
 ---
 
-Partners hand over the complete task source, rights information, verifier logic, and any native evidence. Standard Data handles managed QC execution, benchmark review, normalization, and the final inclusion decision.
+Deliver one task folder under its domain, following the [GDPx repository structure](/gdpx/quickstart#repository-layout). Keep task-specific runtime files and recorded evidence together.
 
 ## Responsibilities
 
 | Partner | Standard Data |
 | --- | --- |
-| Deliver the exact runnable task and source material | Confirm the source layout or adapter |
-| Explain the intended work, task family, and rubric | Normalize accepted source into the canonical GDPx contract |
-| Provide rights, provenance, and sanitization information | Run or verify the managed QC1 smoke |
-| Preserve any supplied trajectories, verifier output, and work products | Review difficulty, reward integrity, and failure causes |
-| Correct task, environment, or verifier defects found in review | Run the approved evaluation matrix and decide inclusion |
+| Provide the instruction, runtime, starting data, verifier, and reference material | Review construction, solvability, scoring, and difficulty |
+| Explain source rights, task family, and dependencies | Confirm identity mappings and any API normalization |
+| Preserve supplied runs, traces, native artifacts, and failure analyses | Run or verify the required evaluation plan and make release decisions |
+| Repair defects and identify changed bytes | Review the new revision and accepted evidence |
 
-There is no public endpoint to launch or approve managed QC1. A partner-supplied Harbor run or provider export can be useful preflight evidence, but it cannot approve itself or advance a QC stage automatically.
+Do not fabricate exported `TASK.json` identities, run records, scores, or execution receipts. If your source does not yet have issued IDs, identify it as a new task and let intake assign them.
 
-## Before QC: runnable readiness
+## Handoff checklist
 
-A task is ready to enter QC only when:
+- Pin the task revision and repository commit or source ZIP hash.
+- Include `task.toml`, instructions, environment, tests, reference material, and any declared steps.
+- Identify private images, external data, tools, rights, and required runtime configuration.
+- Keep Oracle/no-op checks in `qc/` and model attempts in `rollouts/`.
+- Preserve every supplied attempt's record, trace, verifier output, and native work products.
+- Include an evidence-grounded explanation for failed attempts used in review.
+- Retrieve required LFS and skipped artifacts, or mark the handoff incomplete.
+- Remove secrets and private reasoning; keep protected grading material out of the agent environment.
 
-- the exact environment builds and resets;
-- all required source files and tools are available;
-- the verifier runs and returns interpretable output;
-- a known-good solution passes when one can reasonably be represented, or an equivalent solvability check passes;
-- a no-op, known-bad output, or equivalent negative control fails; and
-- the task, verifier, and evidence contain no secrets or inaccessible dependencies.
+A repository listing or `status: draft` is not a passing QC result. Check actual trial evidence and the review decision.
 
-This is pre-QC readiness. Do not call it QC0, Stage 0, or G0. An authoring checklist may label the build check G0, but G0 is not a benchmark stage.
+## Choose the delivery path
 
-## The four GDPx review stages
+**Source delivery:** hand over the task folders and complete evidence through the agreed channel. Preserve native filenames and source provenance.
 
-### QC1: Construction integrity
+**Direct API delivery:** build a separate canonical bundle using [API bundle upload](/gdpx/evaluation-bundle-upload). A repository ZIP does not satisfy that contract by itself.
 
-On the exact frozen task revision, Standard Data runs or verifies one qualifying managed smoke attempt. Earlier construction attempts may fail or be rejected; they do not count. QC1 checks whether the environment, tools, source files, reset behavior, verifier, and evidence capture work together.
+For multi-run campaigns, retain the whole current-revision corpus in the source layout. Do not apply the API's one-rollout-per-task-per-bundle limit to the repository.
 
-That attempt must preserve the prompt, observable trajectory, final answer and work products, verifier output, criterion decisions, and score reconciliation. A partner can supply an existing attempt for diagnosis, but the task stays in QC1 until Standard Data validates a qualifying managed attempt on the same revision.
+## Review and release
 
-QC1 does not establish difficulty. A clean pass proves the task runs, not that it is challenging enough for the benchmark.
+Follow the four [QC stages](/qc-stages-for-benchmark). Upload success, retained evidence, and API `review_ready` each describe a technical state—not completion of all program reviews.
 
-### QC2: Difficulty and reward integrity
-
-Standard Data reviews repeated current-revision attempts in the native harness. We ask:
-
-- Is the signal non-saturated and useful?
-- Do successful attempts solve the intended task?
-- Are failed attempts legitimate model failures?
-- Does the verifier resist leakage and reward hacking?
-- Are false positives, false negatives, and partial-credit decisions acceptable?
-
-If the QC1 model repeatedly passes or reaches the score ceiling, the task does not pass QC2. Harden or remove the task, then rerun the new revision. A working environment is not a reason to promote a saturated task.
-
-A single failed attempt does not prove difficulty either. QC2 is a repeated-run judgment about the task and its reward signal.
-
-### QC3: Benchmark evaluation
-
-After QC1 and QC2, freeze the task revision and run the written model–harness matrix. The current default is 16 completed subject attempts per task for each required pairing, unless Standard Data issues a different evaluation plan for the campaign.
-
-An attempt counts only when it has:
-
-- the exact frozen task and runtime configuration;
-- a final reward, threshold, and pass/fail outcome;
-- complete reviewer-visible evidence;
-- all required native work products; and
-- no infrastructure or provider failure that invalidates the attempt.
-
-Retries, setup failures, Oracle runs, hinted runs, and calibration probes do not count toward the subject total.
-
-<Info>
-  QC3 is an evaluation corpus, not a single canonical task file. Keep the 16 attempts out of `TASK.json`. Standard Data owns QC3 ingestion and campaign mapping. Partners should preserve the complete native corpus and should submit individual QC3 attempts through `evidence_only` only when a Standard Data operator provides the target revision and admission plan. The current API does not natively label a run as QC3.
-</Info>
-
-### QC4: Release review
-
-Standard Data reviews the complete evaluation set, checks its failure modes and scoring behavior, resolves material anomalies, and normalizes accepted evidence for release. QC4 ends with an explicit decision to include, rework, or remove the task.
-
-## API status versus program status
-
-The current v3 backend enforces the canonical task-evidence and managed-QC1 requirements for entry into the active evidence catalog. QC2, QC3, and QC4 remain separate program review stages.
-
-These statuses are not interchangeable:
-
-- `review_ready` does not, by itself, mean QC2 through QC4 are complete;
-- an active evidence-catalog record does not mean the task is in the released GDPx benchmark; and
-- a partner-supplied trajectory does not count as a passed QC stage until Standard Data reviews it under the applicable stage.
-
-Use the benchmark tracker or written review record for four-stage status. Use the API for immutable task and rollout evidence.
-
-## Failure analysis
-
-For every failed attempt in the delivered or evaluated corpus, write a readable failure-analysis summary grounded in the evidence. Identify:
-
-- the first observable failure;
-- the affected test or rubric criterion;
-- whether the origin is the model, task, verifier, environment, provider, or orchestration;
-- the exact trajectory, tool, test, or artifact evidence supporting that conclusion;
-- whether the task remained solvable with the supplied context and tools; and
-- any required repair and rerun.
-
-The [rollout-analysis endpoint](/gdpx/benchmark-rollout-analysis) is optional. It can provide a structured first pass when the failure origin is unclear. Treat its recommendation as review evidence, not a QC-stage decision.
-
-## Submission counts versus rollout counts
-
-These counts describe different things:
-
-| Concept | Count |
-| --- | --- |
-| Partner source handoff | May contain the complete native rollout corpus |
-| v3 `task_and_evidence` ZIP | One evaluation and one rollout for each unique task in that ZIP |
-| v3 `evidence_only` ZIP | One rollout candidate for one retained task revision |
-| QC3 evaluation corpus | The number of completed attempts required by the written evaluation matrix |
-
-An `evidence_only` submission can supply the first QC1 attempt for an exact retained canonical Audit draft. For an already retained revision, it freezes a later attempt candidate. That candidate requires separate operator admission and leaves the qualifying QC1 anchor unchanged. Check the live schema and submission state to see which case applies.
-
-## Final handoff checklist
-
-Before you hand off a package:
-
-- freeze the exact task revision and file inventory;
-- include the runnable environment, verifier, and calibration evidence;
-- include rights, provenance, sanitization, and overlap-risk notes;
-- retain every supplied attempt's observable trajectory, outputs, work products, verifier evidence, and grading;
-- add an evidence-grounded summary for every failed attempt;
-- identify incomplete or truncated source evidence plainly;
-- record the ZIP size and SHA-256; and
-- state whether the package is a partner source handoff or a canonical v3 bundle.
-
-See [Task packaging](/gdpx/benchmark-task-package) for the two layouts and [Evaluation bundle upload](/gdpx/evaluation-bundle-upload) for direct API submission.
+When a task changes, identify the new revision and rerun affected checks. Never overwrite earlier evidence or relabel it as a run of the new task.

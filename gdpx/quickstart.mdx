@@ -1,139 +1,68 @@
 ---
 title: "GDPx task format"
-description: "See how runnable tasks, partner handoffs, rollout evidence, and GDPx submissions fit together."
+description: "Read the Harbor task, model rollouts, and Oracle/no-op evidence in one task folder."
 sidebarTitle: "Task format"
-keywords: ["Harbor", "GDPx", "benchmark tasks", "task format", "rollout evidence"]
 ---
 
-GDPx asks a practical question: can an agent finish realistic, economically useful work? Each task packages the job, source material, tools, expected work product, and a verifier that can explain the score.
+Start with the [GDPx repository](https://github.com/Standard-Data-LLC/gdpx). It groups tasks by domain and keeps each task's runtime and recorded evidence together.
 
-## Know which package you are building
-
-GDPx has two delivery layers. They serve different purposes and are not interchangeable.
-
-| Layer | Purpose | Format authority |
-| --- | --- | --- |
-| Partner source handoff | Delivers runnable tasks, native rollout evidence, and review notes to Standard Data | The agreed partner layout and any adapter advertised for that delivery |
-| Canonical GDPx submission | Creates immutable task and evidence records through the GDPx API | The live v3 capability response and linked JSON Schema |
-
-<Warning>
-  A partner handoff is not a canonical v3 review bundle. Standard Data may normalize an approved source layout, but no adapter can invent missing task files, trajectories, verifier evidence, work products, or identity bindings.
-</Warning>
-
-Before you build a ZIP for API submission, fetch the live contract:
+## Repository layout
 
 ```text
-GET /api/v3/gdpx/capabilities
-GET /api/v3/gdpx/schemas/review-bundle
-```
-
-If an example here differs from the deployed schema, follow the live response.
-
-## The runnable task
-
-Harbor is the default portable runtime format. A standard single-step task looks like this:
-
-```text
-<task-id>/
+INDEX.json
+<domain>/<task-name>/
+├── TASK.json
 ├── task.toml
 ├── instruction.md
 ├── environment/
-│   └── Dockerfile
 ├── tests/
-│   └── test.sh
-└── solution/
-    └── solve.sh                 # when a scripted reference is reasonable
+├── solution/
+├── steps/                         # multi-step tasks only
+├── rollouts/<model-harness>/<run-id>/
+│   ├── run.json
+│   ├── traces/<trace-file>.json
+│   └── artifacts/
+└── qc/<run-id>/
+    ├── run.json
+    ├── traces/<trace-file>.json
+    └── artifacts/
 ```
 
-Harbor's [task documentation](https://www.harborframework.com/docs/tasks) is the runtime schema authority.
+Some exports have an `artifacts.SKIPPED.json` record instead of downloaded artifacts. Some large files use Git LFS. Neither is a substitute for the actual evidence bytes.
 
-### `task.toml`
-
-Set the runtime, resources, timeouts, and verifier entry point. Pin every dependency that could change the task's behavior.
-
-### `instruction.md`
-
-Write the instruction the agent will see. Describe the outcome and constraints without exposing the solution or hidden grading material.
-
-### `environment/`
-
-Include the complete starting state and every source file the agent can see. The environment must build from the delivered files and reset cleanly between attempts.
-
-### `tests/test.sh`
-
-Run the verifier after the agent finishes. A direct GDPx Harbor delivery writes `/logs/verifier/reward.json` and keeps enough per-test evidence to explain the reward. An adapter advertised in the capability response may accept its documented native verifier output and normalize it into canonical evidence.
-
-### `solution/solve.sh`
-
-Provide a known-good path when a reference solution makes sense. A native reference artifact can replace the shell script when that better matches the work.
-
-The agent must not be able to read the solution, hidden tests, or verifier-only material during the attempt.
-
-## Scoring terms
-
-| Term | Meaning |
+| Path | What it contains |
 | --- | --- |
-| Verifier | The complete scoring system for the task |
-| Deterministic checks | Code-based components of the verifier |
-| Judge | An optional model-based verifier component for criteria that require practitioner judgment |
-| Rubric | The observable criteria and aggregation rules used by the verifier |
+| `INDEX.json` | Task locations, rollout-run counts, QC-run counts, and solution presence |
+| `TASK.json` | Exported organization, task/revision identity, source-package provenance, and run IDs |
+| `task.toml` | Harbor runtime configuration and task metadata |
+| `instruction.md` | The instruction shown to the agent |
+| `environment/` | Build configuration, tools, and starting files |
+| `tests/` | Verifier code and grading resources |
+| `solution/` | Oracle/reference material |
+| `rollouts/` | Model runs on this revision, grouped by model–harness pair |
+| `qc/` | Oracle and no-op baseline runs, kept out of model success rates |
 
-## Evidence around the task
+Domain folders include `biology`, `cybersecurity`, `finance`, `finance-onefinnet`, `hardware-engineering`, `healthcare`, `legal`, and `ml-and-infrastructure-engineering`. Read identity from metadata; a folder name is not a task or revision ID.
 
-A runnable task is only the starting point. Every rollout used for QC or reported results must preserve:
+## The runnable task
 
-- the exact task revision and agent-visible context;
-- the ordered observable trajectory, including tool calls and results;
-- the final answer and native work products;
-- verifier and per-test output;
-- criterion-level grading and score reconciliation;
-- the model, harness, configuration, limits, timing, and outcome; and
-- stable task, run, rollout, and artifact identities.
+Run the Harbor package inside the task folder, not the whole repository. Keep task-specific supporting files and any declared `steps/` tree intact. Use the package's `task.toml` and any task-specific README for runtime requirements; [Harbor's task reference](https://www.harborframework.com/docs/tasks) explains the runtime fields.
 
-Do not collect or submit private chain of thought. Remove credentials, signed URLs, and provider-private fields, but keep the rest of the observable evidence intact.
+Repository presence does not prove readiness. A solution may be a placeholder, a dependency may need authorized retrieval, and a run may be incomplete. Check the [package](/gdpx/benchmark-task-package) and [QC evidence](/qc-stages-for-benchmark) before using a task.
 
-See [Rollout viewer evidence](/gdpx/rollout-viewer-evidence) for the review surface.
+## Read a result
 
-## Choose the right path
+1. Read `TASK.json` for the exact revision and run IDs.
+2. Open that run's `run.json` for configuration, status, and individual results.
+3. Follow each result to its trace and native artifacts.
+4. Separate scored model attempts from Oracle, baseline, and failed infrastructure attempts.
 
-### Send a source handoff
+One run can contain several trials. `INDEX.json` counts runs, not completed subject attempts.
 
-Use the [partner handoff layout](/gdpx/benchmark-task-package#partner-source-handoff) when Standard Data will normalize your delivery. Send it through the channel named in your onboarding agreement. Keep the complete native evidence in its original structure and include a file inventory or crosswalk. Before reorganizing an existing export, confirm the expected adapter with Standard Data.
+## Repository format versus API format
 
-Adapter acceptance means the source can be read. It does not mean the task passed QC or entered the benchmark.
+The repository is a task-and-evidence export. It is **not** the ZIP contract for `POST /api/v3/gdpx-submissions`.
 
-### Submit a canonical v3 bundle
+In particular, repository `TASK.json` is provenance metadata and may contain `runs`. The API's canonical `TASK.json` is a different, strict task document; API run records live under `evaluations/`.
 
-Use the [evaluation bundle contract](/gdpx/evaluation-bundle-upload) when you submit directly through the GDPx API. The canonical `TASK.json` is strict: rollout records live under `evaluations/`, not in a `rollouts` field inside `TASK.json`.
-
-A `task_and_evidence` bundle carries one admission attempt for each included task. An `evidence_only` submission can attach the first QC1 attempt to an exact retained canonical Audit draft or retain a later attempt candidate for an already retained revision. That later candidate still needs separate operator admission and does not change the qualifying QC1 anchor. A QC3 campaign can contain many attempts, but they do not all belong in one canonical task record or one v3 bundle.
-
-## The review sequence
-
-GDPx uses four program review stages:
-
-1. **QC1 — Construction integrity:** Standard Data runs or verifies one qualifying managed smoke attempt on the exact task revision.
-2. **QC2 — Difficulty and reward integrity:** repeated attempts show a useful, non-saturated signal and a trustworthy verifier.
-3. **QC3 — Benchmark evaluation:** the approved model–harness matrix is run on the frozen revision.
-4. **QC4 — Release review:** Standard Data reviews results, normalizes accepted evidence, and decides final inclusion.
-
-The v3 backend currently enforces QC1 requirements for the active evidence catalog. QC2 through QC4 remain separate program review gates. A record in the active evidence catalog does not enter the released GDPx benchmark until QC4 approves it.
-
-See [QC stages](/qc-stages-for-benchmark) for definitions and [Partner delivery](/gdpx/benchmark-task-delivery) for responsibilities.
-
-## Where to go next
-
-<CardGroup cols={2}>
-  <Card title="Design and grade" href="/gdpx/benchmark-task-design">
-    Define the work, environment, rubric, and calibration anchors.
-  </Card>
-  <Card title="Package the task" href="/gdpx/benchmark-task-package">
-    Prepare a source handoff or canonical v3 bundle without mixing the formats.
-  </Card>
-  <Card title="Evaluate the task" href="/gdpx/benchmark-task-evaluation">
-    Run authoring checks and analyze failures and reward integrity.
-  </Card>
-  <Card title="Deliver for review" href="/gdpx/benchmark-task-delivery">
-    Follow the QC sequence and hand off the exact frozen revision.
-  </Card>
-</CardGroup>
+Use [Task packaging](/gdpx/benchmark-task-package) for the repository structure and [API bundle upload](/gdpx/evaluation-bundle-upload) only when building a direct API submission. Do not zip the repository and assume the API accepts it unchanged.

@@ -1,29 +1,20 @@
 ---
-title: "Benchmark overview"
+title: "Benchmark best practices"
 sidebarTitle: "Benchmark overview"
-description: "Find the GDPx guidance for task design, packaging, evaluation, and review."
-keywords: ["GDPx", "benchmark", "rubrics", "task design", "quality control"]
+description: "Design useful work, package it consistently, and preserve evidence that explains the score."
 ---
 
-GDPx measures whether a model can finish representative, economically useful knowledge work in a realistic environment. We evaluate the whole job: kickoff, source material, tools, observable work, final artifact, deterministic checks, and rubric.
+A good GDPx task asks an agent to finish meaningful work with realistic context and tools. Its verifier rewards the intended outcome, accepts valid alternative methods, and explains failures.
 
-<Info>
-  GDPx does not use a universal pass-rate band. Core items should separate the models named in the written evaluation plan, while easier items may serve as anchors. A zero-pass task can stay only when it is demonstrably solvable, the verifier works, and criterion-level results still provide useful signal.
-</Info>
+Keep difficulty honest: a broken environment is not a hard task, and one model failure does not establish a useful benchmark.
 
-## Find the right page
+## Find the right guide
 
-The guidance is split into four pages. Start with the part of the task you are working on:
+- [Task format](/gdpx/quickstart): the domain/task tree, provenance, model runs, and baseline runs.
+- [Design and grading](/gdpx/benchmark-task-design): the instruction, environment, rubric, and calibration.
+- [Task packaging](/gdpx/benchmark-task-package): runtime files, multi-step tasks, identity, and visibility.
+- [Evaluation and failure analysis](/gdpx/benchmark-task-evaluation): scored attempts, failure origins, and distributions.
+- [Partner delivery](/gdpx/benchmark-task-delivery): the final handoff.
+- [QC stages](/qc-stages-for-benchmark): construction, difficulty, evaluation, and release review.
 
-- [Design and grade](/gdpx/benchmark-task-design): define the work, build the environment, and make the rubric observable.
-- [Package the task](/gdpx/benchmark-task-package): assemble the Harbor task, task taxonomy, ZIP, and self-contained environment.
-- [Evaluate and analyze](/gdpx/benchmark-task-evaluation): run acceptance checks, analyze failures, and document reward integrity.
-- [Partner delivery and review](/gdpx/benchmark-task-delivery): run the required partner evaluation and prepare the final handoff.
-
-## How the formats fit together
-
-The [Harbor task](/gdpx/quickstart#the-runnable-task) is the portable runtime core. Source handoffs and canonical submissions are separate formats. [Package the task](/gdpx/benchmark-task-package) explains when to use each one.
-
-## Follow the review sequence
-
-See [Partner delivery and review](/gdpx/benchmark-task-delivery) for the four QC stages and current rollout requirements.
+Use [API bundle upload](/gdpx/evaluation-bundle-upload) only for the separate canonical API format.

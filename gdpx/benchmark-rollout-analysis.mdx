@@ -6,7 +6,7 @@ description: "Classify one observable attempt and distinguish model failures fro
 
 `POST /v1/benchmark-rollout-analyses` analyzes one normalized attempt. It returns a cited failure classification and recommended repairs. It does not import evidence, advance QC, or certify a task.
 
-## Map the repository evidence
+## Prepare the attempt evidence
 
 Select one result from `run.json` and its matching trace and artifacts. A run with several trials needs separate analysis requests.
 
@@ -18,15 +18,15 @@ Use the request schema in [live OpenAPI](https://api.standarddata.io/openapi.jso
 - `runtime`: Oracle smoke, environment/provider/orchestration health, limits, and action definitions; and
 - stable evidence IDs, with tool calls linked to their results.
 
-The API requires a canonical `taskrev_<64 lowercase hex>` ID and task-content hash. Repository `rev_…` IDs are not interchangeable. Use the verified canonical mapping for the exact source revision; do not change an ID prefix or invent a hash to satisfy validation.
+The API requires a canonical `taskrev_<64 lowercase hex>` ID and task-content hash. Use the verified mapping for the exact task revision. If you only have source-system IDs, obtain that mapping from Standard Data; do not change an ID prefix or invent a hash to satisfy validation.
 
-Repository rubric weights may use another scale. If you supply the API's optional criterion `weight`, normalize it to the schema's 0–1 range using the actual scoring rule. Preserve the original aggregation and hard gates in the evidence.
+Your rubric weights may use another scale. If you supply the API's optional criterion `weight`, normalize it to the schema's 0–1 range using the actual scoring rule. Preserve the original aggregation and hard gates in the evidence.
 
 ## Keep the request bounded and safe
 
 The request limit is 2 MiB, with at most 1.5 MiB of evidence text and further per-field limits. Send a faithful analysis projection that retains the first failure and every failed test—not a ZIP, raw `run.json`, or complete provider archive.
 
-Exclude private reasoning, secrets, credentials, internal storage paths, signed URLs, and provider-private payloads, including values embedded in nested objects or schema keys. Do not paste the repository's raw storage references.
+Exclude private reasoning, secrets, credentials, internal storage paths, signed URLs, and provider-private payloads, including values embedded in nested objects or schema keys.
 
 The full observable source evidence still belongs with the attempt. A smaller API request does not make missing or truncated source evidence complete.
 

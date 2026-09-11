@@ -8,7 +8,7 @@ Every QC decision applies to one exact task revision. Changing the instruction, 
 
 ## Baseline runs are not stage labels
 
-The repository's `qc/<run-id>/` contains Oracle and no-op baseline runs. Its name does not mean that QC1–QC4 passed.
+Keep Oracle and no-op baseline runs under `qc/<run-id>/`. That folder name does not mean that QC1–QC4 passed.
 
 Read `run.json`, its individual results, and referenced traces. A placeholder Oracle, failed baseline, or grader crash cannot establish solvability or difficulty.
 
@@ -31,12 +31,12 @@ If repeated valid attempts saturate the task, harden or remove it and review the
 
 For QC3, follow the written campaign plan. The default is 16 completed subject attempts per task for each required model–harness pairing unless that plan specifies otherwise.
 
-- Count individual valid model trials, not `INDEX.json` totals or run directories.
+- Count individual valid model trials, not run totals or directories.
 - Keep Oracle, no-op, hinted, and calibration attempts out of subject totals.
 - Exclude setup failures, provider failures, voided trials, and duplicate retry records.
 - Pin task, environment, verifier, model, harness, settings, and limits.
 
-A repository run may contain several attempts. Its `qc/` and `rollouts/` folders are evidence storage, not an enforcement mechanism for the campaign's sample size.
+A run may contain several attempts. The `qc/` and `rollouts/` folders organize evidence; they do not enforce the campaign's sample size.
 
 ## Evidence behind a decision
 
@@ -46,11 +46,11 @@ Use [Rollout evidence](/gdpx/rollout-viewer-evidence) to check completeness. The
 
 ## API status is separate
 
-Repository export status, Audit intake status, and program QC are different records.
+Source metadata, Audit intake status, and program QC are different records.
 
 | Signal | Meaning |
 | --- | --- |
-| Repository `TASK.json` or run folder | Exported identity and evidence; not certification |
+| Source task metadata or run folder | Recorded identity and evidence; not certification |
 | Audit draft retained | A draft is stored, possibly with blockers |
 | API `review_ready` or active catalog membership | The API's technical admission requirements were met |
 | Recorded QC4 decision | Standard Data approved release inclusion, rework, or removal |

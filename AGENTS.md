@@ -31,3 +31,6 @@
 
 {/* Define what should and shouldn't be documented */}
 {/* Example: Don't document internal admin features */}
+
+- Customer docs must be self-contained. Do not link to or mention the private task source repository, or require customers to access internal files.
+- Explain the task layout in the docs themselves. Keep source task metadata distinct from canonical API submission documents.

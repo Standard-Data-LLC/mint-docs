@@ -6,7 +6,7 @@ description: "Use the older workspace flow only for an explicitly requested draf
 
 `POST /api/v2/workspace-submissions` is the legacy draft workflow. It does not create a canonical v3 evidence-catalog candidate or certify a QC stage.
 
-Use [API bundle upload](/gdpx/evaluation-bundle-upload) for current submissions. The [GDPx repository layout](/gdpx/quickstart) is a source export, not an alternative v2 intake specification.
+Use [API bundle upload](/gdpx/evaluation-bundle-upload) for current submissions. The [task layout](/gdpx/quickstart) describes authoring and handoff, not an alternative v2 intake specification.
 
 ## If a legacy draft is requested
 
@@ -21,4 +21,4 @@ Do not substitute v2 capability fields for the v3 contract. Do not assume that a
 
 Recover the exact runnable task and complete evidence. Normalize them against the live v3 schemas, preserve the source-to-canonical identity mapping, and follow Standard Data's admission plan.
 
-A v2 manifest or repository `TASK.json` cannot be dropped into canonical v3 `TASK.json`. New submissions preserve earlier immutable records; they do not edit those records in place.
+A v2 manifest or source metadata document cannot be dropped into canonical v3 `TASK.json`. New submissions preserve earlier immutable records; they do not edit those records in place.

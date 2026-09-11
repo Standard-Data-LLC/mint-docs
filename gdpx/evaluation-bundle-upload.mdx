@@ -4,9 +4,9 @@ sidebarTitle: "API bundle upload"
 description: "Normalize a GDPx task and its evidence into the live Audit submission contract."
 ---
 
-`POST /api/v3/gdpx-submissions` accepts an API bundle, not an unchanged [GDPx repository folder](/gdpx/quickstart).
+`POST /api/v3/gdpx-submissions` accepts an API bundle, not an unchanged [task folder](/gdpx/quickstart).
 
-Repository `TASK.json`, lowercase `run.json`, and `traces/` are source records. The API uses strict control documents and an `evaluations/` tree. Renaming or zipping the source files does not perform this mapping.
+Source metadata, lowercase `run.json`, and `traces/` need mapping into the API's strict control documents and `evaluations/` tree. Renaming or zipping the source files does not perform this mapping.
 
 ## Discover the contract
 
@@ -31,7 +31,7 @@ Check `access.can_submit`, `admission.can_submit`, required scopes, modes, adapt
 
 Creation and upload require `uploads:write` and `imports:write`; task readback requires `tasks:read`. Neither `/v1/whoami` nor v2 intake readiness is the v3 admission gate.
 
-The currently advertised adapters are `canonical` and `legacy_snapshot`. There is no advertised adapter for uploading the GDPx repository export unchanged. A legacy snapshot is a draft path, not a shortcut to complete canonical evidence.
+The currently advertised adapters are `canonical` and `legacy_snapshot`. Neither accepts an arbitrary task folder as complete canonical evidence. A legacy snapshot is a draft path, not a shortcut to admission.
 
 ## Choose the mode
 
@@ -43,7 +43,7 @@ The currently advertised adapters are `canonical` and `legacy_snapshot`. There i
 
 Use the separately advertised draft contract and `audit_only` policy for `audit_task_draft`. A legacy snapshot needs canonical normalization before it can receive qualifying evidence.
 
-Under `gdpx-review-bundle/1.1.0`, a `task_and_evidence` bundle can contain 1–100 tasks. `evidence_only` targets one task. These are API submission limits, not limits on the number of runs or trials retained in the repository.
+Under `gdpx-review-bundle/1.1.0`, a `task_and_evidence` bundle can contain 1–100 tasks. `evidence_only` targets one task. These are API submission limits, not limits on the runs or trials you retain with a task.
 
 A later attempt does not replace immutable task bytes or become current automatically. Follow Standard Data's admission plan for attaching evidence and campaign mapping.
 
@@ -75,7 +75,7 @@ Put `GDPX_BUNDLE.json` at the ZIP root, without an extra enclosing folder. Valid
 | `RUN.json` / `ROLLOUT.json` | Canonical task, run, and rollout identities, execution settings, and evidence bindings |
 | Evidence files | Observable trajectory, final answer, native work products, verifier output, every criterion decision, and score reconciliation |
 
-Do not copy repository `TASK.json.runs` or add `rollouts` to canonical `TASK.json`. Keep evaluation records under `evaluations/`. An image digest, directory hash, or file count is not a complete workspace inventory.
+Do not copy a source metadata document into canonical `TASK.json` or add `runs` or `rollouts` fields. Keep evaluation records under `evaluations/`. An image digest, directory hash, or file count is not a complete workspace inventory.
 
 Preserve source-to-canonical identity mappings and original task bytes. An adapter cannot invent missing traces, criterion decisions, artifacts, or managed-execution proof. Exclude private reasoning, credentials, signed URLs, and provider-private payloads.
 

@@ -10,18 +10,18 @@ Start inside one task's `rollouts/<model-harness>/<run-id>/`. Read `run.json`, t
 
 | Source | Read it for |
 | --- | --- |
-| `TASK.json` | Exact task revision and associated run IDs |
+| Supplied task metadata, such as `TASK.json` | Exact task revision and associated run IDs |
 | `run.json` | Model, harness, run status, settings, events, and individual `results` |
 | `traces/<trace-file>.json` | Attempt identity, observable steps, rubric decisions, metrics, and artifact references |
 | `artifacts/` | Native deliverables, verifier output, and retained logs |
 
-Trace fields vary by exporter and task. Current traces can include `steps`, `rubric`, `reconciliation`, `tokens`, `cost_usd`, `metadata`, and `artifacts`. Follow their recorded references; do not infer a missing value from the directory name.
+Trace fields vary by harness and task. They can include `steps`, `rubric`, `reconciliation`, `tokens`, `cost_usd`, `metadata`, and `artifacts`. Follow their recorded references; do not infer a missing value from the directory name.
 
 Show an unavailable metric as **Not supplied**, never zero. A run-level status does not replace the result of each trial.
 
 ## Check six things
 
-These are review sections, not six required repository filenames.
+These are review sections, not six required filenames.
 
 | Section | Evidence you need |
 | --- | --- |
@@ -38,13 +38,13 @@ Use `not_applicable` only with a source-grounded reason. Missing evidence is not
 
 Match each criterion to its exact wording, weight or aggregation role, verdict, rationale, and supporting evidence. Keep hard gates separate from weighted scores.
 
-Retain the reported score, aggregation rule, threshold, and the inputs needed to recalculate it. If the export lacks a reconciliation or a criterion decision, record the gap; do not manufacture a passing ledger.
+Retain the reported score, aggregation rule, threshold, and the inputs needed to recalculate it. If the evidence lacks a reconciliation or a criterion decision, record the gap; do not manufacture a passing ledger.
 
 ## Preserve native work and observable activity
 
 Keep every work product the verifier graded. A preview or summary cannot replace the original workbook, drawing, document, code, or other native artifact.
 
-Retain observable messages and tool activity in order. Exclude private reasoning, credentials, signed URLs, and provider-private fields. Raw provider logs are not automatically safe because they appear in an export.
+Retain observable messages and tool activity in order. Exclude private reasoning, credentials, signed URLs, and provider-private fields. Inspect raw provider logs before including them in a delivery.
 
 A bounded trace preview can refer to complete retained evidence. Check `steps_omitted`, `truncated` flags, and the backing artifact before calling the trajectory complete.
 
@@ -52,7 +52,7 @@ A bounded trace preview can refer to complete retained evidence. Check `steps_om
 
 - Match the task revision, run, attempt, role, and trial across records.
 - Confirm that referenced artifacts exist and match recorded sizes and hashes where supplied.
-- Resolve Git LFS pointers and required `artifacts.SKIPPED.json` entries through authorized retrieval.
+- Include actual artifact bytes; pointers and omission notices do not count as complete evidence.
 - Treat internal object keys as provenance, not public download URLs.
 - Record missing or source-truncated evidence as a gap, not a successful review.
 
@@ -60,6 +60,6 @@ Every failed attempt used in review needs a readable, cited [failure analysis](/
 
 ## Wilderness and API readback
 
-A repository export, a retained Audit draft, and a rollout selected for Wilderness **Results** are different states. A draft in **Review Tasks** may still have blockers.
+A delivered task package, a retained Audit draft, and a rollout selected for Wilderness **Results** are different states. A draft in **Review Tasks** may still have blockers.
 
 For direct API submissions, use [API bundle upload](/gdpx/evaluation-bundle-upload#verify-readback) to confirm the selected task, run, rollout, and artifacts. API readiness is not a [QC4 release decision](/qc-stages-for-benchmark).

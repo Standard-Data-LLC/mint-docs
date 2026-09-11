@@ -4,7 +4,7 @@ sidebarTitle: "Task packaging"
 description: "Keep the runnable task, provenance, and current-revision evidence together."
 ---
 
-Use the [repository layout](/gdpx/quickstart#repository-layout): one task folder under its domain. Keep the task's own filenames and supporting directories; do not flatten them into a separate batch-wide trajectory folder.
+Use the [task layout](/gdpx/quickstart#task-layout): one folder per task, grouped by domain for a batch. Keep each task's filenames and supporting directories intact.
 
 ## Runtime files
 
@@ -25,19 +25,11 @@ Harbor Oracle execution uses `solution/solve.sh`. Some retained packages documen
 
 Mount only the instruction, starting files, and permitted tools for the model attempt. Keep hidden tests, Oracle material, prior answers, `rollouts/`, and `qc/` out of that environment.
 
-A repository clone is for authoring and review, not an agent-visible mount. Enforce separation through the container, filesystem permissions, and verifier configuration. Keep verifier credentials server-side.
+Do not mount the full delivery folder into the agent environment. Enforce separation through the container, filesystem permissions, and verifier configuration. Keep verifier credentials server-side.
 
 ## Preserve task identity
 
-Repository `TASK.json` records the exported task, not a new authoring schema:
-
-- `org`, `org_id`, `task_id`, `name`, and `domain`;
-- `revision_id`, revision metadata, and `format_version`;
-- source upload/package references and `package_root`;
-- `runs.qc` and `runs.rollouts`; and
-- `exported_at`.
-
-Preserve IDs issued by the source system. Match each `run.json.task_revision_id` to `TASK.json.revision_id`. A domain folder can differ from the metadata domain; a display name can differ from the internal task ID.
+If supplied, preserve the source `TASK.json` and its task/revision identity, provenance, and associated run IDs. Match each `run.json.task_revision_id` to that task's recorded revision. A display name or folder name is not a server ID.
 
 For a new task, provide its source, rights, task family, and intended scoring in the task metadata and review notes. Do not fabricate server IDs or copy another task's provenance.
 
@@ -56,18 +48,18 @@ Trace filenames may include a generated suffix. Follow the recorded trace refere
 
 ## Check completeness before handoff
 
-1. Pin the repository commit and exact task revision.
-2. Resolve Git LFS pointers and any authorized external data or image dependencies.
-3. Retrieve required artifacts marked as skipped; record anything still unavailable.
+1. Freeze the exact task revision and record the source package hash.
+2. Include the actual files and make required data or image dependencies accessible through the agreed delivery channel.
+3. Record anything required that is still unavailable; an omission notice is not an artifact.
 4. Verify that the environment builds, the reference check passes, and the negative control fails.
 5. Preserve native work products, verifier output, and complete observable evidence.
-6. Remove secrets, private reasoning, repository metadata, and unrelated temporary files from the delivery.
+6. Remove secrets, private reasoning, version-control internals, and unrelated temporary files from the delivery.
 7. Record the delivered file inventory and hashes.
 
 Do not convert graded workbooks, CAD files, or other native deliverables to PDF just to reduce size. See [Large evidence files](/guides/large-folder-uploads).
 
 ## Direct API submission
 
-The repository's `TASK.json`, `run.json`, and traces are source records, not the API's `TASK.json`, `RUN.json`, and `ROLLOUT.json`.
+Source `TASK.json`, `run.json`, and traces are not the API's `TASK.json`, `RUN.json`, and `ROLLOUT.json` control documents.
 
 Only a bundle built against the live API contract goes to `POST /api/v3/gdpx-submissions`. Follow [API bundle upload](/gdpx/evaluation-bundle-upload) for that separate layout, mapping, and validation. Do not rename source files to imitate it.

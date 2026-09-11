@@ -1,43 +1,38 @@
 ---
 title: "Analyze a benchmark rollout"
-sidebarTitle: "Rollout analysis"
-description: "Classify one observable rollout and determine whether a failure is a legitimate model failure."
-keywords: ["GDPx", "rollout analysis", "failure analysis", "Luna", "QC"]
+sidebarTitle: "Rollout analysis API"
+description: "Classify one observable attempt and distinguish model failures from task, verifier, or runtime problems."
 ---
 
-`POST /v1/benchmark-rollout-analyses` examines one normalized, observable attempt. Use it for a structured first pass on where a failure started and whether it is legitimate.
+`POST /v1/benchmark-rollout-analyses` analyzes one normalized attempt. It returns a cited failure classification and recommended repairs. It does not import evidence, advance QC, or certify a task.
 
-<Warning>
-  This endpoint is optional and analysis-only. It does not store the rollout, create canonical evidence, pass a QC stage, or add evidence to the active evidence catalog. If you use it, retain the exact request and response.
-</Warning>
+## Map the repository evidence
 
-## What the analysis answers
+Select one result from `run.json` and its matching trace and artifacts. A run with several trials needs separate analysis requests.
 
-The analysis keeps three questions separate:
+Use the request schema in [live OpenAPI](https://api.standarddata.io/openapi.json), under `BenchmarkRolloutAnalysisRequest`. Supply:
 
-1. What did the verifier report?
-2. What first went wrong in the observable attempt?
-3. Is the result valid benchmark evidence, or did the task, verifier, runtime, provider, or orchestration fail?
+- `task`: instruction, rubric, known-good evidence, and immutable identity;
+- `rollout`: model identity, ordered observable events, final output, and usage;
+- `verifier`: outcome, score, threshold, and per-test evidence;
+- `runtime`: Oracle smoke, environment/provider/orchestration health, limits, and action definitions; and
+- stable evidence IDs, with tool calls linked to their results.
 
-A classification cannot replace the repeated-run evidence required for QC2 or the evaluation plan required for QC3.
+The API requires a canonical `taskrev_<64 lowercase hex>` ID and task-content hash. Repository `rev_…` IDs are not interchangeable. Use the verified canonical mapping for the exact source revision; do not change an ID prefix or invent a hash to satisfy validation.
 
-## Prepare the request
+Repository rubric weights may use another scale. If you supply the API's optional criterion `weight`, normalize it to the schema's 0–1 range using the actual scoring rule. Preserve the original aggregation and hard gates in the evidence.
 
-Bind the request to one exact task revision, source run, and rollout. Give the endpoint:
+## Keep the request bounded and safe
 
-- the task instruction and relevant agent-visible context;
-- atomic rubric criteria and known-good evidence;
-- the ordered observable trajectory and final output;
-- verifier outcome, reward, threshold, per-test output, and verifier identity;
-- environment, provider, and orchestration status;
-- model, harness, budgets, usage, timeout, and stop reason; and
-- stable evidence IDs for every quoted item.
+The request limit is 2 MiB, with at most 1.5 MiB of evidence text and further per-field limits. Send a faithful analysis projection that retains the first failure and every failed test—not a ZIP, raw `run.json`, or complete provider archive.
 
-Leave out private chain of thought, actual credentials, signed URLs, and provider-private payloads.
+Exclude private reasoning, secrets, credentials, internal storage paths, signed URLs, and provider-private payloads, including values embedded in nested objects or schema keys. Do not paste the repository's raw storage references.
 
-If the full retained evidence exceeds the endpoint's request limit, make a faithful analysis projection that preserves the first failure and every failed test. The complete source evidence still belongs in the canonical bundle. A smaller analysis request does not authorize truncated rollout evidence.
+The full observable source evidence still belongs with the attempt. A smaller API request does not make missing or truncated source evidence complete.
 
 ## Call the endpoint
+
+Use a key with `evaluations:write`:
 
 ```bash
 export STANDARD_DATA_API_BASE="https://api.standarddata.io"
@@ -51,100 +46,37 @@ curl --fail-with-body \
   --output rollout-analysis-response.json
 ```
 
-The request is synchronous. Follow the request contract returned by the service, not a cached example.
+The request is synchronous. Retain the exact request and response as supporting evidence bound to the source task, run, and attempt.
 
-## Read the response
+## Read the decision
 
-Along with the exact task and rollout identities, the response includes:
-
-| Field | Meaning |
+| Fields | Meaning |
 | --- | --- |
-| `analysis_status` | `complete` or `needs_human_review` |
-| `observed_verifier_outcome` | The verifier outcome from the request |
-| `deep_swe_tag` | The closed failure category when the evidence supports one |
-| `confusion_class` | The verifier disposition: TP, TN, FP, or FN |
-| `failure_legitimacy` | Whether this was a valid model failure, non-model failure, invalid pass, passing rollout, or unresolved case |
-| `failure_origin` | Model, prompt, verifier, environment, provider, orchestration, training data, triangulation, or unknown |
-| `first_failure_locator` | The first grounded divergence |
-| `evidence` | Citations to submitted observable evidence |
-| `failing_tests` | Per-test root causes |
+| `analysis_status`, `missing_inputs` | Complete classification or unresolved human review |
+| `deep_swe_tag`, `confusion_class` | Failure category and verifier disposition |
+| `failure_legitimacy`, `failure_origin` | Whether the result is valid, and whether the model or another system caused it |
+| `first_failure_locator`, `evidence`, `failing_tests` | Cited first divergence and per-test root causes |
+| `benchmark_fix`, `model_behavior_fix` | Task/verifier/infra repairs versus model mistakes |
 | `qc_recommendation` | Accept as evidence, repair and rerun, harden and rerun, or human review |
-| `missing_inputs` | Evidence required before the result can be resolved |
-| `input_fingerprint` / `output_fingerprint` | Hashes used to retain the analysis with the attempt |
+| `input_fingerprint`, `output_fingerprint` | Bind the analysis to its inputs and output |
 
-`analysis_status: complete` means the endpoint finished its classification. It does not mean the task passed QC.
+A category alone does not establish legitimacy. A model failure needs a solvable task, passing Oracle smoke, aligned verification, healthy runtime, and observable evidence explaining the failed tests.
 
-## Understand failure legitimacy
+`TRIAL_INCOMPLETE` additionally requires genuine model-caused exhaustion under adequate declared limits. A mechanical timeout or missing budget is not enough.
 
-A failed attempt can count as a legitimate model failure only when:
+A legitimate pass remains a pass. If repeated attempts saturate the task, harden or remove it and review the new revision; do not relabel success as a failure. See [QC stages](/qc-stages-for-benchmark).
 
-- the task is solvable and sufficiently clear with the supplied context and tools;
-- the instruction, rubric, tests, and verifier agree;
-- the environment, provider, and orchestration are healthy;
-- the model behavior caused the failure; and
-- the evidence is complete enough to support the conclusion.
+## Handle errors
 
-Common non-model origins include:
+| Status | Action |
+| --- | --- |
+| `400` / `422` | Correct the request, identity mapping, evidence links, or reported fields |
+| `401` / `403` | Check the key and `evaluations:write` scope |
+| `413` | Reduce the analysis projection without discarding required source evidence |
+| `429` | Follow `Retry-After` |
+| `502` | Inspect the reason: judge output or evidence validation did not complete |
+| `503` / `504` | Follow the returned retry guidance for service or provider recovery |
 
-- broken or mismatched tests;
-- hidden expectations not stated or discoverable;
-- ambiguous instructions;
-- unavailable tools or dependencies;
-- provider or controller failures; and
-- reward leakage or a cheated pass.
+Retain `request_id`, error code, `reason_code`, `failure_stage`, and `retryable` when returned. A service failure with `task_grade_issued: false` is not a failed task grade. Do not retry indefinitely or turn the error into a model failure.
 
-The category label alone is not enough to establish legitimacy.
-
-## Apply the saturation rule
-
-This analysis does not override GDPx difficulty review.
-
-- A passing QC1 attempt proves construction, not difficulty.
-- One failed attempt does not prove difficulty.
-- If the QC1 model repeatedly passes or reaches the score ceiling, keep the task in QC1, harden or remove it, and rerun the new revision.
-- Do not count a saturated smoke result as QC2 evidence.
-
-See [QC2: Difficulty and reward integrity](/gdpx/benchmark-task-delivery#qc2-difficulty-and-reward-integrity).
-
-## Handle human review
-
-If the evidence cannot establish the first failure, solvability, verifier alignment, or runtime health, the service returns `needs_human_review` and names the missing inputs.
-
-Add the missing observable evidence or record a qualified human review. An unresolved result cannot be recast as a legitimate model failure.
-
-## Retain the analysis correctly
-
-If you call the endpoint, keep these files beside the rollout:
-
-```text
-rollout-analysis-request.json
-rollout-analysis-response.json
-failure-analysis.md
-```
-
-Bind each file to the task, run, and rollout with its path, media type, byte size, and SHA-256. The readable summary should identify:
-
-- the verifier outcome and score;
-- the first observable failure;
-- every affected criterion or test;
-- the failure origin and evidence references;
-- the endpoint's status, category, legitimacy decision, and recommendation;
-- the request and response fingerprints; and
-- unresolved inputs or required reruns.
-
-These files are supporting artifacts. They do not replace `trajectory.atif.json`, `verifier.json`, `criterion-decisions.json`, native work products, or the reviewer-visible sections.
-
-See [Canonical ZIP layout](/gdpx/evaluation-bundle-upload#canonical-zip-layout) and [Rollout viewer evidence](/gdpx/rollout-viewer-evidence).
-
-## Errors
-
-| Status | Meaning | Action |
-| --- | --- | --- |
-| `400` | Invalid content type or JSON | Send one valid JSON object |
-| `401` | Missing or invalid API key | Supply a valid bearer key |
-| `403` | Key lacks the analysis scope | Request the correct scope |
-| `413` | Request exceeds the current limit | Create a faithful bounded projection; do not truncate canonical evidence |
-| `422` | Schema or evidence binding failed | Correct the reported request errors |
-| `429` | Rate limit exceeded | Follow `Retry-After` |
-| `502` | Judge response failed validation | Retry once when appropriate, then escalate |
-| `503` or `504` | Service unavailable or timed out | Retry after service recovery |
+An unresolved `needs_human_review` result also cannot be counted as a legitimate model failure. Supply the missing observable evidence or obtain a qualified review.

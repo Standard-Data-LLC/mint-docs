@@ -1,139 +1,61 @@
 ---
-title: "Evaluate and analyze benchmark tasks"
+title: "Evaluate and analyze tasks"
 sidebarTitle: "Evaluation and failure analysis"
-description: "Check task construction, calibrate the verifier, and analyze rollout failures and reward integrity."
-keywords: ["GDPx", "benchmark evaluation", "failure analysis", "reward integrity"]
+description: "Separate baseline checks, model outcomes, and execution failures on the exact task revision."
 ---
 
-Evaluate the exact bytes you plan to deliver. Any change to the instruction, environment, rubric, verifier, or source material creates a new revision, so rerun the applicable checks.
+Evaluate the exact task bytes you plan to deliver. Rerun affected checks after any change to the instruction, environment, source data, rubric, or verifier.
 
-## Authoring checks
+## Validate construction
 
-Run these checks before the four benchmark QC stages.
+| Check | Required evidence |
+| --- | --- |
+| Build and reset | The environment starts with the intended tools and files and returns to a clean state |
+| Oracle/reference | A known-good output receives the intended passing result |
+| Negative control | No-op or known-bad work fails for the expected reason |
 
-| Check | Expected result | Requirement |
-| --- | --- | --- |
-| Build and reset | The environment builds from delivered files and returns to a clean starting state | Required before QC1 |
-| Known-good solution | The reference output receives the intended passing score | Required when a reasonable reference can be supplied; otherwise document the equivalent solvability check |
-| No-op or known-bad output | Empty, irrelevant, or clearly wrong work fails | Required when applicable; otherwise document the equivalent negative control |
+Keep these runs under `qc/<run-id>/`. A documented equivalent solvability check can cover a task without an executable Oracle; do not label a placeholder or unexecuted reference as a passing Oracle.
 
-Authoring teams may call them G0, G1, and G2. Those are authoring checks, not QC0–QC2 or tracker stages.
+Preserve the verifier's native output. Current packages use `reward.txt`, `reward.json`, and supporting grader files. Follow that package's `tests/test.sh` and runtime contract instead of renaming reward files.
 
-For a direct GDPx Harbor delivery, the verifier writes `/logs/verifier/reward.json`. A capability-advertised adapter may accept and normalize its documented native verifier output. The canonical record must still include verifier evidence and criterion decisions that reproduce the score.
+## Read the attempt, not just the run status
 
-## Calibrate the verifier
+Use `run.json.results` to find individual outcomes, roles, scores, and trace references. A run marked `failed` may contain a scored task failure, a voided trial, or a runtime problem.
 
-Use deterministic checks wherever code can settle the question. Reserve a judge for criteria that require practitioner judgment.
+For each attempt, check:
 
-For every rubric criterion:
+- the run's `task_revision_id` against the task's exported `revision_id`;
+- the model and harness recorded in the run, not inferred from a folder label;
+- its attempt/role/trial identity and referenced trace;
+- verifier completion, score, threshold, and hard gates; and
+- native artifacts and any truncation or missing-evidence markers.
 
-- state one independently gradable claim;
-- identify the observable evidence needed to pass;
-- record the weight only when the aggregation rule uses weights;
-- define dependencies or hard gates explicitly; and
-- make the final numeric score and threshold-derived pass/fail outcome reproducible.
+A grader crash, provider error, or setup failure is not a scored model failure. Keep it as a diagnostic and exclude it from subject success rates.
 
-For weighted aggregation, the weights must sum to one. Unweighted and custom aggregation rules need their own deterministic reconciliation.
+## Analyze failures
 
-Calibrate against a known-good output and a known-bad output or equivalent negative control. If the task uses partial credit or a judge, add a partial-credit anchor. Then vary the wording and formatting without changing the substance: the score should stay stable. Add irrelevant detail: the score should not improve.
+Every failed attempt used in review needs an evidence-grounded explanation:
 
-## Calibrate difficulty
+1. Identify the first observable divergence and affected criteria or tests.
+2. Cite the exact trace, tool result, verifier output, or work product.
+3. Separate model behavior from task, verifier, environment, provider, and orchestration defects.
+4. Check solvability with the same context and tools.
+5. State uncertainty, required repair, and what must be rerun.
 
-Follow the written evaluation plan for target model tiers, harnesses, and attempt counts. GDPx does not use one universal pass-rate band for every task.
+Retain the analysis with that attempt. The [rollout-analysis endpoint](/gdpx/benchmark-rollout-analysis) is an optional structured first pass, not a QC decision. Keep its request, response, and fingerprints if you use it.
 
-Core benchmark items should separate performance at the intended frontier. Easier items can serve as anchors. Keep a zero-pass task only when it is demonstrably solvable and its criterion-level scores still provide useful signal.
+## Check reward integrity
 
-Before you make a difficulty claim, pin:
+Inspect passes as well as failures. Look for leaked answers, test edits, hardcoded outputs, reward-file manipulation, and judges that reward style over substance.
 
-- model and provider revision;
-- harness and harness version;
-- prompt and tool configuration;
-- sampling, context, budget, timeout, and retry policy;
-- environment and verifier versions; and
-- task-content and workspace-inventory identities.
+Retain confirmed exploits, exclude invalid passes from success rates, repair the verifier, and rerun the new revision. Do not change the scoring rule after seeing results without recording a new revision.
 
-QC3 attempt counts are defined on [Partner delivery](/gdpx/benchmark-task-delivery#qc3-benchmark-evaluation). Do not add the QC3 corpus to canonical `TASK.json`.
-
-## Analyze every failed attempt
-
-Every failed attempt used in review needs a readable failure analysis grounded in the retained evidence.
-
-Include:
-
-- the exact task, run, and rollout identity;
-- the first observable failure;
-- each affected test or rubric criterion;
-- exact trajectory, tool, test, or artifact references;
-- the failure origin: model, task, verifier, environment, provider, or orchestration;
-- whether a qualified practitioner could solve the task with the same context and tools;
-- confidence and any unresolved ambiguity; and
-- the smallest repair and required rerun, if applicable.
-
-For an optional structured first pass, use [Analyze a benchmark rollout](/gdpx/benchmark-rollout-analysis). Its response is not a QC decision. If you call it, keep the exact request, response, citations, and fingerprints with the same attempt.
-
-<Warning>
-  Never request, infer, retain, or expose private chain of thought. Base the analysis on observable messages, tool activity, state changes, artifacts, and verifier output.
-</Warning>
-
-## Use hints only as diagnostic probes
-
-A hint can test a suspected failure cause, but it must not reveal the solution.
-
-1. Identify the first likely failure from observable evidence.
-2. Write a hint that names the dimension to reconsider without naming the answer.
-3. Rerun the same pinned envelope.
-4. Record the hint, rationale, result, and interpretation.
-
-Hinted attempts are diagnostic only. They do not count toward the unhinted subject total.
-
-## Review reward integrity
-
-Inspect both passing and failed attempts. A suspicious pass may reveal:
-
-- test or verifier modification;
-- hardcoded expected outputs;
-- reward-file manipulation;
-- leakage from hidden material;
-- a pass without completing the intended work; or
-- a judge that rewards style instead of substance.
-
-Keep confirmed exploits as evidence, exclude them from reported success rates, repair the verifier, and rerun the new revision.
+Hints are diagnostic only: name a dimension to reconsider without revealing the answer, record the hint and outcome, and keep that run separate from unhinted subject attempts.
 
 ## Report distributions
 
-For each task or batch, report:
+Report counts by model–harness pair and failure origin, along with valid attempts, exclusions, unresolved cases, and reward-integrity findings.
 
-1. the failure taxonomy and review method;
-2. counts by failure origin and model;
-3. unresolved or human-review cases;
-4. reward-integrity findings and exclusions; and
-5. known limits of the evidence.
+Do not count `qc/` baselines, hints, duplicate retries, or invalid execution attempts as subject rollouts. A retried attempt counts only if it independently meets the campaign's validity rules.
 
-Leave ambiguous evidence unresolved rather than forcing it into a model-failure category.
-
-## Review the correct package
-
-### Partner source handoff
-
-Check that:
-
-- task identities map cleanly to native evidence;
-- every environment is reproducible and resettable;
-- each supplied attempt includes complete observable evidence and native work products;
-- each failed attempt has a failure-analysis summary;
-- source, rights, and sanitization information is present; and
-- the agreed adapter is confirmed before changing the source layout.
-
-### Canonical v3 bundle
-
-Check that:
-
-- the bundle follows the live capability response and linked schema;
-- canonical `TASK.json` contains no `rollouts` field;
-- each workspace and evidence file is inventoried and hash-bound;
-- each v1.1 `task_and_evidence` ZIP contains only one evaluation and one rollout per unique task;
-- for the same byte-identical retained canonical revision, `evidence_only` may retain one later attempt candidate only under operator direction; it requires separate operator admission and does not replace the qualifying QC1 anchor;
-- every criterion has exactly one decision; and
-- the reported and calculated scores reconcile.
-
-See [Task packaging](/gdpx/benchmark-task-package) for the format boundary and [Evaluation bundle upload](/gdpx/evaluation-bundle-upload) for the canonical API contract.
+Use [QC stages](/qc-stages-for-benchmark) for the evaluation plan and [Rollout evidence](/gdpx/rollout-viewer-evidence) for completeness checks. The number of folders in the repository does not establish sample size or pass@k.

@@ -1,7 +1,7 @@
 ---
 title: "Handle large evidence files"
 sidebarTitle: "Large evidence files"
-description: "Resolve missing export bytes, preserve native artifacts, and follow the actual upload limits."
+description: "Include complete evidence, preserve native artifacts, and follow the actual upload limits."
 ---
 
 A GDPx task folder can include large datasets, images, CAD files, and run artifacts. Keep them with the task and attempt they belong to; do not flatten or convert them to make the folder look smaller.
@@ -11,12 +11,11 @@ A GDPx task folder can include large datasets, images, CAD files, and run artifa
 | What you find | What to do |
 | --- | --- |
 | Native file | Preserve the original bytes and any recorded integrity metadata |
-| Git LFS pointer | Retrieve the file through authorized Git LFS access before running or grading |
-| `artifacts.SKIPPED.json` | Read the export omission, retrieve the required bundle through authorized access, and record unresolved gaps |
+| File pointer or omission notice | Include the actual file through the agreed delivery channel, or record it as missing |
 | Internal object reference | Treat it as provenance, not a public URL or proof that the bytes were delivered |
 | Truncated trace preview | Locate the complete retained observable evidence before claiming completeness |
 
-The size limit recorded in `artifacts.SKIPPED.json` belongs to that export. It is not the API's upload limit.
+Packaging or transfer-tool limits are separate from the API's upload limits.
 
 If required bytes are unavailable, mark the delivery incomplete. Do not replace them with empty files, summaries, invented hashes, or broken download links.
 

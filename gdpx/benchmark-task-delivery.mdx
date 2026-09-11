@@ -4,7 +4,7 @@ sidebarTitle: "Partner delivery"
 description: "Hand over the exact runnable package and the evidence behind its results."
 ---
 
-Deliver one task folder under its domain, following the [GDPx repository structure](/gdpx/quickstart#repository-layout). Keep task-specific runtime files and recorded evidence together.
+Deliver one folder per task, following the [task layout](/gdpx/quickstart#task-layout). Group batches by domain and keep each task's runtime files and recorded evidence together.
 
 ## Responsibilities
 
@@ -15,28 +15,28 @@ Deliver one task folder under its domain, following the [GDPx repository structu
 | Preserve supplied runs, traces, native artifacts, and failure analyses | Run or verify the required evaluation plan and make release decisions |
 | Repair defects and identify changed bytes | Review the new revision and accepted evidence |
 
-Do not fabricate exported `TASK.json` identities, run records, scores, or execution receipts. If your source does not yet have issued IDs, identify it as a new task and let intake assign them.
+Do not fabricate task identities, run records, scores, or execution receipts. If your source does not yet have issued IDs, identify it as a new task and let intake assign them.
 
 ## Handoff checklist
 
-- Pin the task revision and repository commit or source ZIP hash.
+- Pin the task revision and source package hash.
 - Include `task.toml`, instructions, environment, tests, reference material, and any declared steps.
 - Identify private images, external data, tools, rights, and required runtime configuration.
 - Keep Oracle/no-op checks in `qc/` and model attempts in `rollouts/`.
 - Preserve every supplied attempt's record, trace, verifier output, and native work products.
 - Include an evidence-grounded explanation for failed attempts used in review.
-- Retrieve required LFS and skipped artifacts, or mark the handoff incomplete.
+- Include every required artifact's actual bytes, or mark the handoff incomplete.
 - Remove secrets and private reasoning; keep protected grading material out of the agent environment.
 
-A repository listing or `status: draft` is not a passing QC result. Check actual trial evidence and the review decision.
+A file inventory or `status: draft` is not a passing QC result. Check actual trial evidence and the review decision.
 
 ## Choose the delivery path
 
 **Source delivery:** hand over the task folders and complete evidence through the agreed channel. Preserve native filenames and source provenance.
 
-**Direct API delivery:** build a separate canonical bundle using [API bundle upload](/gdpx/evaluation-bundle-upload). A repository ZIP does not satisfy that contract by itself.
+**Direct API delivery:** build a separate canonical bundle using [API bundle upload](/gdpx/evaluation-bundle-upload). A task-folder ZIP does not satisfy that contract by itself.
 
-For multi-run campaigns, retain the whole current-revision corpus in the source layout. Do not apply the API's one-rollout-per-task-per-bundle limit to the repository.
+For multi-run campaigns, retain all current-revision evidence in the source layout. The API's one-rollout-per-task-per-bundle limit does not limit what you retain with the task.
 
 ## Review and release
 

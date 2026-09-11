@@ -6,7 +6,7 @@ description: "Prepare a task, inspect its evidence, and choose the right deliver
 
 ## 1. Start with the task folder
 
-Use the [GDPx repository](https://github.com/Standard-Data-LLC/gdpx) as the structural reference. Locate `<domain>/<task-name>/` through `INDEX.json`, then read its `TASK.json`, `task.toml`, instruction, and any task-specific README.
+Prepare one folder per task using the [task layout](/gdpx/quickstart#task-layout). Include `task.toml`, the instruction, environment, tests, and reference material. Preserve any supplied task/revision metadata.
 
 Keep the exact runnable package intact. Fix missing dependencies or placeholder reference material before claiming that it is ready to run.
 
@@ -26,12 +26,12 @@ Changing task, environment, rubric, or verifier bytes creates a new revision. Do
 
 | Goal | Interface |
 | --- | --- |
-| Browse current task packages and exported evidence | [GDPx repository](https://github.com/Standard-Data-LLC/gdpx) |
+| Prepare task files and evidence | [Task packaging](/gdpx/benchmark-task-package) |
 | Get feedback on one task document | [`POST /v1/evaluate`](/gdpx/audit-endpoint) |
 | Analyze one bounded, observable attempt | [`POST /v1/benchmark-rollout-analyses`](/gdpx/benchmark-rollout-analysis) |
 | Submit a canonical Audit draft or evidence bundle | [`POST /api/v3/gdpx-submissions`](/gdpx/evaluation-bundle-upload) |
 
-Neither feedback endpoint imports tasks or advances QC. A repository export is not a direct API submission; normalization must preserve its identities and evidence.
+Neither feedback endpoint imports tasks or advances QC. Direct submission requires the API bundle format, with verified task identity and evidence bindings.
 
 ## 5. Deliver for review
 

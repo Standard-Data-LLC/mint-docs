@@ -4,14 +4,13 @@ description: "Read the Harbor task, model rollouts, and Oracle/no-op evidence in
 sidebarTitle: "Task format"
 ---
 
-Start with the [GDPx repository](https://github.com/Standard-Data-LLC/gdpx). It groups tasks by domain and keeps each task's runtime and recorded evidence together.
+Package each task in its own folder, with its runtime files and recorded evidence together. For a batch, group task folders by domain.
 
-## Repository layout
+## Task layout
 
 ```text
-INDEX.json
-<domain>/<task-name>/
-├── TASK.json
+<task-name>/
+├── TASK.json                      # source metadata, when supplied
 ├── task.toml
 ├── instruction.md
 ├── environment/
@@ -28,12 +27,11 @@ INDEX.json
     └── artifacts/
 ```
 
-Some exports have an `artifacts.SKIPPED.json` record instead of downloaded artifacts. Some large files use Git LFS. Neither is a substitute for the actual evidence bytes.
+Add `rollouts/` and `qc/` records as runs become available. Include the actual evidence files, not pointers or omission notices.
 
 | Path | What it contains |
 | --- | --- |
-| `INDEX.json` | Task locations, rollout-run counts, QC-run counts, and solution presence |
-| `TASK.json` | Exported organization, task/revision identity, source-package provenance, and run IDs |
+| `TASK.json`, when supplied | Source task/revision identity, provenance, and associated run IDs |
 | `task.toml` | Harbor runtime configuration and task metadata |
 | `instruction.md` | The instruction shown to the agent |
 | `environment/` | Build configuration, tools, and starting files |
@@ -42,27 +40,27 @@ Some exports have an `artifacts.SKIPPED.json` record instead of downloaded artif
 | `rollouts/` | Model runs on this revision, grouped by model–harness pair |
 | `qc/` | Oracle and no-op baseline runs, kept out of model success rates |
 
-Domain folders include `biology`, `cybersecurity`, `finance`, `finance-onefinnet`, `hardware-engineering`, `healthcare`, `legal`, and `ml-and-infrastructure-engineering`. Read identity from metadata; a folder name is not a task or revision ID.
+For a new task, provide its name, domain, source, and scoring intent in the task metadata. Preserve issued task and revision IDs when available; do not invent them or treat folder names as server IDs.
 
 ## The runnable task
 
-Run the Harbor package inside the task folder, not the whole repository. Keep task-specific supporting files and any declared `steps/` tree intact. Use the package's `task.toml` and any task-specific README for runtime requirements; [Harbor's task reference](https://www.harborframework.com/docs/tasks) explains the runtime fields.
+Run Harbor against the individual task folder. Keep task-specific supporting files and any declared `steps/` tree intact. Use `task.toml` and any task-specific README for runtime requirements; [Harbor's task reference](https://www.harborframework.com/docs/tasks) explains the runtime fields.
 
-Repository presence does not prove readiness. A solution may be a placeholder, a dependency may need authorized retrieval, and a run may be incomplete. Check the [package](/gdpx/benchmark-task-package) and [QC evidence](/qc-stages-for-benchmark) before using a task.
+A complete-looking folder does not prove readiness. Verify that dependencies are available, the reference check passes, and run evidence is complete. Use the [package checklist](/gdpx/benchmark-task-package) and [QC requirements](/qc-stages-for-benchmark).
 
 ## Read a result
 
-1. Read `TASK.json` for the exact revision and run IDs.
+1. Identify the exact task revision and run from the supplied metadata.
 2. Open that run's `run.json` for configuration, status, and individual results.
 3. Follow each result to its trace and native artifacts.
 4. Separate scored model attempts from Oracle, baseline, and failed infrastructure attempts.
 
-One run can contain several trials. `INDEX.json` counts runs, not completed subject attempts.
+One run can contain several trials. Count individual valid subject attempts, not run folders.
 
-## Repository format versus API format
+## Task package versus API bundle
 
-The repository is a task-and-evidence export. It is **not** the ZIP contract for `POST /api/v3/gdpx-submissions`.
+This task-and-evidence layout is for authoring and handoff. It is **not** the ZIP contract for `POST /api/v3/gdpx-submissions`.
 
-In particular, repository `TASK.json` is provenance metadata and may contain `runs`. The API's canonical `TASK.json` is a different, strict task document; API run records live under `evaluations/`.
+Source metadata named `TASK.json` may contain `runs`. The API's canonical `TASK.json` is a different, strict task document; API run records live under `evaluations/`.
 
-Use [Task packaging](/gdpx/benchmark-task-package) for the repository structure and [API bundle upload](/gdpx/evaluation-bundle-upload) only when building a direct API submission. Do not zip the repository and assume the API accepts it unchanged.
+Use [Task packaging](/gdpx/benchmark-task-package) to prepare the task and [API bundle upload](/gdpx/evaluation-bundle-upload) when submitting directly. Build and validate the API bundle before uploading; do not send the task folder unchanged.

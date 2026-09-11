@@ -24,7 +24,7 @@ Use `run.json.results` to find individual outcomes, roles, scores, and trace ref
 
 For each attempt, check:
 
-- the run's `task_revision_id` against the task's exported `revision_id`;
+- the run's `task_revision_id` against the task's recorded revision;
 - the model and harness recorded in the run, not inferred from a folder label;
 - its attempt/role/trial identity and referenced trace;
 - verifier completion, score, threshold, and hard gates; and
@@ -58,4 +58,4 @@ Report counts by model–harness pair and failure origin, along with valid attem
 
 Do not count `qc/` baselines, hints, duplicate retries, or invalid execution attempts as subject rollouts. A retried attempt counts only if it independently meets the campaign's validity rules.
 
-Use [QC stages](/qc-stages-for-benchmark) for the evaluation plan and [Rollout evidence](/gdpx/rollout-viewer-evidence) for completeness checks. The number of folders in the repository does not establish sample size or pass@k.
+Use [QC stages](/qc-stages-for-benchmark) for the evaluation plan and [Rollout evidence](/gdpx/rollout-viewer-evidence) for completeness checks. Folder counts do not establish sample size or pass@k.

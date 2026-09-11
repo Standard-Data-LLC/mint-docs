@@ -18,7 +18,7 @@ It does **not** inspect a Harbor directory, check whether `task.toml` exists on 
 | Discover the API bundle contract | `GET /api/v3/gdpx/capabilities` |
 | Submit a canonical draft or task-and-evidence bundle | [`POST /api/v3/gdpx-submissions`](/gdpx/evaluation-bundle-upload) |
 
-The repository format is documented under [Task format](/gdpx/quickstart). Neither feedback endpoint imports that folder or approves a QC stage.
+Use [Task format](/gdpx/quickstart) to prepare the complete package. Neither feedback endpoint imports that folder or approves a QC stage.
 
 ## Configure access
 
@@ -37,7 +37,7 @@ Check the effective scopes. Successful authentication does not establish submiss
 
 ## Prepare the document
 
-Send one PDF, DOCX, Markdown, or JSON file, up to 10 MB decoded. Do not send a ZIP, raw rollout archive, or full repository.
+Send one PDF, DOCX, Markdown, or JSON file, up to 10 MB decoded. Do not send a ZIP, raw rollout archive, or full task package.
 
 You can submit the task instruction for an early review. For useful packaging and grading feedback, include the relevant runtime declaration, rubric, verifier behavior, and known-good evidence in the document. The service cannot discover files you did not provide.
 
